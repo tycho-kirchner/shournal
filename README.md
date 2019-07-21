@@ -16,7 +16,8 @@ regain valuable information beyond the plain command.
 
 shournal can be integrated pretty tight into the shell
 (currently only bash). Using it there is no need to type
-`shournal --exec $cmd` all the time - enable it once and forget about it,
+<code>shournal&nbsp;&#8209;&#8209;exec&nbsp;$cmd</code>
+all the time - enable it once and forget about it,
 until needed.
 For more details please refer to the
 [shell-integration-scripts](shell-integration-scripts/README.md).
@@ -82,8 +83,7 @@ shournal runs only on GNU/Linux.
   for huge files?
   No, because per default only certain parts of the file are hashed.
 * **What does the following message mean and how to get rid of it?**:
-  `fanotify_mark: failed to add path /foobar ... Permission denied `.
-
+  <code>fanotify_mark:&nbsp;failed&nbsp;to&nbsp;add&nbsp;path&nbsp;/foobar&nbsp;...&nbsp;Permission&nbsp;denied</code>.
   This message might be printed on executing a command with shournal.
   Most probably the administrator mounted a filesystem object for which you don't have
   permissions, thus you cannot *monitor* file events.
@@ -166,17 +166,20 @@ More options are available, see also
   *Packages lists*:
 
   Debian/Ubuntu:
-  `apt-get install g++ cmake make qtbase5-dev libqt5sql5-sqlite
-  uuid-dev libcap-dev uuid-runtime`
+  ```
+  apt-get install g++ cmake make qtbase5-dev libqt5sql5-sqlite uuid-dev libcap-dev uuid-runtime
+  ```
 
   Opensuse:
-  `zypper install gcc-c++ cmake make libqt5-qtbase-devel libQt5Sql5-sqlite
-  libuuid-devel libcap-devel uuidd`
+  ```
+  zypper install gcc-c++ cmake make libqt5-qtbase-devel libQt5Sql5-sqlite libuuid-devel libcap-devel uuidd
+  ```
 
   CentOS (note: CentOS 7 as of July 2019 only ships with gcc 4.8
   -> compile gcc >= 5.0 yourself):
-  `yum install gcc-c++ cmake make qt5-qtbase-devel libuuid-devel
-  libcap-devel uuidd`
+  ```
+  yum install gcc-c++ cmake make qt5-qtbase-devel libuuid-devel libcap-devel uuidd
+  ```
 
 * In the source-tree-directory, enter the following commands to compile and install:
   ```
@@ -235,7 +238,7 @@ It must be setuid for two reaons:
   which has security-relevant consequences (e.g. mounting a new file to /etc/shadow) might not
   propagate to processes which run in other mount namespaces.
   To make sure mount-propagation applies, **all mounts, which carry setuid-binaries
-  or files they refer to, should be mounted *shared* **, or no (security-relevant)
+  or files they refer to, should be mounted *shared***, or no (security-relevant)
   mount/unmount events should occur, after the first shournal-process started.
   Shared mounts are the default in all recent distributions I know of.
   See also
