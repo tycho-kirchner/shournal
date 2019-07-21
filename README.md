@@ -24,7 +24,7 @@ For more details please refer to the
 In contrast to ptrace-based solutions (e.g. strace),
 shournal does *not* slow down the observed process(es) and
 consumes only a little amount of your precious cpu-time.
-See also [Technology](##Technology).
+See also [Technology](##technology).
 
 Please note that shournal is no reliable auditing-solution -
 it is for people who want to log/reproduce *their own work*.
