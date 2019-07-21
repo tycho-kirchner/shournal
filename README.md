@@ -24,7 +24,7 @@ For more details please refer to the
 In contrast to ptrace-based solutions (e.g. strace),
 shournal does *not* slow down the observed process(es) and
 consumes only a little amount of your precious cpu-time.
-See also [Technology](## Technology).
+See also [Technology](##Technology).
 
 Please note that shournal is no reliable auditing-solution -
 it is for people who want to log/reproduce *their own work*.
@@ -63,7 +63,9 @@ shournal runs only on GNU/Linux.
   by content (size, hash) and mtime, not by its name.
   For the name, `--wname` can be used.
   More concrete:
-  `shournal --exec bash -c 'echo foo > bar; mv bar bar_old'`
+  ```
+  shournal --exec sh -c 'echo foo > bar; mv bar bar_old'
+  ```
   Querying for bar_old by content (`--wfile`-option) yields exactly
   the given command, however, `--wname bar_old` does **not** work
   (`--wname bar` of course works). To use the bar_old *file name*
@@ -73,8 +75,9 @@ shournal runs only on GNU/Linux.
   Please read above rename/move-text first.
   Appending to a file is currently handled as if a new one was created -
   only the last command, which modified a given file can be found with
-  good certainty (by file **content**). However, querying by path/file**name** works;
-  if the file was appended *and* renamed, things get more complicated.
+  good certainty (by file **content**).
+  However, querying by path/file**name** works.
+  If the file was appended *and* renamed, things get more complicated.
 * **To track written files, they are hashed**. Doesn't this take very long
   for huge files?
   No, because per default only certain parts of the file are hashed.
@@ -87,8 +90,12 @@ shournal runs only on GNU/Linux.
   In this case you cannot perform file operations at this path
   anyway, so it should be safe to silence this warning by adding the
   path within the config-file in section `[mounts]`. If you want to ignore all
-  fanotify_mark permission errors, you can set the flag in section [mounts]
-  (ignore_no_permission = true)
+  fanotify_mark permission errors, you can set the flag in section
+  `[mounts]`:
+  ```
+  [mounts]
+  ignore_no_permission = true
+  ```
 
 
 ## Configuration
@@ -150,7 +157,7 @@ More options are available, see also
 
 * Install gcc >= 5.0. Other compilers might work but are untested.
 * Install cmake >=2.8.12 and make
-* for safe generation of uuids I recommend installing uuidd (uuid-runtime)
+* for safe generation of uuids it is recommend to install uuidd (uuid-runtime)
 * install qt-dev, uuid-dev, qt-sqlite-driver, Qt version >= 5.6.
   *With a little effort, shournal could be changed to
   support Qt version >= 5.3. Please open an issue, if that would
@@ -166,7 +173,8 @@ More options are available, see also
   `zypper install gcc-c++ cmake make libqt5-qtbase-devel libQt5Sql5-sqlite
   libuuid-devel libcap-devel uuidd`
 
-  CentOS (note: CentOS 7 as of July 2019 only ships with gcc 4.8 -> compile yourself):
+  CentOS (note: CentOS 7 as of July 2019 only ships with gcc 4.8
+  -> compile gcc >= 5.0 yourself):
   `yum install gcc-c++ cmake make qt5-qtbase-devel libuuid-devel
   libcap-devel uuidd`
 
