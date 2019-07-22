@@ -2,7 +2,7 @@
 # Bash integration for shournal
 
 For a general introduction to shournal's shell-integration
-please visit the [README](../README.md) of the above directory.
+please visit the [README](../) of the above directory.
 
 
 ## Setup
