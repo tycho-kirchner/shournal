@@ -5,7 +5,7 @@
 ## A (file-) journal for your shell
 
 Call a command and recursively monitor which files
-it modifies in an efficient manner.
+it modifies in an efficient and deterministic manner.
 
 shournal stores file properties, to find out later,
 how a given file was modified/created.
@@ -26,10 +26,6 @@ In contrast to ptrace-based solutions (e.g. strace),
 shournal does *not* slow down the observed process(es) and
 consumes only a little amount of your precious cpu-time.
 See also [Technology](#technology).
-
-Please note that shournal is no reliable auditing-solution -
-it is for people who want to log/reproduce *their own work*.
-Advanced users can easily circumvent it.
 
 shournal runs only on GNU/Linux.
 
