@@ -11,6 +11,8 @@ of the above directory.
 * Install shournal (obviously)
 * You'll need the location of shournal's shell integration shared library
  (libshournal-shellwatch.so) which is typically at `/usr/local/lib/shournal`
+* Download the [bash_integration.sh](./[bash_integration.sh]) (see above) and
+  put it into your favorite scripts-directory
 * Add the following **to the end** of your .bashrc:
   ```
   HISTCONTROL="ignoredups" # or anything other than "ignorespace" or "ignoreboth"
