@@ -217,7 +217,7 @@ More options are available, see also
 The linux-kernel's *fanotify* (not to be confused with the more popular
 *inotify*) is able to observe file-events for whole
 mountpoints. By unsharing the mount-namespace it is possible to monitor only
-the file-events of a given process and its children (but see [Caveats](##Caveats)).
+the file-events of a given process and its children (but see [Limitations](#limitations)).
 See also `man mount_namespaces` and fanotify.
 
 
