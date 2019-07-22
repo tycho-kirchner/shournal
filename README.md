@@ -15,12 +15,11 @@ regain valuable information beyond the plain command.
 
 
 shournal can be integrated pretty tight into the shell
-(currently only bash). Using it there is no need to type
+(currently only bash). Using the
+[shell-integration](shell-integration-scripts/README.md) there is no need to type
 <code>shournal&nbsp;&#8209;&#8209;exec&nbsp;$cmd</code>
 all the time - enable it once and forget about it,
 until needed.
-For more details please refer to the
-[shell-integration-scripts](shell-integration-scripts/README.md).
 
 In contrast to ptrace-based solutions (e.g. strace),
 shournal does *not* slow down the observed process(es) and
