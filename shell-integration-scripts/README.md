@@ -3,7 +3,9 @@
 
 ## TL;DR
 After setup, put `SHOURNAL_ENABLE` into your shell's rc (e.g. .bashrc)
-and log all configured file events, *without further ado*.
+and log all configured file events, *without further ado*.  
+
+* [Bash integration](https://github.com/tycho-kirchner/shournal/tree/master/shell-integration-scripts/bash)
 
 ## Requirements
 You are using a shell which is linked dynamically against (g)libc
@@ -115,12 +117,13 @@ below).
   there should be some mechanism to wait for the processes to finish,
   within the the interactive shell-session or a script.
 * For further limitations please also read the general
-  [README](../).
+  [README](https://github.com/tycho-kirchner/shournal).
 
 
 ## Supported shells
 
-Currently only *bash* is supported.
+Currently only
+[bash](https://github.com/tycho-kirchner/shournal/tree/master/shell-integration-scripts/bash) is supported.
 If you want your favorite shell to be integrated as well,
 please open an issue (don't forget to donate (: ) . Or, even better, send
 a pull-request.

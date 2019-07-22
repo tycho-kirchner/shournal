@@ -16,7 +16,8 @@ regain valuable information beyond the plain command.
 
 shournal can be integrated pretty tight into the shell
 (currently only bash). Using the
-[shell-integration](shell-integration-scripts) there is no need to type
+[shell-integration](https://github.com/tycho-kirchner/shournal/tree/master/shell-integration-scripts)
+there is no need to type
 <code>shournal&nbsp;&#8209;&#8209;exec&nbsp;$cmd</code>
 all the time - enable it once and forget about it,
 until needed.

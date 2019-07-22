@@ -2,7 +2,9 @@
 # Bash integration for shournal
 
 For a general introduction to shournal's shell-integration
-please visit the [README](../) of the above directory.
+please visit the
+[README](https://github.com/tycho-kirchner/shournal/tree/master/shell-integration-scripts)
+of the above directory.
 
 
 ## Setup
