@@ -76,6 +76,67 @@ other boilerplate-code would have been necessary.
   ```
 
 
+## Installation
+  * Install gcc >= 5.0. Other compilers might work but are untested.
+  * Install cmake >=2.8.12 and make
+  * for safe generation of uuids it is recommend to install uuidd (uuid-runtime)
+  * install qt-dev, uuid-dev, qt-sqlite-driver, Qt version >= 5.6.
+    *With a little effort, shournal could be modified to
+    support Qt version >= 5.3. Please open an issue, if that would
+    be helpful to you.*
+
+    *Packages lists*:
+
+    Debian/Ubuntu:
+    ```
+    apt-get install g++ cmake make qtbase5-dev libqt5sql5-sqlite uuid-dev libcap-dev uuid-runtime
+    ```
+
+    Opensuse:
+    ```
+    zypper install gcc-c++ cmake make libqt5-qtbase-devel libQt5Sql5-sqlite libuuid-devel libcap-devel uuidd
+    ```
+
+    CentOS (note: CentOS 7 as of July 2019 only ships with gcc 4.8
+    -> compile gcc >= 5.0 yourself):
+    ```
+    yum install gcc-c++ cmake make qt5-qtbase-devel libuuid-devel libcap-devel uuidd
+    ```
+
+  * In the source-tree-directory, enter the following commands to compile and install:
+    ```
+    mkdir -p build
+    cd build
+    cmake  .. # defaults to -DCMAKE_BUILD_TYPE=Release
+    make
+    # as root:
+    make install
+
+    ```
+  * Depending on your distribution, additional steps might be necessary to
+    enable the (recommended) uuidd-daemon. If systemd is in use, one may need to:
+    ```
+    systemctl enable uuidd
+    systemctl start uuidd
+    ```
+
+  * if you plan on using the shell-integration, you'll need the location of
+    `libshournal-shellwatch.so` which is typically within /usr/local/lib/shournal
+  * Add a group to your system, which is primarily needed for the shell-integration:
+
+    ```groupadd shournalmsenter```
+
+    However, *do not add any users to that group*. It is part of a permission check, where root adopts that gid (within shournal).
+    If you don't like the default group name, you can specify your own: at build time pass the following to cmake:
+
+    ```-DMSENTER_GROUPNAME=$your_group_name```
+
+  * Two executables were built: shournal and shournal-run. The latter is a setuid program, it has to be owned by root while having the setuid-bit set.
+    Typing `make install` as root does this automatically, to do so manually, enter as root:
+    ```
+    chown root shournal-run
+    chmod u+s  shournal-run
+    ```
 
 ## FAQ
 * **Does shournal track file rename/move operations?**<br>
@@ -116,8 +177,7 @@ other boilerplate-code would have been necessary.
   [mounts]
   ignore_no_permission = true
   ```
-
-
+  
 ## Configuration
 shournal stores a self-documenting config-file typically at
 ~/.config/shournal
@@ -170,71 +230,6 @@ More options are available, see also
 * For sshfs it is necessary, to add ```-o allow_root``` to the sshfs-options,
   otherwise permission errors during ```fanotify_mark``` are raised.
   See also: https://serverfault.com/a/188896
-
-
-## Installation
-(side note: below qt libraries are not for graphical purposes (: )
-
-* Install gcc >= 5.0. Other compilers might work but are untested.
-* Install cmake >=2.8.12 and make
-* for safe generation of uuids it is recommend to install uuidd (uuid-runtime)
-* install qt-dev, uuid-dev, qt-sqlite-driver, Qt version >= 5.6.
-  *With a little effort, shournal could be modified to
-  support Qt version >= 5.3. Please open an issue, if that would
-  be helpful to you.*
-
-  *Packages lists*:
-
-  Debian/Ubuntu:
-  ```
-  apt-get install g++ cmake make qtbase5-dev libqt5sql5-sqlite uuid-dev libcap-dev uuid-runtime
-  ```
-
-  Opensuse:
-  ```
-  zypper install gcc-c++ cmake make libqt5-qtbase-devel libQt5Sql5-sqlite libuuid-devel libcap-devel uuidd
-  ```
-
-  CentOS (note: CentOS 7 as of July 2019 only ships with gcc 4.8
-  -> compile gcc >= 5.0 yourself):
-  ```
-  yum install gcc-c++ cmake make qt5-qtbase-devel libuuid-devel libcap-devel uuidd
-  ```
-
-* In the source-tree-directory, enter the following commands to compile and install:
-  ```
-  mkdir -p build
-  cd build
-  cmake  .. # defaults to -DCMAKE_BUILD_TYPE=Release
-  make
-  # as root:
-  make install
-
-  ```
-* Depending on your distribution, additional steps might be necessary to
-  enable the (recommended) uuidd-daemon. If systemd is in use, one may need to:
-  ```
-  systemctl enable uuidd
-  systemctl start uuidd
-  ```
-
-* if you plan on using the shell-integration, you'll need the location of
-  `libshournal-shellwatch.so` which is typically within /usr/local/lib/shournal
-* Add a group to your system, which is primarily needed for the shell-integration:
-
-  ```groupadd shournalmsenter```
-
-  However, *do not add any users to that group*. It is part of a permission check, where root adopts that gid (within shournal).
-  If you don't like the default group name, you can specify your own: at build time pass the following to cmake:
-
-  ```-DMSENTER_GROUPNAME=$your_group_name```
-
-* Two executables were built: shournal and shournal-run. The latter is a setuid program, it has to be owned by root while having the setuid-bit set.
-  Typing `make install` as root does this automatically, to do so manually, enter as root:
-  ```
-  chown root shournal-run
-  chmod u+s  shournal-run
-  ```
 
 
 ## Technology
