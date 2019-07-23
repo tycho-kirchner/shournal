@@ -125,5 +125,5 @@ below).
 Currently only
 [bash](./bash) is supported.
 If you want your favorite shell to be integrated as well,
-please open an issue (don't forget to donate (: ) . Or, even better, send
+please open an issue. Or, even better, send
 a pull-request.
