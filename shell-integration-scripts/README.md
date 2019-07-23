@@ -5,7 +5,7 @@
 After setup, put `SHOURNAL_ENABLE` into your shell's rc (e.g. .bashrc)
 and log all configured file events, *without further ado*.  
 
-* [Bash integration](shournal/tree/master/shell-integration-scripts/bash)
+* [Bash integration](shell-integration-scripts/bash)
 
 ## Requirements
 You are using a shell which is linked dynamically against (g)libc
