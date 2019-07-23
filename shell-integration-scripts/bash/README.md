@@ -44,7 +44,7 @@ of the above directory.
   only possible, if all commands are saved to the history.
   Besides `HISTCONTROL` also
   other variables like `HISTIGNORE` or `HISTSIZE` must be set appropriately.
-  shournal's shell integration checks those variables and gives hints, if
+  shournal's bash integration checks those variables and gives hints, if
   there is need for action.
 * **Never** modify the PROMPT_COMMAND after enabling shournal
   (unless you know what you are doing (; )
