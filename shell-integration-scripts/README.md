@@ -3,24 +3,23 @@
 
 ## TL;DR
 After setup, put `SHOURNAL_ENABLE` into your shell's rc (e.g. .bashrc)
-and log all configured file events, *without further ado*.  
+and log all configured meta-data (file events, etc.), *without further ado*.  
 
 * [Bash integration](./bash)
 
-## Requirements
-You are using a shell which is linked dynamically against (g)libc
-(default case) and supported by shournal (see below).
-
-
 ## Motivation
 
-Having to type shournal before every single command one wants
-to observe can be tiresome. Another typing-overhead is introduced by using
-pipes or redirections. Consider the following example:
+For a general introduction about the meta-data *shournal* stores
+please visit the general [README](/../../).  
 
-    shournal --exec echo hi > foo
+Having to type *shournal* before every single command one wants
+to observe can be tiresome. Another typing-overhead would be
+introduced by using pipes or redirections.
+Consider the following **broken** example:
 
-As most shell users know the redirection applies to the whole command,
+    shournal --exec echo hi > foo    # Don't do this.
+
+As many shell users know the redirection applies to the whole command,
 while shournal itself only observes "echo hi". The file modification event ('hi'
   written to 'foo')
 is hence **not** tracked by shournal.
@@ -32,20 +31,28 @@ one must rather type
 That's annoying, right?
 
 Therefore before observing one or multiple commands,
-`source` the respective integration-file within your shell's rc (e.g. .bashrc)
-and type
+`source` the respective integration-file within your shell's rc
+(e.g. .bashrc) and type
 
     SHOURNAL_ENABLE
 
-That's (almost) all. Forget about shournal until needed ( e.g. you want to know how
-  a certain file was created).
+That's (almost) all. Forget about *shournal* until needed
+( e.g. you want to know how a certain file was created).
 
 
 Further options are currently  
 `SHOURNAL_DISABLE` (disable the observation) and  
 `SHOURNAL_SET_VERBOSITY` to change the default verbostiy ("dbg, info, warning, critical").
 For dbg, shournal must have been compiled with debugging symbols. A verbosity higher than
-warning is not recommended.
+*warning* is not recommended.
+
+## Requirements
+The shell must be
+[supported by shournal](#supported-shells)
+and linked dynamically against (g)libc
+(default case, can be tested e.g. with<br>
+`file $(which bash) | grep "dynamically linked"` )
+
 
 ## Updates
 If the shell-integration is running while shournal is updated, it becomes necessary,
@@ -53,7 +60,7 @@ to restart your shell. A more elegant way than logout-login might be to `exec` y
 
 
 ## FAQ
-* **Obtaining the value of variables**.  
+* **How to obtain the value of variables?**.<br>
   If shell-variables are used within a command, shournal's reports might
   not seem to be very helpful. However, the shell-integration assigns
   each shell-session a unique identifier (uuid).
@@ -62,7 +69,7 @@ to restart your shell. A more elegant way than logout-login might be to `exec` y
   This of course only works, if SHOURNAL_ENABLE was called, *before*
   a variable was assigned. Example:  
   `shournal --query --shell-session-id 'L/932KZTEemRB/dOGB9LOA==' | grep var_name`
-* **What about new shell-sessions**?  
+* **What about new, nested shell-sessions**?<br>
   By *new shell-sessions* it is meant to call e.g. `bash` within an already
   running bash-process. What happens next really depends on whether the
   shell is itself "observed" by shournal or not (e.g. whether
@@ -74,6 +81,8 @@ to restart your shell. A more elegant way than logout-login might be to `exec` y
   file-modifications caused by that process will yield the plain
   shell-command (and not individual commands possibly entered
   within the new shell session).
+
+
 
 
 ## Technology
@@ -88,7 +97,7 @@ mount-namespace common to the whole *command sequence*.
 The so executed program is **not** using shournal's LD_PRELOAD'ed
 library any more, so the observation also works for
 statically linked executables.  
-The observed shell communicates with an external shournal-run-process
+The observed shell communicates with an external *shournal-run*-process
 via a socket. To not interfere with the file-descriptors, the shell creates,
 this socket is the highest allowed (free) descriptor (typically 1023).
 The observation of external processes continues until all instances

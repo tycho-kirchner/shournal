@@ -4,57 +4,81 @@
 
 ## A (file-) journal for your shell
 
-Call a command and recursively monitor which files
-it modifies in an efficient and deterministic manner.
+#### What is it (good for)?
+*TL;DR*:
+* **Integrated tool** to increase the reproducibility of your work
+  on the shell:  what did you do when and where and what files were modified.
+* **Stand-alone tool** to monitor file events of a command/process (tree),
+  similar to <br>
+  `strace -e close $cmd`
+  but **a lot** faster.
 
-shournal stores file properties, to find out later,
-how a given file was modified/created.
+*More details please*:  
 
-It can collect scripts or other *read* files during execution to
-regain valuable information beyond the plain command.
+Using your shell's history is nice. But sometimes you want more:
+* What files were modified by a command? Or reverse: What shell-command(s)
+  were used to create/modify a certain file?
+* You executed a script. What was the script-content by the time it was called?
+* What other commands were executed during the same shell-session?
+* What about working directory, command start- and end-time or the
+  exit status ($?) ?
 
+*shournal* provides the answer to these questions while
+causing only a negligible overhead.   
+Besides its ability to monitor a whole process tree for file
+events it can be integrated really tight into the shell -
+you won't even notice it (;  
+See also: [shell-integration](./shell-integration-scripts)
 
-shournal can be integrated pretty tight into the shell
-(currently only bash). Using the
-[shell-integration](./shell-integration-scripts)
-there is no need to type
-<code>shournal&nbsp;&#8209;&#8209;exec&nbsp;$cmd</code>
-all the time - enable it once and forget about it,
-until needed.
-
-In contrast to ptrace-based solutions (e.g. strace),
-shournal does *not* slow down the observed process(es) and
-consumes only a little amount of your precious cpu-time.
-See also [Technology](#technology).
-
-shournal runs only on GNU/Linux.
+*shournal* runs only on GNU/Linux.
 
 
 ## Examples
+Please note: below examples make use of the
+[shell-integration](./shell-integration-scripts).<br>
+Otherwise `shournal --exec $cmd` and
+other boilerplate-code would have been necessary.
 
-* Create a file and ask shournal, how it was created:
+* Create a file and ask shournal, how it came to be:
   ```
-  $ shournal --exec sh -c 'echo hi > foo'
+  $ SHOURNAL_ENABLE # monitor all commands using the shell-integration
+  $ echo hi > foo
   $ shournal --query --wfile foo
-  Command id 1 returned 0 - 14.05.19 10:19 : sh -c echo hi > foo
+  Command id 1 returned 0 - 14.05.19 10:19 : echo hi > foo
     Written file(s):
        /home/user/foo (3 bytes) Hash: 15349503233279147316
 
   ```
-* shournal can be configured, to store specific read files, like shell-scripts,
+* shournal can be configured, to store *specific* read files, like shell-scripts,
   within it's database. An unmodified file occupies space only once.
   ```
-  $ shournal -e ./test.sh
+  $ ./test.sh
   $ shournal -q --history 1
   Command id 2 returned 0 - 14.05.19 14:01 : ./test.sh
     Read file(s):
        /home/user/test.sh (213 bytes) id 1
+           #!/usr/bin/env bash
+           echo 'Hello world'
+
+  ```
+* What commands were executed at the current working directory?
+  ```
+  shournal --query --command-working-dir "$PWD"
+  ```
+* What commands were executed within a specific shell-session? The
+  uuid can be taken from the command output of a previous query.
+  ```
+  shournal --query --shell-session-id $uuid
+  ```
+* For the full list of query-options, please enter
+  ```
+  shournal --query --help
   ```
 
 
 
 ## FAQ
-* **Does shournal track file rename/move operations?**
+* **Does shournal track file rename/move operations?**<br>
   No, but most often it should not be a problem. Using the
   `--wfile` commandline-query-option, shournal finds the stored command
   by content (size, hash) and mtime, not by its name.
@@ -68,18 +92,18 @@ shournal runs only on GNU/Linux.
   (`--wname bar` of course works). To use the bar_old *file name*
   (and not content) as basis for a successful query, in this case
   `--command-text -like '%bar_old%'` can be used.
-* **What happens to an appended file?** How to get a "modification history"?
+* **What happens to an appended file?**<br>
+  How to get a "modification history"?
   Please read above rename/move-text first.
   Appending to a file is currently handled as if a new one was created -
   only the last command, which modified a given file can be found with
   good certainty (by file **content**).
   However, querying by path/file**name** works.
   If the file was appended *and* renamed, things get more complicated.
-* **To track written files, they are hashed**. Doesn't this take very long
-  for huge files?
+* **To track written files, they are hashed. Is that slow for big files?**<br>
   No, because per default only certain parts of the file are hashed.
-* **What does the following message mean and how to get rid of it?**:
-  <code>fanotify_mark:&nbsp;failed&nbsp;to&nbsp;add&nbsp;path&nbsp;/foobar&nbsp;...&nbsp;Permission&nbsp;denied</code>.
+* **What does the following message mean and how to get rid of it?**:<br>
+  `fanotify_mark: failed to add path /foobar ... Permission denied`.
   This message might be printed on executing a command with shournal.
   Most probably the administrator mounted a filesystem object for which you don't have
   permissions, thus you cannot *monitor* file events.
@@ -155,7 +179,7 @@ More options are available, see also
 * Install cmake >=2.8.12 and make
 * for safe generation of uuids it is recommend to install uuidd (uuid-runtime)
 * install qt-dev, uuid-dev, qt-sqlite-driver, Qt version >= 5.6.
-  *With a little effort, shournal could be changed to
+  *With a little effort, shournal could be modified to
   support Qt version >= 5.3. Please open an issue, if that would
   be helpful to you.*
 
