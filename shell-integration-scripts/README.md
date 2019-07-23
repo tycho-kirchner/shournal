@@ -117,7 +117,7 @@ below).
   there should be some mechanism to wait for the processes to finish,
   within the the interactive shell-session or a script.
 * For further limitations please also read the general
-  [README](../../shournal).
+  [README](/../../).
 
 
 ## Supported shells
