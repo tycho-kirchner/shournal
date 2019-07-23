@@ -3,7 +3,7 @@
 
 For a general introduction to shournal's shell-integration
 please visit the
-[README](https://github.com/tycho-kirchner/shournal/tree/master/shell-integration-scripts)
+[README](../../shell-integration-scripts)
 of the above directory.
 
 
