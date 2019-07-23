@@ -5,7 +5,7 @@
 After setup, put `SHOURNAL_ENABLE` into your shell's rc (e.g. .bashrc)
 and log all configured file events, *without further ado*.  
 
-* [Bash integration](shell-integration-scripts/bash)
+* [Bash integration](https://github.com/tycho-kirchner/shournal/tree/master/shell-integration-scripts/bash)
 
 ## Requirements
 You are using a shell which is linked dynamically against (g)libc
@@ -123,7 +123,7 @@ below).
 ## Supported shells
 
 Currently only
-[bash](https://github.com/tycho-kirchner/shournal/tree/master/shell-integration-scripts/bash) is supported.
+[bash](./bash) is supported.
 If you want your favorite shell to be integrated as well,
 please open an issue (don't forget to donate (: ) . Or, even better, send
 a pull-request.
