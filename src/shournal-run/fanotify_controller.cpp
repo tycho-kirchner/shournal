@@ -216,21 +216,30 @@ bool FanotifyController::handleEvents()
         // Read some events
         len = read(m_fanFd, buf, sizeof(buf));
         if (len == -1 && errno != EAGAIN) {
-            if(errno == EACCES){
-                // known issue...
-                logInfo << "read fan fd failed:"
+            const auto preamble = qtr("read from fanotify file descriptor failed:");
+            // TODO: file a bug to the fanotify-devs? According to man 7 fanotify
+            // there should be no permission check, when the kernel repoens the file
+            // for fanotify...
+            // Furthermore it is unclear whether other events in the queue after a
+            // bad fd are gone as well.
+            switch (errno) {
+            case ENOENT: break; // a deleted file is not of interest anyway. ignore.
+            case EACCES:
+                logInfo << preamble
                         << qtr("EACCES most likely occurred, because a not readable "
                                "file was closed on a NFS-storage, or similar.");
-            } else {
-                logWarning << "read fan fd failed " << "(" + QString::number(errno) + ") -"
+                break;
+            default:
+                logWarning << preamble << "(" + QString::number(errno) + ") -"
                             << translation::strerror_l();
+                break;
             }
             return false;
         }
 
         // Check if end of available data reached
-        if (len <= 0){
-            break;
+        if (len <= 0) {
+            return true;
         }
         logDebug << "read"
                  << static_cast<size_t>(len) / sizeof(fanotify_event_metadata) << "events";
@@ -267,7 +276,6 @@ bool FanotifyController::handleEvents()
     // maybe_todo: add option for small delay to allow for
     // the accumulation of events within fanotify
     //usleep(1000 * 10);
-    return true;
 }
 
 

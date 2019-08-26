@@ -1,12 +1,21 @@
 cmake_minimum_required(VERSION 2.8.12)
 
-project(shournal)
 
 # version applied to all released files: shournal, shournal-run, libshournal-shellwatch.so
 # and bash_integration.sh
-set(shournal_version "2.0")
+set(shournal_version "2.1")
 
-if(CMAKE_COMPILER_IS_GNUCC)
+# stay compatible with cmake-versions < 3.0 and don't really use the version-feature:
+if(CMAKE_VERSION VERSION_LESS "3.0")
+    set(CMAKE_PROJECT_VERSION ${shournal_version})
+    project(shournal LANGUAGES CXX)
+else()
+    cmake_policy( SET CMP0048 NEW )
+    project(shournal VERSION ${shournal_version} LANGUAGES CXX)
+endif()
+
+
+if(CMAKE_COMPILER_IS_GNUCXX)
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
         message(FATAL_ERROR "GCC version must be at least 5.0!")
     endif()
@@ -14,7 +23,7 @@ else()
     message(WARNING "You are using an unsupported compiler. Compilation was only tested with GCC.")
 endif()
 
-if ( CMAKE_COMPILER_IS_GNUCC )
+if ( CMAKE_COMPILER_IS_GNUCXX )
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wunused-result")
 endif()
 
@@ -27,7 +36,6 @@ if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
   endif()
 endif()
-
 
 
 IF(CMAKE_BUILD_TYPE MATCHES Release)
@@ -44,7 +52,7 @@ add_definitions( -DSHOURNAL_MSENTERGROUP="${MSENTER_GROUPNAME}")
 
 macro(use_cxx11)
   if (CMAKE_VERSION VERSION_LESS "3.1")
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if (CMAKE_COMPILER_IS_GNUCXX)
       set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
     endif ()
   else ()
@@ -56,7 +64,7 @@ use_cxx11()
 
 
 if (CMAKE_VERSION VERSION_LESS "3.3")
-    IF (NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" AND
+    IF (NOT  CMAKE_COMPILER_IS_GNUCXX AND
         NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
         message("Warning - cannot hide all symbols of libshournal.so.")
         message("Please upgrade cmake or use clang/gcc")
@@ -70,7 +78,7 @@ endif()
 
 function(hide_static_lib_symbols staticLib)
     if (CMAKE_VERSION VERSION_LESS "3.3")
-        IF ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR
+        IF ( CMAKE_COMPILER_IS_GNUCXX OR
             "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
         target_compile_options(${staticLib} PRIVATE "-fvisibility=hidden")
         ENDIF()
@@ -86,7 +94,7 @@ endfunction(hide_static_lib_symbols)
 # If cmake is too old, try to use compiler optinons directly or
 # print warning, if that also fails.
 # if (CMAKE_VERSION VERSION_LESS "3.3")
-#     IF ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR
+#     IF (CMAKE_COMPILER_IS_GNUCXX OR
 #         "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 #         SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
 #         set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
