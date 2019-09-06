@@ -2,6 +2,7 @@
 
 #include <climits>
 #include <cstdlib>
+#include <cassert>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -15,6 +16,37 @@
 #include "translation.h"
 #include "shell_request_handler.h"
 
+/// @return absolute version of the passed path or an empty string in case
+/// of an error.
+static std::string mkAbsPath(const char* path){
+    if(path[0] == '/'){
+        return path;
+    }
+    std::string buf(PATH_MAX, '\0');
+
+    char* rawBuf = strDataAccess(buf);
+    if(getcwd(rawBuf, buf.size()) == nullptr){
+        logWarning << qtr("Failed to resolve relative path %1. "
+                       "The working-directory could not be determined (%2). "
+                       "File events will not be registered.")
+                   .arg(path, translation::strerror_l());
+        return {};
+    }
+    if(rawBuf[0] != '/'){
+        // see also man 3 getcwd
+        logWarning << qtr("Failed to resolve relative path %1. "
+                       "The working-directory does not begin with '/' but %2. "
+                       "File events will not be registered.")
+                   .arg(path, rawBuf);
+        return {};
+    }
+
+    // resize to actual length
+    buf.resize(strlen(rawBuf));
+    buf += '/';
+    buf += path;
+    return buf;
+}
 
 int event_open::handleOpen(const char *pathname, int flags, mode_t mode, bool largeFile)
 {
@@ -39,19 +71,17 @@ int event_open::handleOpen(const char *pathname, int flags, mode_t mode, bool la
         return g_shell.orig_open(pathname, flags, mode);
     }
 
-    char buf[PATH_MAX + 1];
-    const char* actualPath;
-    if(pathname[0] == '/'){
-        actualPath = pathname;
-    } else {
-        if(realpath(pathname, buf) == nullptr){            
-            logInfo << qtr("Failed to resolve relative path %1 (%2). "
-                           "File events will not be registered.")
-                       .arg(pathname, translation::strerror_l());
-            return g_shell.orig_open(pathname, flags, mode);
-        }
-        actualPath = buf;
+    const auto absPath = mkAbsPath(pathname);
+    if(absPath.size() < 2){
+        // Get here on mkAbsPath-error or because user attempted to open "/" or ""
+        // The shortest possible absolute FILEpath under linux is two chars long.
+        // We may get here, if bash-user calls e.g.
+        // while read line; do echo $line ; done < "/"
+        logDebug << "no valid path" << absPath;
+        return g_shell.orig_open(pathname, flags, mode);
     }
-    return openat(g_shell.shournalRootDirFd, actualPath + 1, flags, mode);
+    // pass the resolved abs. path relative to shournal's root directory fd,
+    // by omitting the initial '/'.
+    return openat(g_shell.shournalRootDirFd, absPath.c_str() + 1, flags, mode);
 }
 

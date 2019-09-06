@@ -129,13 +129,16 @@ private:
         auto dbCleanup = finally([] { db_connection::close(); });
         QVERIFY(cmdIter->next());
         QCOMPARE(cmdIter->value().text, QString::fromStdString(cmd));
+        QVERIFY(QFile(QString::fromStdString(fpath)).remove());
     }
 
 private slots:
     void testWrite() {
         auto pTmpDir = testhelper::mkAutoDelTmpDir();
+        auto tmpDirPath = pTmpDir->path().toStdString();
 
-        std::string filepath = pTmpDir->path().toStdString() + "/f1";
+
+        std::string filepath = tmpDirPath + "/f1";
         std::vector<std::string> cmds {
                     "echo '%' > " + filepath, // percent unveiled a printf format bug in shournal 0.7
                     "(echo foo2 ) > " + filepath,
@@ -147,6 +150,10 @@ private slots:
                     "(echo foo8 > " + filepath + ") & wait",
                     "/bin/echo foo9 > " + filepath + " & wait",
                     "sh -c 'echo foo10 > " + filepath + " & wait'",
+                    // relative paths must also work:
+                    "cd " + tmpDirPath + "; echo hi > f1",
+                    "cd " + tmpDirPath + "; echo hi > ./f1",
+                    "cd " + tmpDirPath + "; echo hi > ../" + splitAbsPath(tmpDirPath).second + "/f1",
         };
 
         const auto setupCmd = AutoTest::globals().integrationSetupCommand;
