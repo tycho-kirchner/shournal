@@ -19,6 +19,14 @@
 
 #include "exccommon.h"
 
+#define DISABLE_MOVE(Class) \
+    Class(const Class &&) Q_DECL_EQ_DELETE;\
+    Class &operator=(Class &&) Q_DECL_EQ_DELETE;
+
+#define DEFAULT_MOVE(Class) \
+    Class(Class &&) noexcept Q_DECL_EQ_DEFAULT;\
+    Class &operator=(Class &&) noexcept Q_DECL_EQ_DEFAULT ;
+
 bool readLineInto(QTextStream& stream, QString *line, qint64 maxlen = 0);
 
 
@@ -57,7 +65,9 @@ QDebug& operator<<(QDebug& out, const std::string& str);
 
 /// Common functions to get raw data access for std::string and QByteArray
 char* strDataAccess(std::string& str);
+const char* strDataAccess(const std::string& str);
 char* strDataAccess(QByteArray& str);
+const char* strDataAccess(const QByteArray& str);
 
 int indexOfNonWhiteSpace(const QString& str);
 
@@ -181,8 +191,7 @@ QString absPath(const QString& path);
 /// to target-type and return true
 /// on success
 template<typename T>
-bool qVariantTo(QVariant var, T* result)
-{
+bool qVariantTo(QVariant var, T* result) {
     if(! var.convert(qMetaTypeId<T>())){
         return false;
     }
@@ -190,6 +199,8 @@ bool qVariantTo(QVariant var, T* result)
     return true;
 }
 
+// Don't forget to register converter functions when adding more types...
+bool qVariantTo(const std::string& str, QString* result);
 
 class ExcQVariantConvert : public QExcCommon
 {
@@ -229,12 +240,15 @@ T qVariantTo_throw(const QVariant& src, bool collectStacktrace=true){
 template<typename T>
 T qVariantTo_throw(const std::string& src, bool collectStacktrace=true ){
     T dst;
-    qVariantTo_throw(QVariant::fromValue(src), &dst, collectStacktrace);
+    if(! qVariantTo(src, &dst)){
+        // this should never happen, because of having
+        // specialized for std::string...
+        QString mesg = qtr(
+                    "Failed to convert std::string to target type.");
+        throw ExcQVariantConvert(mesg, collectStacktrace);
+    }
     return dst;
 }
-
-
-
 
 
 QByteArray make_uuid(bool *madeSafe=nullptr);

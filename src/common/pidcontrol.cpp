@@ -66,8 +66,7 @@ pidcontrol::parseRealUidOf(int procDirFd){
     if(uid.empty()){
         return {};
     }
-    return {qVariantTo_throw<uid_t>(uid)};
-    //return NullableValue<uid_t>(qVariantTo_throw<uid_t>(uid));
+    return {qVariantTo_throw<uid_t>(QByteArray::fromStdString(uid))};
 }
 
 

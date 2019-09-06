@@ -12,7 +12,7 @@
 #include <vector>
 #include <QVector>
 #include <deque>
-#include <signal.h>
+#include <csignal>
 #include <QtGlobal>
 
 #include "excos.h"
@@ -146,7 +146,8 @@ template <class Str_t>
 Str_t readStr(int fd, size_t nbytes, bool retryOnInterrupt=false);
 
 size_t recvmsg (int fd, struct msghdr *message, int flags=0);
-void rename(const std::string & old, const std::string & new_);
+template <class Str_t>
+void rename(const Str_t & old, const Str_t & new_);
 
 size_t sendmsg (int fd, const struct msghdr *message,
             int flags=0);
@@ -161,6 +162,10 @@ void setegid(gid_t gid);
 
 void setpriority(int which, id_t who, int prio);
 
+template <class Str_t>
+void setenv(const Str_t& name, const Str_t& value,
+            bool overwrite=true);
+
 void seteuid(uid_t uid);
 void setuid (uid_t uid);
 
@@ -174,6 +179,8 @@ int sigwait(const sigset_t *set);
 void sigfillset(sigset_t *set);
 
 sighandler_t signal(int sig, sighandler_t handler);
+
+void symlink(const char *target, const char *linkpath);
 
 SocketPair_t socketpair (int domain, int type_, int protocol=0);
 
@@ -281,3 +288,22 @@ Str_t os::readStr(int fd, size_t nbytes, bool retryOnInterrupt)
     return buf;
 }
 
+
+/// @throws ExcOs
+template <class Str_t>
+void os::rename(const Str_t & old, const Str_t & new_){
+    if(::rename(strDataAccess(old), strDataAccess(new_)) == -1){
+        throw ExcOs("rename failed");
+    }
+}
+
+/// @throws ExcOs
+template <class Str_t>
+void os::setenv(const Str_t &name, const Str_t &value, bool overwrite)
+{
+    // in contrast to putenv, setenv makes copies of the passed
+    // string, so we are safe, when value-string goes out of scope
+    if(::setenv(strDataAccess(name), strDataAccess(value), int(overwrite)) == -1){
+         throw ExcOs("setenv failed");
+    }
+}

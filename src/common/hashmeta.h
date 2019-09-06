@@ -1,16 +1,16 @@
 #pragma once
 
 #include <qglobal.h>
-#include <stddef.h>
+#include <cstddef>
 
 struct HashMeta
 {
     typedef int size_type;
 
-    HashMeta();
+    HashMeta() = default;
     HashMeta(size_type chunks, size_type maxCountOfR);
-    size_type chunkSize;
-    size_type maxCountOfReads;
+    size_type chunkSize {};
+    size_type maxCountOfReads {};
 
     bool isNull() const;
 

@@ -1,6 +1,7 @@
 
 #include <sys/socket.h>
 #include <cassert>
+#include <cstdlib>
 #include <QCoreApplication>
 #include <dirent.h>
 
@@ -140,24 +141,14 @@ void updateVerbosityFromEnv(){
 /// Shells usually start at low numbers for internal file descriptors (usually 10),
 /// we try to find the highest possible free fd
 /// If startFd != -1, start searching from that.
-int findHighestFreeFd(int startFd=-1){
-    int fd = (startFd == -1) ? static_cast<int>(osutil::getMaxCountOpenFiles() -1)
-                             : startFd;
-    // the shell needs some fds for its own. Actually 30 is quite low already
-    for(; fd > 30; --fd) {
-        if(fd == 255 ){ // that one is usually reserved
-            continue;
-        }
-        if(! osutil::fdIsOpen(fd)){
-            return fd;
-        }
-        logDebug << qtr("fd %1 already open. Trying a lower "
-                       "fd instead...").arg(fd);
+int verbose_findHighestFreeFd(int startFd=-1){
+    int fd = osutil::findHighestFreeFd(startFd, 30);
+    if(fd == -1){
+        logWarning << qtr("Could not find a free file descriptor number. "
+                          "The max. number of open files for this process is %1.")
+                      .arg(osutil::getMaxCountOpenFiles());
     }
-    logWarning << qtr("The max number of open files for this shell-process is too low. "
-                      "Please increase it."
-                      );
-    return -1;
+    return fd;
 }
 
 
@@ -189,11 +180,11 @@ void handlePrepareCmd(){
     g_shell.shournalSocket.setSockFd(-1);
 
     try {
-        g_shell.shournalSocketNb = findHighestFreeFd();
+        g_shell.shournalSocketNb = verbose_findHighestFreeFd();
         if( g_shell.shournalSocketNb == -1){
             return;
         }
-        g_shell.shournalRootDirFd = findHighestFreeFd(g_shell.shournalSocketNb - 1);
+        g_shell.shournalRootDirFd = verbose_findHighestFreeFd(g_shell.shournalSocketNb - 1);
         if( g_shell.shournalRootDirFd == -1){
             return;
         }
@@ -216,7 +207,23 @@ void handlePrepareCmd(){
         subprocess::Subprocess subproc;
         subproc.setInNewSid(true); // Survive parent shell exit
         // Pass the socket to the external shournal process for communication purposes.
-        subproc.setForwardFdsOnExec({ sockets[0]});
+        std::unordered_set<int> forwardFs {sockets[0]};
+        if(app::inIntegrationTestMode()){
+            const char* pipeFdStr = getenv("_SHOURNAL_INTEGRATION_TEST_PIPE_FD");
+            if(pipeFdStr == nullptr){
+                QIErr() << "app is set to integration test mode, but pipe-fd is not set...";
+            } else {
+                int pipeFd = qVariantTo_throw<int>(QByteArray(pipeFdStr));
+                if(! osutil::fdIsOpen(pipeFd)){
+                    QIErr() << "_SHOURNAL_INTEGRATION_TEST_PIPE_FD set in env "
+                               "but fd" << pipeFd <<  "is not open";
+                } else {
+                    forwardFs.insert(pipeFd);
+                }
+            }
+        }
+
+        subproc.setForwardFdsOnExec(forwardFs);
         subproc.call(args);
 
         os::close(sockets[0]);

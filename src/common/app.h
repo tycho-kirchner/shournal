@@ -13,6 +13,7 @@ void setupNameAndVersion();
 bool inIntegrationTestMode();
 
 const QVersionNumber& version();
+const QVersionNumber& initialVersion();
 
 
 }

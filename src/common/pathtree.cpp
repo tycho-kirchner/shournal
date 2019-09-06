@@ -333,7 +333,7 @@ bool PathTree::isParentPath(const std::string &path, bool allowEquals) const {
     return dir->isEnd && allowEquals;
 }
 
-///  @return true, if param path is subpath of any previously inserted paths
+/// @return true, if param path is subpath of any previously inserted paths
 /// or the same, if allowEquals=true
 bool PathTree::isSubPath(const std::string &path, bool allowEquals) const {
     auto node = m_rootDir;

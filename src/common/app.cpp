@@ -51,3 +51,9 @@ const QVersionNumber &app::version()
     static const QVersionNumber v = QVersionNumber::fromString(SHOURNAL_VERSION);
     return v;
 }
+
+const QVersionNumber &app::initialVersion()
+{
+    static const QVersionNumber v = QVersionNumber{0, 1}; // first version ever;
+    return v;
+}

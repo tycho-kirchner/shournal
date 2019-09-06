@@ -28,17 +28,6 @@ char *translation::strerror_l(int errorNumber)
 
 
 
-translation::TrSnippets* translation::TrSnippets::s_instance = nullptr;
-
-translation::TrSnippets::TrSnippets() :
-    enable(qtr("enable")),
-    shournalShellIntegration(qtr("shournal shell-integration")),
-    shournalRestore(qtr("shournal-restore"))
-{}
-
-translation::TrSnippets::~TrSnippets()
-= default;
-
 translation::TrSnippets& translation::TrSnippets::instance()
 {
     static TrSnippets s_instance;

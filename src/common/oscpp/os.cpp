@@ -123,13 +123,6 @@ std::string os::getCacheDir()
     return cacheDirStr;
 }
 
-/// @throws ExcOs
-void os::rename(const std::string &old, const std::string &new_)
-{
-    if(::rename(old.c_str(), new_.c_str()) == -1){
-        throw ExcOs("rename failed");
-    }
-}
 
 /// @throws ExcOs
 void os::close(int fd)
@@ -713,6 +706,14 @@ sighandler_t os::signal(int sig, sighandler_t handler)
     return oldhandler;
 }
 
+void os::symlink(const char *target, const char *linkpath)
+{
+    if(::symlink(target, linkpath) == -1){
+        throw ExcOs("symlink failed");
+    }
+}
+
+
 /// @throws ExcOs
 void os::chdir(const char *path)
 {
@@ -837,6 +838,9 @@ void os::flock(int fd, int operation)
     }
 
 }
+
+
+
 
 
 

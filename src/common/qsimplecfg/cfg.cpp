@@ -14,6 +14,7 @@
 #include "cflock.h"
 #include "excos.h"
 
+
 namespace  {
 
 
@@ -27,11 +28,28 @@ void unsetStreamCommentMode(QFormattedStream& s){
     s.setLineStart("");
 }
 
+void writeMultiLineKey(QFormattedStream& stream, const QString& keyname,
+                       const QString& value){
+    assert(stream.streamChunkSep() == '\n');
+
+    auto oldMaxLineWidth = stream.maxLineWidth();
+    stream.setMaxLineWidth(std::numeric_limits<int>::max());
+    const QString TRIPLE_QUOTE = "'''";
+    stream << keyname + " = " + TRIPLE_QUOTE;
+    auto oldLineStart = stream.lineStart();
+    // repsecting oldLineStart makes this function compatible
+    // with comment and normal mode.
+    stream.setLineStart(oldLineStart + "   ");
+    stream << value;
+    stream.setLineStart(oldLineStart);
+    stream << TRIPLE_QUOTE;
+    stream.setMaxLineWidth(oldMaxLineWidth);
+}
 } // namespace
 
 
 /// Parse the config file at filepath. Create it, if necessary.
-/// Note thath the content of multi-line strings between triple quotes
+/// Note that the content of multi-line strings between triple quotes
 /// is parsed "as is", except for an optional final \n, if the closing triple
 /// quotes are in the next line. Example:
 /// '''
@@ -40,14 +58,14 @@ void unsetStreamCommentMode(QFormattedStream& s){
 /// -> no \n after <text> (but before it there is one).
 /// So it does not matter, wether the closing triple quotes are in the same
 /// or the next line.
-/// Another file in the same directory with _LOCK-extension is locked, before parsing.
+/// While parsing the file is locked using flock(2).
 /// @throws ExcCfg
+qsimplecfg::Cfg::Cfg() :
+    m_allowEraseSections(true)
+{}
+
 void qsimplecfg::Cfg::parse(const QString &filepath)
 {
-    m_nameSectionHash.clear();
-    m_initialComments.clear();
-    m_lastFilepath = filepath;
-
     createDirsToFilename(filepath);
     QFile file(filepath);
 
@@ -55,19 +73,28 @@ void qsimplecfg::Cfg::parse(const QString &filepath)
         throw ExcCfg(qtr("Failed to open %1 - %2").
                      arg(filepath, file.errorString()));
     }
+
     CFlock lock(file.handle());
     try {
         lock.lockShared();
     } catch (const os::ExcOs& e) {
-       throw ExcCfg(qtr("Parse error: failed to obtain lock on %1 : %2").arg(filepath, e.what()));
+       throw ExcCfg(qtr("Parse error: failed to obtain lock on %1 : %2").arg(
+                        QFileInfo(file).absoluteFilePath(), e.what()));
     }
+    parse(file);
+}
 
+/// @overload
+/// @param file: parse the already for reading opened file (whose offset should typically be zero).
+/// No locking is performed!
+void qsimplecfg::Cfg::parse(QFile &file)
+{
     QTextStream in(&file);
     try{
         parse(&in);
     } catch(ExcCfg & ex){
         ex.setDescrip(ex.descrip() +
-                       qtr(". Please correct the file at %1").arg(m_lastFilepath));
+                       qtr(". Please correct the file at %1").arg(QFileInfo(file).absoluteFilePath()));
         throw;
     }
 }
@@ -78,15 +105,7 @@ void qsimplecfg::Cfg::parse(const QString &filepath)
 /// @throws ExcCfg
 void qsimplecfg::Cfg::store(const QString &filepath)
 {
-    QFile file;
-    if(! filepath.isEmpty()){
-        file.setFileName(filepath);
-    } else {
-        if(m_lastFilepath.isEmpty()){
-            throw QExcIllegalArgument("empty filepath passed while lastFilePath is also empty");
-        }
-        file.setFileName(m_lastFilepath);
-    }
+    QFile file(filepath);
 
     createDirsToFilename(file.fileName());
 
@@ -103,6 +122,7 @@ void qsimplecfg::Cfg::store(const QString &filepath)
 
     QFormattedStream stream(&file);
     stream.setStreamChunkSep('\n');
+    unsetStreamCommentMode(stream);
 
     if(! m_initialComments.isEmpty()){
         setStreamCommentMode(stream);
@@ -111,52 +131,46 @@ void qsimplecfg::Cfg::store(const QString &filepath)
     }
     stream << "\n\n";
 
-    for(auto it = m_nameSectionHash.begin(); it != m_nameSectionHash.end(); ++it){
-        stream << '[' + it.key() + "]";
-        if( ! it.value().comments().isEmpty()){
-            setStreamCommentMode(stream);
-            stream << it.value().comments();
-            unsetStreamCommentMode(stream);
-        }
-
-        for(auto sectionIt = it.value().keyValHash().begin();
-            sectionIt != it.value().keyValHash().end();
-            ++sectionIt){
-            QString optTriplesStart;
-            QString optTriplesEnd;
-            QString val = sectionIt.value().rawStr.trimmed();
-            if(sectionIt.value().separator.contains('\n') ||
-                    val.contains('\n')){
-                optTriplesStart = "'''\n";
-                optTriplesEnd = "\n'''";
-            }
-            stream << sectionIt.key() + " = " + optTriplesStart +
-                                                 val +
-                                                optTriplesEnd;
-
-        }
+    for(const auto& nameSect : m_nameSectionHash){
+        stream << '[' + nameSect.second.sect->sectionName() + "]";
+        writeSectionCommentsToStream(nameSect.second.sect, stream);
+        writeSectionToStream(nameSect.second.sect, stream);
         stream << "\n\n";
     }
 }
 
-qsimplecfg::Section &qsimplecfg::Cfg::operator[](const QString &key)
+
+/// Get a parsed section or create a new one with given name.
+/// The order in which operator[] is called,
+/// determines the order in which it will be stored to disk on Cfg::store().
+/// Parsed sections ( see parse() ) which were not requested via this function,
+/// will *not* be store()'ed. The idea is that the config scheme is autogenerated
+/// by requesting the sections and keys.
+/// Note that calling this function a second time with the same section name,
+/// after another section was created, does *not* change the order.
+/// @return the Section_Ptr is never null.
+qsimplecfg::Cfg::Section_Ptr qsimplecfg::Cfg::operator[](const QString &sectName)
 {
-    auto sectIt = m_nameSectionHash.find(key);
-    if(sectIt == m_nameSectionHash.end()){
-        sectIt = m_nameSectionHash.insert(key, Section(key));
+    auto parsedIt = m_parsedNameSectionHash.find(sectName);
+    if(parsedIt != m_parsedNameSectionHash.end()){
+        SectWithMeta sectMeta;
+        sectMeta.sect = parsedIt->second;
+        m_nameSectionHash.insert({sectName, sectMeta});
+        m_parsedNameSectionHash.erase(parsedIt);
+        return sectMeta.sect;
     }
-    sectIt.value().setSectionWasRead(true);
-    return sectIt.value();
+
+    // section was not parsed or requested a second time: get or create:
+    auto & sectMeta = m_nameSectionHash[sectName];
+    if(sectMeta.sect == nullptr){
+        sectMeta.sect = make_shared_section(sectName);
+    }
+    return sectMeta.sect;
 }
 
-const qsimplecfg::Cfg::SectionHash &qsimplecfg::Cfg::sectionHash()
-{
-    return m_nameSectionHash;
-}
 
-
-void qsimplecfg::Cfg::handleKeyValue(QStringRef &line, size_t *pLineNumber,
-                                     QTextStream *stream, Section *section)
+void qsimplecfg::Cfg::handleParseKeyValue(QStringRef &line, size_t *pLineNumber,
+                                     QTextStream *stream,const Section_Ptr& section)
 {
     int equalIdx = line.indexOf('=');
     if(equalIdx == -1){
@@ -167,7 +181,7 @@ void qsimplecfg::Cfg::handleKeyValue(QStringRef &line, size_t *pLineNumber,
     QStringRef key = line.left(equalIdx).trimmed();
     QStringRef value = line.mid(equalIdx + 1).trimmed();
     if(! value.startsWith("'''")){
-        // simple case: not a multi line string
+        // simple case: not a multi-line string
         section->insert(key.toString(), value.toString());
         return;
     }
@@ -220,18 +234,87 @@ void qsimplecfg::Cfg::handleKeyValue(QStringRef &line, size_t *pLineNumber,
 
 }
 
+void
+qsimplecfg::Cfg::writeKeyValue(const QString &key,
+                               const QString &val,
+                               const QString &sep,
+                               QFormattedStream &stream)
+{
+    if(sep.contains('\n') ||
+            val.contains('\n')){
+        writeMultiLineKey(stream, key, val);
+    } else {
+        stream << key + " = " + val;
+    }
+}
+
+void
+qsimplecfg::Cfg::writeSectionToStream(const qsimplecfg::Cfg::Section_Ptr &sect,
+                                      QFormattedStream &stream)
+{
+    for(const auto & keyValMeta : sect->keyValHash()){
+        QString valStr;
+        if(keyValMeta.second.insertDefault){
+            valStr =   QVariantListToString(
+                        keyValMeta.second.defaultValues,
+                        keyValMeta.second.separator);
+        } else {
+            if(keyValMeta.second.rawStr.isNull()){
+                // No value was parsed and default shall
+                // not be inserted -> do not write this
+                // key to file.
+                continue;
+            }
+            valStr = keyValMeta.second.rawStr.trimmed();
+        }
+        writeKeyValue(keyValMeta.first, valStr, keyValMeta.second.separator, stream);
+    }
+}
+
+void
+qsimplecfg::Cfg::writeSectionCommentsToStream(const qsimplecfg::Cfg::Section_Ptr &sect,
+                                                   QFormattedStream &stream)
+{
+    setStreamCommentMode(stream);
+    if(! sect->comments().isEmpty()){
+        stream << sect->comments() + '\n';
+    }
+    for(const auto& keyValMeta : sect->keyValHash()){
+        const auto & key = keyValMeta.first;
+        const auto & valMeta = keyValMeta.second;
+        if(! valMeta.insertDefaultToComments){
+            continue;
+        }
+        const QString defaultValStr =  QVariantListToString(valMeta.defaultValues, valMeta.separator);
+        writeKeyValue(key, defaultValStr, valMeta.separator, stream);
+    }
+    unsetStreamCommentMode(stream);
+}
+
+
 /// @throws ExcCfg
-void qsimplecfg::Cfg::createDirsToFilename(const QString &filename)
+void
+qsimplecfg::Cfg::createDirsToFilename(const QString &filename)
 {
     assert(! filename.isEmpty());
     QFileInfo fileInfo(filename);
-    QDir dir;
-
-    if(! dir.mkpath(fileInfo.absolutePath())){
+    if(! QDir().mkpath(fileInfo.absolutePath())){
         throw ExcCfg(qtr("Failed to create directories for path %1")
                                  .arg(fileInfo.absolutePath()) );
     }
 }
+
+
+QString
+qsimplecfg::Cfg::QVariantListToString(const QVariantList &l, const QString &sep)
+{
+    QString str;
+    for(const auto& v : l){
+        str += qVariantTo_throw<QString>(v) + sep;
+    }
+    return str;
+}
+
 
 
 void qsimplecfg::Cfg::setInitialComments(const QString &comments)
@@ -239,22 +322,16 @@ void qsimplecfg::Cfg::setInitialComments(const QString &comments)
     m_initialComments = comments;
 }
 
-const QString& qsimplecfg::Cfg::lastFilePath() const
-{
-    return m_lastFilepath;
-}
+
 
 /// Return all sections and their keys which were not read after having been
 /// inserted.
-qsimplecfg::NotReadSectionKeys qsimplecfg::Cfg::generateNonReadSectionKeyPairs()
+qsimplecfg::NotReadSectionKeys
+qsimplecfg::Cfg::generateNonReadSectionKeyPairs()
 {
     NotReadSectionKeys allNotRead;
     for(auto it = m_nameSectionHash.begin(); it != m_nameSectionHash.end(); ++it){
-        if(! it.value().sectionWasRead()){
-            // section not of interest
-            continue;
-        }
-       auto notReadKeys = it.value().notReadKeys();
+       auto notReadKeys = it.value().sect->notReadKeys();
        if(! notReadKeys.empty()){
            allNotRead.push_back({it.key(), notReadKeys});
        }
@@ -262,27 +339,58 @@ qsimplecfg::NotReadSectionKeys qsimplecfg::Cfg::generateNonReadSectionKeyPairs()
     return allNotRead;
 }
 
-/// transfer all values of old section to new section and remove old.
-/// Note that comments, etc. are not updated (because those are typically set already)
-/// @return true, if both section existed
-bool qsimplecfg::Cfg::moveValsToNewSect(const QString &oldName, const QString &newName)
+/// Rename a parsed section. Warning: it is *not* allowed, to call this function
+/// after having accessed a section via operator[], because that would destroy
+/// the order of the sections.
+/// @return true, if the old section existed.
+bool qsimplecfg::Cfg::renameParsedSection(const QString &oldName, const QString &newName)
 {
-    auto oldSectIt = m_nameSectionHash.find(oldName);
-    auto newSectIt = m_nameSectionHash.find(newName);
-    if(oldSectIt == m_nameSectionHash.end() ||
-            newSectIt == m_nameSectionHash.end()){
+    assert(m_nameSectionHash.empty());
+    auto oldIt = m_parsedNameSectionHash.find(oldName);
+    if(oldIt == m_parsedNameSectionHash.end()){
         return false;
     }
-    newSectIt.value().updateValuesFromOtherSection(oldSectIt.value());
-    m_nameSectionHash.erase(oldSectIt);
+    Section_Ptr sect = oldIt->second;
+    sect->setSectionName(newName);
+    m_parsedNameSectionHash.erase(oldIt);
+
+    m_parsedNameSectionHash[newName] = sect;
     return true;
 }
 
+/// @return those sections which were parsed but not accessed via operator[]
+const qsimplecfg::Cfg::ParsedNameSectionHash&
+qsimplecfg::Cfg::getParsedButNotReadNameSectionHash() const
+{
+    return m_parsedNameSectionHash;
+}
+
+
+/// Get a parsed section. Warning: it is *not* allowed, to call this function
+/// after having accessed a section via operator[], because that would destroy
+/// the order of the sections. So call this function after Cfg::parse but before
+/// accessing any section via operator[].
+/// @return the parsed section or null
+qsimplecfg::Cfg::Section_Ptr qsimplecfg::Cfg::getParsedSectionIfExist(const QString &sectName)
+{
+    assert(m_nameSectionHash.empty());
+    auto it = m_parsedNameSectionHash.find(sectName);
+    if(it == m_parsedNameSectionHash.end()){
+        return nullptr;
+    }
+    return it->second;
+}
+
+/// @overload
 void qsimplecfg::Cfg::parse(QTextStream *in)
 {
+    m_parsedNameSectionHash.clear();
+    m_nameSectionHash.clear();
+    m_initialComments.clear();
+
     bool withinSection=false;
-    Section currentSection("DUMMY"); // will be overidden
-    QString currentSectionName;
+    Section_Ptr currentSect;
+    QString currentSectName;
     size_t currentLine = 0;
 
     QString lineBuf;
@@ -297,8 +405,7 @@ void qsimplecfg::Cfg::parse(QTextStream *in)
         currentLine++;
 
         if(line.startsWith('#')){
-            ;
-            // No point in reading comments.
+            ;  // No point in reading comments.
         } else if(line.isEmpty()){
             ;
         } else if(line.startsWith('[')){
@@ -306,29 +413,25 @@ void qsimplecfg::Cfg::parse(QTextStream *in)
                 throw ExcCfg(qtr("Line %1 - %2: section start [ without closing end ] detected").
                              arg(currentLine).arg(line.toString()));
             }
-
-            if(withinSection){
-                // store previous section in map
-                m_nameSectionHash.insert(currentSectionName, currentSection);
-            }
             withinSection = true;
-            currentSectionName = line.mid(1, line.size() - 2).toString();
-            if(currentSectionName.isEmpty()){
+            currentSectName = line.mid(1, line.size() - 2).toString();
+            if(currentSectName.isEmpty()){
                 throw ExcCfg(qtr("Line %1 - %2: empty section detected").
                              arg(currentLine).arg(line.toString()));
             }
-            currentSection = Section(currentSectionName);
-
+            auto currentSectIt = m_parsedNameSectionHash.find(currentSectName);
+            if(currentSectIt != m_parsedNameSectionHash.end()){
+                throw ExcCfg(qtr("Line %1 - %2: section name already defined (in upper line)").
+                             arg(currentLine).arg(line.toString()));
+            }
+            currentSect = make_shared_section(currentSectName);
+            m_parsedNameSectionHash.insert({currentSectName, currentSect});
         } else {
             if(! withinSection){
                 throw ExcCfg(qtr("Line %1 - %2: Content before first section").
                              arg(currentLine).arg(line.toString()));
             }
-            handleKeyValue(line, &currentLine, in, &currentSection );
+            handleParseKeyValue(line, &currentLine, in, currentSect );
         }
-    }
-    if(withinSection){
-        // final section not added yet
-        m_nameSectionHash.insert(currentSectionName, currentSection);
     }
 }

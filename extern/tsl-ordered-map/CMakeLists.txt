@@ -1,11 +1,17 @@
 
+SET(lib_orderedmap_files
+    ordered_hash
+    ordered_map
+    ordered_set
+)
+
 
 add_library(lib_orderedmap
-    orderedmap
+    ${lib_orderedmap_files}
  )
 
 add_library(lib_orderedmap_shared
-    orderedmap
+    ${lib_orderedmap_files}
     )
 
 set_property(TARGET lib_orderedmap_shared PROPERTY POSITION_INDEPENDENT_CODE ON)

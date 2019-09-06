@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "util.h"
 
 namespace os {
 
@@ -26,6 +27,10 @@ public:
     void flushToProc();
 
     static Ptr_t fromProc();
+
+public:
+    Q_DISABLE_COPY(Capabilites)
+    DEFAULT_MOVE(Capabilites)
 
 private:
     Capabilites(cap_t caps);

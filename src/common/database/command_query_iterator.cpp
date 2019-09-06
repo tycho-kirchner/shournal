@@ -4,14 +4,14 @@
 #include "util.h"
 #include "db_connection.h"
 #include "db_conversions.h"
+#include "db_controller.h"
 
 
-///  @param reverseIter: if true, instead of calling 'next', 'previous' will be called
+///  @param reverseIter: if true, instead of calling next(), previous() will be called
 /// on the passed query.
-CommandQueryIterator::CommandQueryIterator(std::shared_ptr<QSqlQueryThrow> query, bool reverseIter) :
+CommandQueryIterator::CommandQueryIterator(std::shared_ptr<QSqlQueryThrow>& query, bool reverseIter) :
     m_cmdQuery(query),
     m_tmpQuery(db_connection::mkQuery()),
-    m_didNext(false),
     m_reverseIter(reverseIter)
 {
 }
@@ -20,10 +20,7 @@ CommandQueryIterator::CommandQueryIterator(std::shared_ptr<QSqlQueryThrow> query
 bool CommandQueryIterator::next()
 {
     m_cmd.clear();
-    bool nextRet;
-
-    if(m_reverseIter) nextRet= m_cmdQuery->previous();
-    else nextRet= m_cmdQuery->next();
+    const bool nextRet = (m_reverseIter) ? m_cmdQuery->previous() : m_cmdQuery->next();
     if(nextRet){
         fillCommand();
     }
@@ -61,7 +58,7 @@ void CommandQueryIterator::fillCommand()
     m_cmd.hostname = m_cmdQuery->value(i++).toString();
 
     fillWrittenFiles();
-    fillReadFiles();
+    m_cmd.fileReadInfos = db_controller::queryReadInfos_byCmdId(m_cmd.idInDb);
 }
 
 void CommandQueryIterator::fillWrittenFiles()
@@ -81,27 +78,5 @@ void CommandQueryIterator::fillWrittenFiles()
     }
 }
 
-void CommandQueryIterator::fillReadFiles()
-{
-    m_tmpQuery->prepare("select readFile.id,path,name,mtime,size,mode from readFile "
-                       "join readFileCmd on readFile.id=readFileCmd.readFileId "
-                       "where cmdId=?"
-                );
-    m_tmpQuery->addBindValue(m_cmd.idInDb);
-    m_tmpQuery->exec();
-    while(m_tmpQuery->next()){
-        int i=0;
-        FileReadInfo fInfo;
-        fInfo.idInDb = qVariantTo_throw<qint64>(m_tmpQuery->value(i++));
-        fInfo.path = m_tmpQuery->value(i++).toString();
-        fInfo.name = m_tmpQuery->value(i++).toString();
-        fInfo.mtime = m_tmpQuery->value(i++).toDateTime();
-        fInfo.size =  qVariantTo_throw<qint64>(m_tmpQuery->value(i++));
-        fInfo.mode =  qVariantTo_throw<mode_t>(m_tmpQuery->value(i++));
-
-        m_cmd.fileReadInfos.push_back(fInfo);
-    }
-
-}
 
 

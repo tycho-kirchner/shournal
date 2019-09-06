@@ -1,7 +1,7 @@
 #include "sqlite_database_scheme_updates.h"
 
 
-void sqlite_database_scheme_updates::zero_point_nine(QSqlQueryThrow &query)
+void sqlite_database_scheme_updates::v0_9(QSqlQueryThrow &query)
 {
     // until this version no scripts (read files) were stored in the database
     // so the tables can be dropped (and re-created) safely.
@@ -38,4 +38,17 @@ void sqlite_database_scheme_updates::zero_point_nine(QSqlQueryThrow &query)
           "PRIMARY KEY(`id`)"
         ")"
     );
+}
+
+
+void sqlite_database_scheme_updates::v2_1(QSqlQueryThrow &query)
+{
+    // Add support for read files without belonging scripts.
+    // Also start hashing read files as well. Because the same read file
+    // can refer to multiple commands (many-to-many), it would be wrong to
+    // refererence the hashMetaId of a command -> add hashmetaId column.
+    query.exec("alter table `readFile` add column `hash` BLOB");
+    query.exec("alter table `readFile` add column `hashmetaId` INTEGER");
+    query.exec("alter table `readFile` add column `isStoredToDisk` INTEGER DEFAULT 1");
+
 }

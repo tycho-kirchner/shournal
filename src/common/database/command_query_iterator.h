@@ -9,7 +9,7 @@
 class CommandQueryIterator
 {
 public:
-    CommandQueryIterator(std::shared_ptr<QSqlQueryThrow> query, bool reverseIter);
+    CommandQueryIterator(std::shared_ptr<QSqlQueryThrow> &query, bool reverseIter);
 
     bool next();
 
@@ -23,12 +23,10 @@ private:
 
     void fillCommand();
     void fillWrittenFiles();
-    void fillReadFiles();
 
     std::shared_ptr<QSqlQueryThrow> m_cmdQuery;
     QueryPtr m_tmpQuery;
     CommandInfo m_cmd;
-    bool m_didNext;
     bool m_reverseIter;
 };
 

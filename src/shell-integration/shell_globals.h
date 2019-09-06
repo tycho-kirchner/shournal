@@ -1,6 +1,6 @@
 #pragma once
 
-#include <signal.h>
+#include <csignal>
 #include <sched.h>
 #include <atomic>
 #include <QByteArray>
@@ -11,6 +11,7 @@
 #include "fdcommunication.h"
 #include "sessioninfo.h"
 #include "attached_shell.h"
+#include "util.h"
 
 typedef pid_t (*fork_func_t)();
 
@@ -18,9 +19,6 @@ typedef int (*execve_func_t)(const char *filename, char *const argv[],
                   char *const envp[]);
 
 typedef int (*open_func_t)(const char *pathname, int flags, mode_t mode);
-
-// typedef FILE* (*fopen_func_t)(const char *path, const char *mode);
-
 
 enum class E_WatchState {DISABLED, WITHIN_CMD, INTERMEDIATE, ENUM_END};
 
@@ -31,32 +29,32 @@ class ShellGlobals
 public:
     static ShellGlobals& instance();
 
-    int shournalSocketNb;
-    fork_func_t orig_fork{};
-    execve_func_t orig_execve{};
-    open_func_t orig_open{};
-    // fopen_func_t orig_fopen{};
+    int shournalSocketNb {-1};
+    fork_func_t orig_fork {};
+    execve_func_t orig_execve {};
+    open_func_t orig_open {};
 
     std::atomic_flag ignoreEvents{};
 
-    E_WatchState watchState;
-    bool inSubshell;
+    E_WatchState watchState {E_WatchState::DISABLED};
+    bool inSubshell {false};
     fdcommunication::SocketCommunication shournalSocket;
-    pid_t lastMountNamespacePid;
+    pid_t lastMountNamespacePid {-1};
 
     struct sigaction origSigintAction{};
     std::atomic_flag ignoreSigation{};
 
-    AttachedShell* pAttchedShell;
-    QtMsgType verbosityLevel;
-    int shournalSockFdDescripFlags;
+    AttachedShell* pAttchedShell {};
+    QtMsgType verbosityLevel {QtMsgType::QtWarningMsg};
+    int shournalSockFdDescripFlags {-1};
 
     SessionInfo sessionInfo;
-    int shournalRootDirFd;
+    int shournalRootDirFd {-1};
 
 public:
-    ShellGlobals(const ShellGlobals &) = delete ;
-    void operator=(const ShellGlobals &) = delete ;
+    ~ShellGlobals() = default;
+    Q_DISABLE_COPY(ShellGlobals)
+    DISABLE_MOVE(ShellGlobals)
 
 private:
     ShellGlobals();

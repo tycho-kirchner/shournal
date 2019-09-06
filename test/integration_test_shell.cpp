@@ -9,8 +9,13 @@
 #include "database/db_connection.h"
 #include "database/db_controller.h"
 #include "database/file_query_helper.h"
+#include "database/query_columns.h"
+#include "qsimplecfg/cfg.h"
+#include "settings.h"
+#include "database/storedfiles.h"
 
 using subprocess::Subprocess;
+using db_controller::QueryColumns;
 
 namespace  {
 
@@ -18,9 +23,27 @@ void writeLine(int fd, const std::string& line){
     os::write(fd, line + "\n");
 }
 
+os::Pipes_t prepareHighFdNumberPipe(){
+    auto pipe_ = os::pipe(0, false); // CLOEXEC irrelevant, dup2 below...
+    int highFd = osutil::findHighestFreeFd();
+    os::dup2(pipe_[0], highFd);
+    os::close(pipe_[0]);
+    pipe_[0] = highFd;
+
+    highFd = osutil::findHighestFreeFd(highFd - 1);
+    os::dup2(pipe_[1], highFd);
+    os::close(pipe_[1]);
+    pipe_[1] = highFd;
+    os::setenv<QByteArray>("_SHOURNAL_INTEGRATION_TEST_PIPE_FD",
+               QByteArray::number(pipe_[1]));
+
+    return pipe_;
+}
+
+
 /// @return write-end of the pipe passed to the shell-process
 int callWithRedirectedStdin(Subprocess& proc){
-    int oldStdIn = os::dup(STDIN_FILENO);
+    int oldStdIn = os::dup(STDIN_FILENO); // CLOEXEC irrelevant, dup2 below...
     auto pipe_ = os::pipe(0);
     os::dup2(pipe_[0], STDIN_FILENO);
     os::close(pipe_[0]);
@@ -33,48 +56,86 @@ int callWithRedirectedStdin(Subprocess& proc){
     return pipe_[1];
 }
 
-}
+
+} // anonymous namespace
 
 
 class IntegrationTestShell : public QObject {
     Q_OBJECT
 
 private:
-    void cmdFileCheck(const std::string& cmd, const std::string& fpath ){
-        testhelper::deletePaths();
+    void writeReadIncludeDirToCfgFile(const QString& readIncludeDir){
+        auto & sets = Settings::instance();
+        qsimplecfg::Cfg cfg;
+        auto sectRead = cfg[Settings::SECT_READ_NAME];
+        sectRead->getValue(Settings::SECT_READ_KEY_ENABLE, true, true);
+        sectRead->getValue(Settings::SECT_READ_KEY_INCLUDE_PATHS, readIncludeDir, true);
+        auto cfgPath = sets.cfgFilepath();
+        cfg.store(cfgPath);
+    }
 
+    void writeScriptSettingsoCfgFile(const QString& includePath, const QStringList& fileExtensions){
+        auto & sets = Settings::instance();
+        qsimplecfg::Cfg cfg;
+        auto sectRead = cfg[Settings::SECT_SCRIPTS_NAME];
+        sectRead->getValue(Settings::SECT_SCRIPTS_ENABLE, true, true);
+        sectRead->getValue(Settings::SECT_SCRIPTS_INCLUDE_PATHS, includePath, true);
+        sectRead->getValues(Settings::SECT_SCRIPTS_INCLUDE_FILE_EXTENSIONS, fileExtensions, true, "\n");
+        auto cfgPath = sets.cfgFilepath();
+        cfg.store(cfgPath);
+    }
+
+
+    /// @param cmd: the command to be executed
+    /// @param setupCommand: command executed before SHOURNAL_ENABLE
+    void executeCmdInbservedShell(const std::string& cmd, const std::string& setupCommand){
+        auto pipe_ = prepareHighFdNumberPipe();
         Subprocess proc;
+        // pass pipe write end -> wait for async shournal grand-child process
+        proc.setForwardFdsOnExec({pipe_[1]});
         int writeFd = callWithRedirectedStdin(proc);
+        os::close(pipe_[1]);
 
-        // Do not pollute the history...
-        // TODO: evtl. adjust this for other shells...
-        std::string tmpHistCmd = "export HISTFILE=" + splitAbsPath(fpath).first + "/tmpHistfile";
-        writeLine(writeFd, tmpHistCmd);
+        if(! setupCommand.empty()){
+            writeLine(writeFd, setupCommand);
+        }
         writeLine(writeFd, "SHOURNAL_ENABLE");
 
         writeLine(writeFd, cmd);
+        writeLine(writeFd, "SHOURNAL_DISABLE");
         writeLine(writeFd, "exit 123");
 
         os::close(writeFd);
         QCOMPARE(proc.waitFinish(), 123);
-        // Sleep a bit, to wait for the asynchronous shournal-run to finish
-        usleep(100* 1000);
+        char c;
+        // wait for shournal grand-child process to finish (close it's write end)
+        os::read(pipe_[0], &c, 1);
+        os::close(pipe_[0]);
+    }
 
-        auto dbCleanup = finally([] { db_connection::close(); });
+    /// @overload
+    void executeCmdInbservedShell(const QString& cmd, const std::string& setupCommand){
+        executeCmdInbservedShell(cmd.toStdString(), setupCommand);
+    }
+
+
+
+    void cmdWrittenFileCheck(const std::string& cmd, const std::string& fpath,
+                             const std::string& setupCommand){
+        executeCmdInbservedShell(cmd, setupCommand);
         SqlQuery query;
         file_query_helper::addWrittenFileSmart(query, QString::fromStdString(fpath));
         auto cmdIter = db_controller::queryForCmd(query);
+        auto dbCleanup = finally([] { db_connection::close(); });
         QVERIFY(cmdIter->next());
         QCOMPARE(cmdIter->value().text, QString::fromStdString(cmd));
-
     }
 
 private slots:
-    void testIt() {
+    void testWrite() {
         auto pTmpDir = testhelper::mkAutoDelTmpDir();
-        std::string tmpDirPath = pTmpDir->path().toStdString();
 
-        std::string filepath = tmpDirPath + "/f1";
+        std::string filepath = pTmpDir->path().toStdString() + "/f1";
         std::vector<std::string> cmds {
                     "echo '%' > " + filepath, // percent unveiled a printf format bug in shournal 0.7
                     "(echo foo2 ) > " + filepath,
@@ -88,9 +149,88 @@ private slots:
                     "sh -c 'echo foo10 > " + filepath + " & wait'",
         };
 
+        const auto setupCmd = AutoTest::globals().integrationSetupCommand;
+
         for(const auto& cmd : cmds){
-            cmdFileCheck(cmd, filepath);
+            testhelper::deletePaths();
+            cmdWrittenFileCheck(cmd, filepath, setupCmd);
         }
+    }
+
+    void testRead(){
+        const auto setupCmd = AutoTest::globals().integrationSetupCommand;
+
+        auto pTmpDir = testhelper::mkAutoDelTmpDir();
+        // for read events only include our tempdir
+        writeReadIncludeDirToCfgFile(pTmpDir->path());
+
+        const QString fname = "foo1";
+        const QString fullPath = pTmpDir->path() + '/' + fname;
+
+        QFileThrow(fullPath).open(QFile::WriteOnly);
+        const QString cmdTxt = "cat " + fullPath;
+        executeCmdInbservedShell(cmdTxt, setupCmd);
+
+        SqlQuery query;
+        const auto & cols = QueryColumns::instance();
+
+        query.addWithAnd(cols.rFile_path, pTmpDir->path());
+        query.addWithAnd(cols.rFile_name, fname);
+
+        auto cmdIter = db_controller::queryForCmd(query);
+        auto dbCleanup = finally([] { db_connection::close(); });
+        QVERIFY(cmdIter->next());
+        auto cmdInfo = cmdIter->value();
+        QCOMPARE(cmdInfo.text, cmdTxt);
+        QCOMPARE(cmdInfo.fileReadInfos.size(), 1);
+        const auto& fReadInfo = cmdInfo.fileReadInfos.first();
+        QCOMPARE(fReadInfo.name, fname);
+        QCOMPARE(fReadInfo.path, pTmpDir->path());
+        QCOMPARE(fReadInfo.isStoredToDisk, false);
+
+        QVERIFY(! cmdIter->next());
+    }
+
+    void testReadScript(){
+        const auto setupCmd = AutoTest::globals().integrationSetupCommand;
+
+        auto pTmpDir = testhelper::mkAutoDelTmpDir();
+        // for read events only include our tempdir
+        writeScriptSettingsoCfgFile(pTmpDir->path(), {"sh"});
+
+        const QString fname = "foo1.sh";
+        const QString fullPath = pTmpDir->path() + '/' + fname;
+        const QString content("abcdefg");
+        testhelper::writeStringToFile(fullPath, content);
+
+        const QString cmdTxt = "cat " + fullPath;
+        executeCmdInbservedShell(cmdTxt, setupCmd);
+
+        SqlQuery query;
+        const auto & cols = QueryColumns::instance();
+
+        query.addWithAnd(cols.rFile_path, pTmpDir->path());
+        query.addWithAnd(cols.rFile_name, fname);
+
+        auto cmdIter = db_controller::queryForCmd(query);
+        auto dbCleanup = finally([] { db_connection::close(); });
+        QVERIFY(cmdIter->next());
+        auto cmdInfo = cmdIter->value();
+        QCOMPARE(cmdInfo.text, cmdTxt);
+        QCOMPARE(cmdInfo.fileReadInfos.size(), 1);
+        const auto& fReadInfo = cmdInfo.fileReadInfos.first();
+        QCOMPARE(fReadInfo.name, fname);
+        QCOMPARE(fReadInfo.path, pTmpDir->path());
+        QCOMPARE(fReadInfo.isStoredToDisk, true);
+        StoredFiles storedFiles;
+        const QString pathToFileInDb = StoredFiles::getReadFilesDir() + "/" +
+                QString::number(fReadInfo.idInDb);
+        QFileThrow fInDb(pathToFileInDb);
+        QVERIFY(fInDb.exists());
+        fInDb.open(QFile::ReadOnly);
+        QCOMPARE(content, testhelper::readStringFromFile(fullPath));
+
+        QVERIFY(! cmdIter->next());
     }
 
 

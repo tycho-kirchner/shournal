@@ -88,7 +88,6 @@ SET(lib_shournal_common_files
     cxxhash
     cpp_exit
     exccommon
-    excqprocthrow
     fdcommunication
     fileeventhandler
     fileeventtypes
@@ -104,7 +103,6 @@ SET(lib_shournal_common_files
     qfddummydevice
     qfilethrow
     qoutstream
-    qprocthrow
     settings
     socket_message
     staticinitializer

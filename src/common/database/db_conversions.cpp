@@ -15,7 +15,7 @@ QVariant db_conversions::fromHashValue(const HashValue &val)
     if(! val.isNull()){
         hashBytes = qBytesFromVar(val.value());
     }
-    return QVariant(hashBytes);
+    return  { hashBytes };
 }
 
 HashValue db_conversions::toHashValue(const QVariant &var)
@@ -23,5 +23,5 @@ HashValue db_conversions::toHashValue(const QVariant &var)
     if(var.isNull()){
         return {};
     }
-    return varFromQBytes(var.toByteArray(), HashValue::value_type(0));
+    return varFromQBytes<HashValue::value_type>(var.toByteArray());
 }

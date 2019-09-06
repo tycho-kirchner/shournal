@@ -62,9 +62,6 @@ QOptArg::QOptArg(const QString &shortName,
     m_defaultTriggerStr = defaultTriggerStr;
 }
 
-QOptArg::~QOptArg()
-= default;
-
 
 QString QOptArg::shortName() const
 {

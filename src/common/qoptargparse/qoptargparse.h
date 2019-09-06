@@ -4,7 +4,7 @@
 #include <QHash>
 
 #include "qoptarg.h"
-#include "orderedmap.h"
+#include "ordered_map.h"
 
 /// Currently no support for having the same argument multiple times
 class QOptArgParse
@@ -20,8 +20,8 @@ public:
     void setHelpIntroduction(const QString& txt);
 
 private:
-    OrderedMap<QString, QOptArg*> m_args;
-    OrderedMap<QString, QOptArg*> m_argsShort;
+    tsl::ordered_map<QString, QOptArg*> m_args;
+    tsl::ordered_map<QString, QOptArg*> m_argsShort;
     QOptArg::RawValues_t m_rest;
     QString m_helpIntroduction;
 

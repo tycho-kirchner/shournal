@@ -1,7 +1,7 @@
 #pragma once
 
 #include <QVariant>
-#include <time.h>
+#include <ctime>
 
 #include "nullable_value.h"
 
@@ -11,6 +11,8 @@ namespace db_conversions {
 
     QVariant fromHashValue(const HashValue& val);
     HashValue toHashValue(const QVariant& var);
+
+
 }
 
 

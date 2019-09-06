@@ -110,8 +110,16 @@ char *strDataAccess(std::string &str){
     return &str[0];
 }
 
+const char *strDataAccess(const std::string &str){
+    return str.c_str();
+}
+
+
 char *strDataAccess(QByteArray &str){
     return str.data();
+}
+const char* strDataAccess(const QByteArray& str){
+    return str.constData();
 }
 
 
@@ -234,3 +242,10 @@ int indexOfNonWhiteSpace(const QString &str)
     return -1;
 }
 
+
+
+bool qVariantTo(const std::string &str, QString *result) {
+    *result = QString::fromStdString(str);
+    return true;
+
+}

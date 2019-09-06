@@ -1,6 +1,6 @@
 #pragma once
 
-
+#include <QMetaType>
 #include "exccommon.h"
 
 
@@ -82,5 +82,3 @@ bool operator==(const NullableValue<T>& lhs, const T& rhs) {
 }
 
 typedef NullableValue<uint64_t> HashValue;
-
-

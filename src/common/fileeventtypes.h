@@ -17,6 +17,7 @@ struct FileReadEvent{
     std::string fullPath;
     mode_t mode;
     QByteArray bytes; // the script file itself
+    HashValue hash;
 };
 
 

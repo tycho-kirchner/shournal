@@ -23,13 +23,13 @@ using namespace db_conversions;
 namespace  {
 
 void
-insertFileWriteEvents(const QueryPtr& query, qint64 cmdId,
+insertFileWriteEvents(const QueryPtr& query, const CommandInfo &cmd,
                 const FileWriteEventHash &writeEvents )
 {
     query->prepare("insert into writtenFile (cmdId,path,name,mtime,size,hash) "
                   "values (?,?,?,?,?,?)");
     for(const auto& fileEvent : writeEvents) {
-        query->addBindValue(cmdId);
+        query->addBindValue(cmd.idInDb);
 
         auto pathFnamePair =  splitAbsPath(QString::fromStdString(fileEvent.fullPath));
         query->addBindValue(pathFnamePair.first);
@@ -44,8 +44,9 @@ insertFileWriteEvents(const QueryPtr& query, qint64 cmdId,
 
 
 void
-insertFileReadEvents(const QueryPtr& query, qint64 cmdId,
-                     qint64 envId, const FileReadEventHash &readEvents )
+insertFileReadEvents(const QueryPtr& query, const CommandInfo &cmd,
+                     const QVariant& envId, const QVariant& hashMetaId,
+                     const FileReadEventHash &readEvents )
 {
     StoredFiles storedFiles;
 
@@ -59,17 +60,18 @@ insertFileReadEvents(const QueryPtr& query, qint64 cmdId,
                                     {"mtime",fromMtime(event.mtime)},
                                     {"size", qint64(event.size)},
                                     {"mode", event.mode},
+                                    {"hash", fromHashValue(event.hash)},
+                                    {"hashmetaId", hashMetaId},
+                                    {"isStoredToDisk", ! event.bytes.isNull()}
                                 }, &existed);
-        if(! existed){
+        if(! existed && ! event.bytes.isNull()){
             storedFiles.addReadFile(readFileId.toString(), event.bytes);
         }
-
         query->prepare("insert into readFileCmd (cmdId, readFileId) values (?,?)");
-        query->addBindValue(cmdId);
+        query->addBindValue(cmd.idInDb);
         query->addBindValue(readFileId);
         query->exec();
     }
-
 }
 
 
@@ -104,9 +106,33 @@ deleteChildlessParents(const QueryPtr& query){
     // Do it last -> foreign key in readFile
     query->exec("delete from env where not exists (select 1 from cmd where "
                "cmd.envId=env.id)");
-
 }
 
+
+FileReadInfos
+queryFileReadInfos(const SqlQuery& sqlQ, const QueryPtr& query_=nullptr, const QString& optionalJoins={}){
+    const QueryPtr query = (query_ != nullptr) ? query_ : db_connection::mkQuery();
+    FileReadInfos readInfos;
+    query->prepare("select readFile.id,path,name,mtime,size,mode,hash,isStoredToDisk from readFile "
+                   + optionalJoins + " where " + sqlQ.query());
+    query->addBindValues(sqlQ.values());
+    query->exec();
+    while(query->next()){
+        int i=0;
+        FileReadInfo fInfo;
+        fInfo.idInDb = qVariantTo_throw<qint64>(query->value(i++));
+        fInfo.path = query->value(i++).toString();
+        fInfo.name = query->value(i++).toString();
+        fInfo.mtime = query->value(i++).toDateTime();
+        fInfo.size =  qVariantTo_throw<qint64>(query->value(i++));
+        fInfo.mode =  qVariantTo_throw<mode_t>(query->value(i++));
+        fInfo.hash = db_conversions::toHashValue(query->value(i++));
+        fInfo.isStoredToDisk = query->value(i++).toBool();
+
+        readInfos.push_back(fInfo);
+    }
+    return readInfos;
+}
 
 
 } // namespace
@@ -195,22 +221,24 @@ void db_controller::updateCommand(const CommandInfo &cmd)
 }
 
 
-
-
-void db_controller::addFileEvents(qint64 cmdId, const FileWriteEventHash &writeEvents,
+/// Add file events belonging to param cmd which must belong to a valid
+/// database entry (idInDb must valid)
+void db_controller::addFileEvents(const CommandInfo &cmd, const FileWriteEventHash &writeEvents,
                                   const FileReadEventHash &readEvents)
 {
+    assert(cmd.idInDb != db::INVALID_INT_ID);
     auto query = db_connection::mkQuery();
     query->transaction();
 
-    query->prepare("select envId from cmd where `id`=?");
-    query->addBindValue(cmdId);
+    query->prepare("select envId,hashmetaId from cmd where `id`=?");
+    query->addBindValue(cmd.idInDb);
     query->exec();
     query->next(true);
-    const auto envId = qVariantTo_throw<qint64>(query->value(0));
+    const QVariant envId = query->value(0);
+    const QVariant hashMetaId = query->value(1);
 
-    insertFileWriteEvents(query, cmdId, writeEvents);
-    insertFileReadEvents(query, cmdId, envId, readEvents);
+    insertFileWriteEvents(query, cmd, writeEvents);
+    insertFileReadEvents(query, cmd, envId, hashMetaId, readEvents);
 }
 
 
@@ -266,9 +294,9 @@ db_controller::queryForCmd(const SqlQuery &sqlQ, bool reverseResultIter){
 
     // endTime is currently more accurate than startTime (at least
     // when collected within the shell integration
-    const QString orderBy = "order by cmd.endTime " +
-                        QString((sqlQ.ascending()) ? "asc " : "desc ") +
-                        ((sqlQ.limit() == -1) ? "" : "limit " + QString::number(sqlQ.limit()));
+    const QString orderBy = "order by cmd.endTime " + sqlQ.ascendingStr() +
+                            sqlQ.mkLimitString();
+
     if( ! reverseResultIter){
         pQuery->setForwardOnly(true);
     }
@@ -285,27 +313,27 @@ db_controller::queryForCmd(const SqlQuery &sqlQ, bool reverseResultIter){
 }
 
 /// if no entry can be found, the id of the returned file info is invalid.
-FileReadInfo db_controller::queryReadInfo(const qint64 id)
+FileReadInfo db_controller::queryReadInfo_byId(const qint64 id, const QueryPtr& query_)
 {
-    auto query = db_connection::mkQuery();
-    query->prepare("select readFile.id,path,name,mtime,size,mode from readFile "
-                  "where readFile.id=?");
-    query->addBindValue(id);
-    query->exec();
-    FileReadInfo info;
-    if(! query->next()){
-        return info;
+    SqlQuery sqlQ;
+    sqlQ.addWithAnd("readFile.id", id);
+    auto fileReadInfos = queryFileReadInfos(sqlQ, query_);
+    if(fileReadInfos.isEmpty()){
+        return FileReadInfo();
     }
-    int i=0;
-    info.idInDb = qVariantTo_throw<qint64>(query->value(i++));
-    info.path = query->value(i++).toString();
-    info.name = query->value(i++).toString();
-    info.mtime = query->value(i++).toDateTime();
-    info.size =  qVariantTo_throw<qint64>(query->value(i++));
-    info.mode =  qVariantTo_throw<mode_t>(query->value(i++));
-
-    return info;
+    assert(fileReadInfos.size() == 1);
+    return fileReadInfos.first();
 }
+
+FileReadInfos db_controller::queryReadInfos_byCmdId(qint64 cmdId, const QueryPtr &query_)
+{
+    SqlQuery sqlQ;
+    sqlQ.addWithAnd("cmdId", cmdId);
+    return queryFileReadInfos(sqlQ, query_,
+                              " join readFileCmd on "
+                              "readFile.id=readFileCmd.readFileId ");
+}
+
 
 /// @param restrictingFilesize: only return hashmeta-entries for which at least one file
 /// exists which was recorded using a given hashmeta and whose size is exactly that.
@@ -337,4 +365,6 @@ db_controller::queryHashmetas(qint64 restrictingFilesize){
     }
     return hashMetas;
 }
+
+
 

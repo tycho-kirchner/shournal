@@ -16,6 +16,7 @@
 class ShournalTestGlobals {
 public:
     subprocess::Args_t integrationShellArgs;
+    std::string integrationSetupCommand;
 };
 
 
@@ -75,7 +76,7 @@ inline int run(int argc, char *argv[])
         }
     }
     if(integrationMode){
-        setenv("_SHOURNAL_IN_INTEGRATION_TEST_MODE", "true", 1);
+        os::setenv<QByteArray>("_SHOURNAL_IN_INTEGRATION_TEST_MODE", "true");
         app::setupNameAndVersion();
         if(! app::inIntegrationTestMode()){
             QIErr() << "Failed to enable integration test mode.";
@@ -91,7 +92,15 @@ inline int run(int argc, char *argv[])
             QIErr() << "missing argument" << argShell.name();
             exit(1);
         }
-        for(const QString& s : argShell.getValue<QString>().split(" ", QString::SkipEmptyParts)){
+        const auto shellArgs = argShell.getValue<QString>().split(" ", QString::SkipEmptyParts);
+        if(shellArgs.first() == "bash"){
+            globals().integrationSetupCommand = "export HISTFILE=/dev/null";
+        } else {
+            QIErr() << "currently only bash is supported.";
+            exit(1);
+        }
+
+        for(const QString& s : shellArgs){
             globals().integrationShellArgs.push_back(s.toStdString());
         }
     } else {
@@ -118,14 +127,6 @@ inline int run(int argc, char *argv[])
 
         }
         ret += QTest::qExec(test, {});
-        // TODO: cleanup is not called in case of an exception. Correct that.
-        /*try {
-        }
-        catch (const std::exception& e) {
-            QErr() << "TEST failed: Unhandled std::exception occurred: " << e.what() << "\n";
-        } catch (...) {
-            QErr() << "TEST failed: Unknown exception occurred\n";
-        } */
     }
     if(ret != 0){
         QErr() << "\n**** AT LEAST ONE TEST FAILED! ****\n\n";

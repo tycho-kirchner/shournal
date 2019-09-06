@@ -47,7 +47,7 @@ public:
         struct CurrentDirInfo {
             _DirMap::const_iterator it; // current position
             _DirMap::const_iterator end;
-            size_t sizeDirName;
+            size_t sizeDirName; // putting brace {} here makes compilation fail. Why?
         };
 
         typedef std::vector<CurrentDirInfo> DirStack;
@@ -59,7 +59,7 @@ public:
         void nextDir();
         bool cdSubDirIfExist(_DirMap::iterator begin, _DirMap::iterator end);
         void nextEntryInParentDirs();
-        bool nextSiblingIfExist(CurrentDirInfo& upperDir);
+        bool nextSiblingIfExist(CurrentDirInfo& dirInfo);
 
         void appendPath(const std::string& dirname);
         void stripPath(size_t lastDirSize);

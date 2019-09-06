@@ -54,14 +54,18 @@ FileWriteEvent generateFileWriteEvent(){
 }
 
 FileReadEvent generateFileReadEvent(){
+    static auto hash_ = std::numeric_limits<uint64_t>::max();
     static int id_ = 1;
+
     FileReadEvent e;
     e.mode = S_IREAD;
     e.size = id_;
     e.bytes = QByteArray::number(id_);
     e.mtime = QDateTime(QDate(2019,1, id_ % 28)).toTime_t();
     e.fullPath = "/tmp/" + std::to_string(id_) + ".txt";
+    e.hash = hash_;
 
+    hash_--;
     id_++;
     return e;
 }
@@ -88,6 +92,7 @@ FileReadInfo fileReadEventToReadInfo(const FileReadEvent& e){
     i.name = QString::fromStdString(splittedPah.second);
     i.size = e.size;
     i.mtime = db_conversions::fromMtime(e.mtime).toDateTime();
+    i.hash = e.hash;
     return i;
 }
 
@@ -143,11 +148,11 @@ private slots:
         fInfos.insert({fCounter,fCounter}, fInfo2);
         ++fCounter;
 
-        auto cmdId = db_controller::addCommand(cmd1);
+        cmd1.idInDb = db_controller::addCommand(cmd1);
         auto closeDb = finally([] {
             db_connection::close();
         });
-        db_controller::addFileEvents(cmdId, fInfos, FileReadEventHash());
+        db_controller::addFileEvents(cmd1, fInfos, FileReadEventHash());
 
         QueryColumns & queryCols = QueryColumns::instance();
         SqlQuery q1;
@@ -180,12 +185,12 @@ private slots:
         readEvents.insert({fCounter, fCounter}, readEvent2);
         fCounter++;
 
-        auto cmd1Id = db_controller::addCommand(cmd1);
+        cmd1.idInDb = db_controller::addCommand(cmd1);
         auto closeDb = finally([] {
             db_connection::close();
         });
 
-        db_controller::addFileEvents(cmd1Id, FileWriteEventHash(), readEvents );
+        db_controller::addFileEvents(cmd1, FileWriteEventHash(), readEvents );
 
         cmd1.fileReadInfos = {fileReadEventToReadInfo(readEvent1), fileReadEventToReadInfo(readEvent2)};
 
@@ -229,14 +234,16 @@ private slots:
         ++fCounter;
 
         CommandInfo cmd1 = generateCmdInfo();
-        auto cmd1Id = db_controller::addCommand(cmd1);
+        cmd1.idInDb = db_controller::addCommand(cmd1);
         auto closeDb = finally([] { db_connection::close(); });
-        db_controller::addFileEvents(cmd1Id, writeEvents, readEvents );
+        db_controller::addFileEvents(cmd1, writeEvents, readEvents );
 
-        cmd1.fileReadInfos = {fileReadEventToReadInfo(readEvent1),fileReadEventToReadInfo(readEvent2)};
-        cmd1.fileWriteInfos = { fileWriteEventToWriteInfo(writeEvent1), fileWriteEventToWriteInfo(writeEvent2) };
+        cmd1.fileReadInfos = {fileReadEventToReadInfo(readEvent1),
+                              fileReadEventToReadInfo(readEvent2)};
+        cmd1.fileWriteInfos = { fileWriteEventToWriteInfo(writeEvent1),
+                                fileWriteEventToWriteInfo(writeEvent2) };
 
-        QCOMPARE(deleteCommandInDb(cmd1Id), 1);
+        QCOMPARE(deleteCommandInDb(cmd1.idInDb), 1);
 
         QueryColumns & queryCols = QueryColumns::instance();
         SqlQuery q1;
@@ -266,23 +273,23 @@ private slots:
         auto readEvent3 = generateFileReadEvent();
         cmd2.fileReadInfos = {fileReadEventToReadInfo(readEvent1),fileReadEventToReadInfo(readEvent3)};
 
-        cmd1Id = db_controller::addCommand(cmd1);
+        cmd1.idInDb = db_controller::addCommand(cmd1);
         readEvents.clear();
         readEvents.insert({fCounter, fCounter}, readEvent1);
         fCounter++;
         readEvents.insert({fCounter, fCounter}, readEvent2);
         fCounter++;
-        db_controller::addFileEvents(cmd1Id, FileWriteEventHash(), readEvents );
+        db_controller::addFileEvents(cmd1, FileWriteEventHash(), readEvents );
 
-        auto cmd2Id = db_controller::addCommand(cmd2);
+        cmd2.idInDb = db_controller::addCommand(cmd2);
         readEvents.clear();
         readEvents.insert({fCounter, fCounter}, readEvent1);
         fCounter++;
         readEvents.insert({fCounter, fCounter}, readEvent3);
         fCounter++;
-        db_controller::addFileEvents(cmd2Id, FileWriteEventHash(), readEvents );
+        db_controller::addFileEvents(cmd2, FileWriteEventHash(), readEvents );
 
-        QCOMPARE(deleteCommandInDb(cmd1Id), 1);
+        QCOMPARE(deleteCommandInDb(cmd1.idInDb), 1);
         // readEvent1 is common to both and should remain, readEvent2 should be deleted,
         // readEvent3 should still be there
         const char* qReadFileSize = "select * from readFile where size=?";
@@ -304,7 +311,7 @@ private slots:
 
         QCOMPARE(countStoredFiles(), 2);
 
-        QCOMPARE(deleteCommandInDb(cmd2Id), 1);
+        QCOMPARE(deleteCommandInDb(cmd2.idInDb), 1);
         query->exec("select * from writtenFile");
         QVERIFY(! query->next());
 
@@ -314,8 +321,10 @@ private slots:
         query->exec("select * from readFileCmd");
         QVERIFY(! query->next());
 
-        QCOMPARE(countStoredFiles(), 0);
+        query->exec("select * from hashmeta");
+        QVERIFY(! query->next());
 
+        QCOMPARE(countStoredFiles(), 0);
     }
 
 };

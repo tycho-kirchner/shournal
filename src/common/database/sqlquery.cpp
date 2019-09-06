@@ -4,13 +4,6 @@
 #include "exccommon.h"
 #include "util.h"
 
-SqlQuery::SqlQuery():
-    m_ascending(true),
-    m_limit(-1)
-{
-
-}
-
 
 
 const QString &SqlQuery::query() const
@@ -35,7 +28,7 @@ void SqlQuery::clear()
     m_columnSet.clear();
     m_tablenames.clear();
     m_ascending = true;
-    m_limit = -1;
+    m_limit = NO_LIMIT;
 }
 
 bool SqlQuery::isEmpty()
@@ -210,15 +203,29 @@ int SqlQuery::limit() const
     return m_limit;
 }
 
-/// @param limit:  -1 means not to impose a limit
+/// @param limit:  NO_LIMIT means *not* to impose a limit
 void SqlQuery::setLimit(int limit)
 {
     m_limit = limit;
 }
 
+/// @return 'limit x '-string or space character, if NO_LIMIT is imposed
+QString SqlQuery::mkLimitString() const
+{
+    return (m_limit == NO_LIMIT) ? " " : "limit " + QString::number(m_limit) + " ";
+}
+
 bool SqlQuery::ascending() const
 {
     return m_ascending;
+}
+
+const QString &SqlQuery::ascendingStr() const
+{
+    static const QString ASC_STR =  "asc ";
+    static const QString DESC_STR = "desc ";
+    if(m_ascending) return ASC_STR;
+    return DESC_STR;
 }
 
 void SqlQuery::setAscending(bool ascending)

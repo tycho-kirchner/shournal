@@ -2,6 +2,8 @@
 
 #include <dirent.h>
 
+#include "util.h"
+
 namespace osutil {
 
 
@@ -32,8 +34,8 @@ public:
     Iterator end() const;
 
 public:
-    FdEntries(const FdEntries &) = delete ;
-    void operator=(const FdEntries &) = delete ;
+    Q_DISABLE_COPY(FdEntries)
+    DEFAULT_MOVE(FdEntries)
 
 private:
 

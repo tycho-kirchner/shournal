@@ -21,7 +21,7 @@ public:
     UserStrConversions();
 
     qint64 bytesFromHuman(QString str);
-    QString bytesToHuman(const qint64 bytes);
+    QString bytesToHuman(qint64 bytes);
 
     QDateTime relativeDateTimeFromHuman(const QString& str, bool subtractIt);
 };

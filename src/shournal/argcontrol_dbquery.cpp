@@ -39,13 +39,20 @@ void queryCmdPrintAndExit(PrettyPrint& prettyPrint, SqlQuery& sqlQ, bool reverse
 
 [[noreturn]]
 void restoreSingleReadFile(QOptArg& argRestoreRfileId){
-    auto fReadInfo = db_controller::queryReadInfo(
+    auto fReadInfo = db_controller::queryReadInfo_byId(
                 static_cast<qint64>(argRestoreRfileId.getValue<uint64_t>())
                 );
     if(fReadInfo.idInDb == db::INVALID_INT_ID){
         QIErr() << qtr("cannot restore file - no database-entry exists");
         cpp_exit(1);
     }
+    if(! fReadInfo.isStoredToDisk){
+        QIErr() << qtr("cannot restore file %1 - only meta-information (path, name, etc.) "
+                       "about the file is stored in the database but not the "
+                       "file itself.").arg(fReadInfo.name);
+        cpp_exit(1);
+    }
+
     QDir currentDir = QDir::current();
     if(QFile::exists(currentDir.absoluteFilePath(fReadInfo.name)) &&
        osutil::isTTYForegoundProcess(STDIN_FILENO) &&
@@ -149,6 +156,8 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     QOptSqlArg argRMtime("rm", "rmtime", rFilePreamble + qtr("by mtime."),
                        QOptSqlArg::cmpOpsAllButLike() );
     parser.addArg(&argRMtime);
+
+    // TODO: argRHash (and others?)
 
     QOptArg argMaxReadFileLines("", "max-rfile-lines",
                             qtr("Display at most the first N lines for each "

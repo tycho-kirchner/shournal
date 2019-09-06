@@ -1,8 +1,25 @@
+#include <iostream>
+
 #include "qfddummydevice.h"
 
 #include "os.h"
 
-QFdDummyDevice::QFdDummyDevice(int fd) : m_fd(fd){}
+/// @param becomeOwner: if true, close the fd in destructor
+QFdDummyDevice::QFdDummyDevice(int fd, bool becomeOwner) :
+    m_fd(fd),
+    m_owner(becomeOwner)
+{}
+
+QFdDummyDevice::~QFdDummyDevice()
+{
+    if(m_owner){
+        try {
+            os::close(m_fd);
+        } catch (const os::ExcOs& e) {
+            std::cerr << __func__ << " " << e.what() << "\n";
+        }
+    }
+}
 
 
 qint64 QFdDummyDevice::readData(char *data, qint64 maxlen) {

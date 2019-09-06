@@ -15,7 +15,7 @@
 class SqlQuery
 {
 public:
-    SqlQuery();
+    static const int NO_LIMIT {-1};
 
     void addWithAnd(const QString& columnName, const QVariant& value,
                     const CompareOperator& operator_=CompareOperator());
@@ -37,10 +37,14 @@ public:
     bool isEmpty();
 
     bool ascending() const;
+    const QString& ascendingStr() const;
+
     void setAscending(bool ascending);
 
     int limit() const;
+    QString mkLimitString() const;
     void setLimit(int limit);
+
 
     void setQuery(const QString &query);
 
@@ -56,8 +60,8 @@ private:
     QVariantList m_values;
     std::unordered_set<QString> m_columnSet;
     std::unordered_set<QString> m_tablenames;
-    bool m_ascending;
-    int m_limit;
+    bool m_ascending {true};
+    int m_limit {NO_LIMIT};
 
 };
 

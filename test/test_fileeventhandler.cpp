@@ -1,6 +1,6 @@
 
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include <unistd.h>
 
 #include <QTest>
@@ -67,8 +67,8 @@ private slots:
         auto & sets = Settings::instance();
         sets.m_wSettings.includePaths.insert("/");
 
-        sets.m_wSettings.hashEnable = true;
-        sets.m_wSettings.hashMeta = HashMeta(2, 2);
+        sets.m_hashSettings.hashEnable = true;
+        sets.m_hashSettings.hashMeta = HashMeta(2, 2);
 
         int fd = tmpFile.handle();
 
@@ -88,13 +88,13 @@ private slots:
         // 10/hashMaxCountOfReads = 5 should be read and used for hash
         writeCompareBuf("ab___cd___", "abcd", fd, fEventHandler);
 
-        sets.m_wSettings.hashMeta = HashMeta(3, 2);
+        sets.m_hashSettings.hashMeta = HashMeta(3, 2);
         writeCompareBuf("abc__def___", "abcdef", fd, fEventHandler);
 
-        sets.m_wSettings.hashMeta = HashMeta(1, 2);
+        sets.m_hashSettings.hashMeta = HashMeta(1, 2);
         writeCompareBuf("a____d_____", "ad", fd, fEventHandler);
 
-        sets.m_wSettings.hashMeta = HashMeta(1, 3);
+        sets.m_hashSettings.hashMeta = HashMeta(1, 3);
         writeCompareBuf("a__b__c___", "abc", fd, fEventHandler);
 
     }
@@ -102,7 +102,7 @@ private slots:
     void tRead(){
         // TODO: implement a test...
 
-        auto & readSettings = Settings::instance().m_rSettings;
+        auto & readSettings = Settings::instance().m_scriptSettings;
         readSettings.enable = true;
         readSettings.includePaths.insert("/"); // todo: mk unique path
         readSettings.maxFileSize = 50000;

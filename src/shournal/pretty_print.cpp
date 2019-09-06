@@ -89,9 +89,13 @@ void PrettyPrint::printReadFileEventEvtlRestore(QFormattedStream& s, const FileR
     s.setLineStart(m_indentlvl2);
     s << readInfo.path  + QDir::separator() + readInfo.name
       << "(" + m_userStrConv.bytesToHuman(readInfo.size) + ")" << "id" << QString::number(readInfo.idInDb) <<  + "\n";
+    if(! readInfo.isStoredToDisk){
+        // since shournal 2.1 it is possible to log only meta-information about
+        // read files without storing them in the read files dir.
+        return;
+    }
 
     QFileThrow f(StoredFiles::getReadFilesDir() + QDir::separator() + QString::number(readInfo.idInDb));
-
     try {
         f.open(QFile::OpenModeFlag::ReadOnly);
         auto mtype = m_mimedb.mimeTypeForData(&f);

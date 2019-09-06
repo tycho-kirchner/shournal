@@ -4,7 +4,7 @@
 // Note: this is the initial scheme, please don't change it.
 // To add new stuff (tables/columns/indexes) please do that in
 // sqlite_database_scheme_updates.cpp
-const char* DATABASE_SCHEME = R"SOMERANDOMTEXT(
+const char* SQLITE_DATABASE_SCHEME = R"SOMERANDOMTEXT(
 
 CREATE TABLE IF NOT EXISTS `version` (
  `id` INTEGER PRIMARY KEY,

@@ -24,9 +24,6 @@ const QHash<QString, E_CompareOperator>& termEnumHash(){
 
 
 
-CompareOperator::CompareOperator() : m_operator(E_CompareOperator::EQ)
-{}
-
 CompareOperator::CompareOperator(E_CompareOperator op) : m_operator(op) {}
 
 /// Transform one of the commandline-passed operators into the enum and store it.

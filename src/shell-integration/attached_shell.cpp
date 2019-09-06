@@ -2,10 +2,6 @@
 #include "attached_shell.h"
 
 
-AttachedShell::AttachedShell()= default;
-
-AttachedShell::~AttachedShell()= default;
-
 void AttachedShell::handleEnable()
 {}
 

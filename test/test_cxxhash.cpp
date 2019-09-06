@@ -20,7 +20,7 @@ private slots:
         lseek(fd, 0, SEEK_SET);
 
         CXXHash h;
-        CXXHash::DigestResult res;
+        CXXHash::DigestResult res{};
 
         res = h.digestFile(fd, 2, 4);
         QCOMPARE(res.countOfReads, 4);

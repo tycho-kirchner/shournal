@@ -48,7 +48,7 @@ rlim_t osutil::getMaxCountOpenFiles()
 /// @return true, if fd existed within this process
 bool osutil::fdIsOpen(int fd)
 {
-    std::string fdpath = "/proc/self/fd/" + std::to_string(fd);
+    const std::string fdpath = "/proc/self/fd/" + std::to_string(fd);
     return os::exists(fdpath);
 }
 
@@ -289,4 +289,23 @@ void osutil::closeVerbose(int fd)
                   << generate_trace_string()
                   << "\n";
     }
+}
+
+/// Filedescriptors are usually given out using low integers, this function allows
+/// for finding the highest fd starting at startFd. If startFd==-1, return the
+/// the highest possible free fd (per-process max.-fd-count is e.g. 1024).
+/// @return: A fd-number if a free fd could be found. The fd is not opened, so there is
+/// a race-condition here. If no fd in the given range could be found, return -1.
+int osutil::findHighestFreeFd(int startFd, int minFd){
+    int fd = (startFd == -1) ? static_cast<int>(osutil::getMaxCountOpenFiles() -1)
+                             : startFd;
+    for(; fd >= minFd; --fd) {
+        if(fd == 255 ){ // that one is usually reserved
+            continue;
+        }
+        if(! osutil::fdIsOpen(fd)){
+            return fd;
+        }
+    }
+    return -1;
 }

@@ -3,7 +3,14 @@
 #include "util.h"
 
 /// @throws QExcIo
-/// @return: *always* true, only bool because of 'override'
+void QFileThrow::flush()
+{
+    if(! QFile::flush()){
+        throw QExcIo(qtr("Failed to flush %1: %2")
+                     .arg(this->fileName(), this->errorString()));
+    }
+}
+
 bool QFileThrow::open(QIODevice::OpenMode flags)
 {
     if(! QFile::open(flags)){
@@ -18,6 +25,17 @@ bool QFileThrow::open(int fd, QIODevice::OpenMode ioFlags, QFileDevice::FileHand
     if(! QFile::open(fd, ioFlags, handleFlags)){
         throw QExcIo(qtr("Failed to open fd %1: %2")
                      .arg(fd).arg(this->errorString()));
+    }
+    return true;
+}
+
+/// @throws QExcIo
+/// @return: *always* true, only bool because of 'override'
+bool QFileThrow::seek(qint64 offset)
+{
+    if(! QFile::seek(offset)){
+        throw QExcIo(qtr("Failed to seek %1: %2")
+                     .arg(this->fileName(), this->errorString()));
     }
     return true;
 }

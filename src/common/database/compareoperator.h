@@ -14,8 +14,7 @@ enum class E_CompareOperator { GT,GE,LT,LE,EQ,NE,LIKE,BETWEEN };
 class CompareOperator
 {
 public:
-
-    CompareOperator();
+    CompareOperator() = default;
     CompareOperator(E_CompareOperator op);
 
     bool fromTerminal(const QString& val);
@@ -25,6 +24,6 @@ public:
     E_CompareOperator asEnum() const;
 
 private:
-    E_CompareOperator m_operator;
+    E_CompareOperator m_operator{E_CompareOperator::EQ};
 };
 

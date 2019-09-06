@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include <stddef.h>
+#include <cstddef>
 #include <unistd.h>
 #include <QByteArray>
 #include <string>
@@ -19,7 +19,7 @@ public:
     {
     public:
         explicit ExcCXXHash(const std::string & msg, int errorcode);
-        const char *what () const noexcept;
+        const char *what () const noexcept override;
     private:
         std::string m_descrip;
         int m_errorcode;
@@ -40,6 +40,10 @@ public:
     DigestResult digestWholeFile(int fd, int bufSize);
     DigestResult digestFile(int fd, int bufSize, off64_t seekstep,
                             int maxCountOfReads=std::numeric_limits<int>::max());
+
+public:
+    CXXHash(const CXXHash&) = delete;
+    void operator=(const CXXHash&) = delete;
 
 private:
     XXH64_state_t * const m_pXXState;

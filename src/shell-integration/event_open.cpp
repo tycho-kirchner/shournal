@@ -44,9 +44,10 @@ int event_open::handleOpen(const char *pathname, int flags, mode_t mode, bool la
     if(pathname[0] == '/'){
         actualPath = pathname;
     } else {
-        if(realpath(pathname, buf) == nullptr){
-            logDebug << qtr("realpath failed for %1 (%2)").arg(pathname,
-                                                               translation::strerror_l())  ;
+        if(realpath(pathname, buf) == nullptr){            
+            logInfo << qtr("Failed to resolve relative path %1 (%2). "
+                           "File events will not be registered.")
+                       .arg(pathname, translation::strerror_l());
             return g_shell.orig_open(pathname, flags, mode);
         }
         actualPath = buf;

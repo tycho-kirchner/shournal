@@ -109,7 +109,7 @@ int shournal_main(int argc, char *argv[])
 
     QOptArg argEditCfg("c", "edit-cfg", qtr("Edit the config-file at %1 "
                                             "with your favourite text-editor:\n"
-                                            "export EDITOR='...'").arg(sets.defaultCfgFilepath()),
+                                            "export EDITOR='...'").arg(sets.cfgFilepath()),
                                              false);
     parser.addArg(&argEditCfg);
 
@@ -188,7 +188,7 @@ int shournal_main(int argc, char *argv[])
         }
 
         if(argEditCfg.wasParsed()){
-            int ret = console_dialog::openFileInExternalEditor(sets.defaultCfgFilepath());
+            int ret = console_dialog::openFileInExternalEditor(sets.cfgFilepath());
             cpp_exit(ret);
         }
 
@@ -203,7 +203,7 @@ int shournal_main(int argc, char *argv[])
         if(argLsOurPaths.wasParsed()){
             QOut() << qtr("Database directory: ") << db_connection::getDatabaseDir() << "\n"
                    << qtr("Configuration directory: ")
-                           << splitAbsPath(sets.defaultCfgFilepath()).first << "\n"
+                           << splitAbsPath(sets.cfgFilepath()).first << "\n"
                    << qtr("Cache directory (log-files): ") << logger::logDir() << "\n" ;
             cpp_exit(0);
         }

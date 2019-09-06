@@ -9,7 +9,7 @@ class ExcCommon : public std::exception
 public:
     explicit ExcCommon(std::string  text);
 
-    const char *what () const noexcept;
+    const char *what () const noexcept override;
     std::string & descrip();
 
 protected:
@@ -23,7 +23,7 @@ class QExcCommon : public std::exception
 public:
     explicit QExcCommon(QString  text, bool collectStacktrace=true);
 
-    const char *what () const noexcept;
+    const char *what () const noexcept override;
     QString descrip() const;
     void setDescrip(const QString &descrip);
 

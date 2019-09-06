@@ -26,9 +26,9 @@ CommandInfo CommandInfo::fromLocalEnv()
     // informative (and also not allowed in the database scheme). Using below approach returns
     // a valid string with a trailing ' (deleted)', if appropriate.
     cmd.workingDirectory = QString::fromLocal8Bit(os::readlink<QByteArray>("/proc/self/cwd"));
-    auto & wsets = Settings::instance().writeFileSettings();
-    if(wsets.hashEnable){
-        cmd.hashMeta = wsets.hashMeta;
+    auto & sets = Settings::instance();
+    if(sets.hashSettings().hashEnable){
+        cmd.hashMeta = sets.hashSettings().hashMeta;
     }
     return cmd;
 }
@@ -55,7 +55,7 @@ bool CommandInfo::operator==(const CommandInfo &rhs) const
            fileReadInfos == rhs.fileReadInfos &&
            startTime == rhs.startTime &&
            endTime == rhs.endTime &&
-            workingDirectory == rhs.workingDirectory;
+           workingDirectory == rhs.workingDirectory;
 }
 
 void CommandInfo::clear()

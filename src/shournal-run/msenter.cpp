@@ -7,7 +7,7 @@
  * Thus we should perform some permission checks, to only allow joining mount-namespaces created
  * by shournal.
  * The target pid's user-id must be the same as the caller, its group *must* be
- * <shournalmsenter> (or defined by user at buildtime).
+ * app::MSENTER_ONLY_GROUP.
  * Reenter the working directory (checked race condition, because using the dirfd does not work).
  * */
 

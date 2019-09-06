@@ -1,7 +1,9 @@
 #pragma once
 
 #include <QString>
-#include <errno.h>
+#include <cerrno>
+
+#include "util.h"
 
 namespace translation {
     bool init();
@@ -11,21 +13,20 @@ namespace translation {
 
     class TrSnippets {
     public:
-        TrSnippets(const TrSnippets&) = delete;
-        void operator=(const TrSnippets&) = delete;
 
-        const QString enable;
-        const QString shournalShellIntegration;
-        const QString shournalRestore;
+
+        const QString enable {qtr("enable")};
+        const QString shournalShellIntegration {qtr("shournal shell-integration")};
+        const QString shournalRestore {qtr("shournal-restore")};
 
         static TrSnippets &instance();
 
+    public:
+        Q_DISABLE_COPY(TrSnippets)
+        DEFAULT_MOVE(TrSnippets)
+        ~TrSnippets() = default;
     private:
-        TrSnippets();
-        ~TrSnippets();
-
-
-        static TrSnippets* s_instance;
+        TrSnippets() = default;
     };
 
 } // namespace translation

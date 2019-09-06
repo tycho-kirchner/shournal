@@ -34,7 +34,6 @@
 #include "subprocess.h"
 #include "app.h"
 #include "pathtree.h"
-#include "qprocthrow.h"
 #include "fileeventhandler.h"
 #include "orig_mountspace_process.h"
 #include "cpp_exit.h"
@@ -102,7 +101,7 @@ FileWatcher::MsenterChildReturnValue FileWatcher::setupMsenterTargetChildProcess
         os::setegid(os::getgid());
         os::seteuid(m_realUid);
         os::close(pipe_[0]);
-        return MsenterChildReturnValue(msenterPid, pipe_[1]);
+        return {msenterPid, pipe_[1]};
     }
     // child
     if(m_sockFd != -1){
@@ -350,7 +349,7 @@ void FileWatcher::flushToDisk(CommandInfo& cmdInfo){
         }
 
         StoredFiles::mkpath();
-        db_controller::addFileEvents(cmdInfo.idInDb, m_fEventHandler.writeEvents(),
+        db_controller::addFileEvents(cmdInfo, m_fEventHandler.writeEvents(),
                                      m_fEventHandler.readEvents() );
     } catch (std::exception& e) {
         // May happen, e.g. if we run out of disk space...
@@ -425,7 +424,7 @@ E_SocketMsg FileWatcher::pollUntilStopped(CommandInfo& cmdInfo,
         // Note: for a (more or less) short time, the size of cached files might be bigger than
         // specified in settings. That should not be a problem though.
         if(m_fEventHandler.sizeOfCachedReadFiles() >
-                prefs.readEventSettings().flushToDiskTotalSize ||
+                prefs.readEventScriptSettings().flushToDiskTotalSize ||
            m_fEventHandler.writeEvents().size() >
                 prefs.writeFileSettings().flushToDiskEventCount){
             logInfo << qtr("flushing to disk.");

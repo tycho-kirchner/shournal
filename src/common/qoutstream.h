@@ -11,6 +11,7 @@ class QOut
 public:
     QOut();
     ~QOut();
+
     template<class T>
     QOut& operator<<(const T& t) {
         m_textStream << t;

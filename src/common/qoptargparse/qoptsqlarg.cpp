@@ -81,12 +81,12 @@ const QOptSqlArg::CompareOperators &QOptSqlArg::cmpOpsEqNe()
 }
 
 
-QOptSqlArg::QOptSqlArg(const QString &flag,
+QOptSqlArg::QOptSqlArg(const QString &shortName,
                        const QString &name,
                        const QString &description,
                        const CompareOperators &supportedOperators,
                        const E_CompareOperator &defaultOperator) :
-    QOptArg(flag, name, description, allArgTrigger(),
+    QOptArg(shortName, name, description, allArgTrigger(),
              CompareOperator(defaultOperator).asTerminal()),
     m_parsedOperator(defaultOperator),
     m_supportedOperators(supportedOperators)

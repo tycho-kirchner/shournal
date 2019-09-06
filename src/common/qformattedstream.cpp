@@ -154,6 +154,22 @@ void QFormattedStream::writeSpace(const QChar &c)
     }
 }
 
+
+const QString &QFormattedStream::lineStart() const
+{
+    return m_lineStart;
+}
+
+int QFormattedStream::maxLineWidth() const
+{
+    return m_maxLineWidth;
+}
+
+QChar QFormattedStream::streamChunkSep() const
+{
+    return m_streamChunkSep;
+}
+
 void QFormattedStream::setStreamChunkSep(const QChar &streamChunkSep)
 {
     m_streamChunkSep = streamChunkSep;

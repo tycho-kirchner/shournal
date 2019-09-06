@@ -25,7 +25,6 @@
 #include "translation.h"
 #include "app.h"
 #include "qexcdatabase.h"
-#include "excqprocthrow.h"
 #include "mount_controller.h"
 #include "orig_mountspace_process.h"
 #include "cpp_exit.h"

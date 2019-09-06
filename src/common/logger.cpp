@@ -223,15 +223,15 @@ void logger::LogRotate::setup()
         // race condition - make sure to only rename once:
          CFlock l(m_file.handle());
          l.lockExclusive();
-         // renamed alreay (by another process)?
+         // renamed already (by another process)?
          if(! osutil::findPathOfFd<QByteArray>(m_file.handle()).endsWith("_old")){
              const std::string path = m_fullpath.toStdString();
              os::rename(path, path + "_old");
-             l.unlock();
-             // open the new logfile file, which should be empty
-             m_file.close();
-             openLogfileOrThrow();
          }
+         l.unlock();
+         m_file.close();
+         // open or create the new logfile:
+         openLogfileOrThrow();
     }
     m_stream.setDevice(&m_file);
 }

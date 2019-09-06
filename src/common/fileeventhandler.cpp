@@ -27,7 +27,7 @@ FileEventHandler::FileEventHandler() :
     m_sizeOfCachedReadFiles(0)
 {
     this->fillAllowedGroups();
-    m_writeEvents.reserve(5000);
+    m_writeEvents.reserve(1000);
 }
 
 FileEventHandler::~FileEventHandler(){
@@ -76,26 +76,26 @@ bool FileEventHandler::userHasReadPermission(const struct stat &st)
 }
 
 /// check whether to accept the file according to file extension and mime-type.
-/// If both set (not-empty) only has has to match,
+/// If both set (not-empty) only one has to match,
 /// if both unset, accept all,
 /// else only take the set one into account.
-bool FileEventHandler::readFileTypeMatches(const Settings::ReadFileSettings &readCfg,
+bool FileEventHandler::readFileTypeMatches(const Settings::ScriptFileSettings &scriptCfg,
                                            int fd, const std::string& fpath)
 {
-    if(! readCfg.includeExtensions.empty() && ! readCfg.includeMimetypes.empty()){
+    if(! scriptCfg.includeExtensions.empty() && ! scriptCfg.includeMimetypes.empty()){
         // both not empty, consider both (OR'd)
-        return fileExtensionMatches(readCfg.includeExtensions, fpath) ||
-               mimeTypeMatches(fd, readCfg.includeMimetypes);
+        return fileExtensionMatches(scriptCfg.includeExtensions, fpath) ||
+               mimeTypeMatches(fd, scriptCfg.includeMimetypes);
     }
-    if(readCfg.includeExtensions.empty() && readCfg.includeMimetypes.empty()){
+    if(scriptCfg.includeExtensions.empty() && scriptCfg.includeMimetypes.empty()){
         return true;
     }
     // one is empty, the other not
-    if(! readCfg.includeExtensions.empty()){
-        return fileExtensionMatches(readCfg.includeExtensions, fpath);
+    if(! scriptCfg.includeExtensions.empty()){
+        return fileExtensionMatches(scriptCfg.includeExtensions, fpath);
     }
-    assert(! readCfg.includeMimetypes.empty());
-    return mimeTypeMatches(fd, readCfg.includeMimetypes);
+    assert(! scriptCfg.includeMimetypes.empty());
+    return mimeTypeMatches(fd, scriptCfg.includeMimetypes);
 }
 
 bool FileEventHandler::fileExtensionMatches(const Settings::StringSet &validExtensions,
@@ -113,6 +113,8 @@ bool FileEventHandler::mimeTypeMatches(int fd, const Settings::MimeSet &validMim
     os::lseek(fd, 0, SEEK_SET);
     return validMimetypes.find(mimetype) != validMimetypes.end();
 }
+
+
 
 int FileEventHandler::sizeOfCachedReadFiles() const
 {
@@ -150,18 +152,12 @@ const FileWriteEventHash &FileEventHandler::writeEvents() const
     return m_writeEvents;
 }
 
-FileWriteEventHash &FileEventHandler::writeEvents()
-{
-    return m_writeEvents;
-}
-
-
 /// @param enableReadActions: if false, do not read from fd, regardless of settings
 /// @throws ExcOs, CXXHashError
-void FileEventHandler::handleCloseWrite(int fd, bool enableReadActions)
+void FileEventHandler::handleCloseWrite(int fd)
 {
     // first lookup the path, then stat, so no filename contains a trailing '(deleted)'
-    const auto pathOfFd = readLinkOfFd(fd);
+    const auto filepath = readLinkOfFd(fd);
     const auto st = os::fstat(fd);
     if(st.st_nlink == 0){
         // always ignore deleted files
@@ -169,31 +165,40 @@ void FileEventHandler::handleCloseWrite(int fd, bool enableReadActions)
     }
 
     if(! userHasWritePermission(st)){
-        logDebug << "closedwrite-event not recorded (no write permission): "
-                 << pathOfFd;
+        logDebug << "closedwrite-event not recorded (no write permission):"
+                 << filepath;
         return;
     }
-    auto & wsets = Settings::instance().writeFileSettings();
-    if(! wsets.includePaths.isSubPath(pathOfFd, true) ){
+    auto & sets = Settings::instance();
+
+    auto & wsets = sets.writeFileSettings();
+    if(wsets.excludeHidden && pathIsHidden(filepath) &&
+            ! wsets.includePathsHidden.isSubPath(filepath, true)){
+        logDebug << "closedwrite-event not recorded (hidden file):"
+                 << filepath;
+        return;
+    }
+
+    if(! wsets.includePaths.isSubPath(filepath, true) ){
         logDebug << "closedwrite-event not recorded (no subpath of include_dirs): "
-                 << pathOfFd;
+                 << filepath;
         return;
     }
-    if(wsets.excludePaths.isSubPath(pathOfFd, true) ){
+    if(wsets.excludePaths.isSubPath(filepath, true) ){
         logDebug << "closedwrite-event not recorded (subpath of exclude_dirs): "
-                 << pathOfFd;
+                 << filepath;
         return;
     }
 
     auto & writeEvent = m_writeEvents[DevInodePair(st.st_dev, st.st_ino)] ;
-    writeEvent.fullPath = pathOfFd;
+    writeEvent.fullPath = filepath;
     writeEvent.mtime = st.st_mtime;
     writeEvent.size = st.st_size;
 
-    if(enableReadActions && wsets.hashEnable){
-        writeEvent.hash =  m_hashControl.genPartlyHash(fd, st.st_size, wsets.hashMeta);
+    if(sets.hashSettings().hashEnable){
+        writeEvent.hash =  m_hashControl.genPartlyHash(fd, st.st_size,
+                                                       sets.hashSettings().hashMeta);
     }
-
 
     logDebug << "closedwrite-event recorded: "
              << writeEvent.fullPath;
@@ -204,8 +209,95 @@ void FileEventHandler::handleCloseWrite(int fd, bool enableReadActions)
     // }
 }
 
+bool FileEventHandler::generalReadSettingsSayLogIt(const bool userHasWritePerm,
+                                                   const std::string& filepath)
+{
+    const auto& cfg = Settings::instance().readFileSettins();
+    if(! cfg.enable){
+        return false;
+    }
+    if(cfg.onlyWritable && ! userHasWritePerm){
+        logDebug << "general read event ignored: no write permission:"
+                 << filepath;
+        return false;
+    }
+    if(cfg.excludeHidden && pathIsHidden(filepath) &&
+            ! cfg.includePathsHidden.isSubPath(filepath, true)){
+        logDebug << "general read event ignored: hidden file:"
+                 << filepath;
+        return false;
+    }
+
+    if( ! cfg.includePaths.isSubPath(filepath, true)){
+        logDebug << "general read event ignored: not a subpath of any included path:"
+                 << filepath;
+        return false;
+    }
+    if( cfg.excludePaths.isSubPath(filepath, true)){
+        logDebug << "general read event ignored: is a subpath of an excluded path:"
+                 << filepath;
+        return false;
+    }
+    return true;
+}
+
+bool
+FileEventHandler::scriptReadSettingsSayLogIt(bool userHasWritePerm,
+                                                  const std::string &fpath,
+                                                  const os::stat_t &st,
+                                                  int fd)
+{
+    const auto& scriptCfg = Settings::instance().readEventScriptSettings();
+    if(! scriptCfg.enable){
+        return false;
+    }
+    // repeat check here: fanotify-read-events are only unregistered, if
+    // general read events are disabled...
+    if(countOfCollectedReadFiles() >= scriptCfg.maxCountOfFiles){
+        logDebug << "possible script-event ignored: already collected enough files:"
+                 << fpath;
+        return false;
+    }
+
+    if(scriptCfg.onlyWritable && ! userHasWritePerm){
+        logDebug << "possible script-event ignored: no write permission:"
+                 << fpath;
+        return false;
+    }
+
+    if(st.st_size > scriptCfg.maxFileSize){
+        logDebug << "possible script-event ignored: file too big:"
+                 << fpath;
+        return false;
+    }
+
+    if( ! scriptCfg.includePaths.isSubPath(fpath, true)){
+        logDebug << "possible script-event ignored: file"
+                 << fpath << "is not a subpath of any included path";
+        return false;
+    }
+    if( scriptCfg.excludePaths.isSubPath(fpath, true)){
+        logDebug << "possible script-event ignored: file"
+                 << fpath << "is a subpath of an excluded path";
+        return false;
+    }
+
+    if(! readFileTypeMatches(scriptCfg, fd, fpath)){
+        logDebug << "script-event ignored: neither file-extension nor mime-type "
+                    "matches for " << fpath;
+        return false;
+    }
+    return true;
+}
+
+bool FileEventHandler::pathIsHidden(const std::string &fullPath)
+{
+    return fullPath.find("/.") != std::string::npos;
+}
+
+
 /// @param enableReadActions: if false, do not read from fd, regardless of settings
-void FileEventHandler::handleCloseNoWrite(int fd, bool enableReadActions)
+void FileEventHandler::handleCloseRead(int fd)
 {
     // first lookup the path, then stat, so no filename contains a trailing '(deleted)'
     const auto fpath = readLinkOfFd(fd);
@@ -216,43 +308,19 @@ void FileEventHandler::handleCloseNoWrite(int fd, bool enableReadActions)
     }
 
     if(! userHasReadPermission(st)){
-        logDebug << "close-no-write-event not recorded (not allowed): "
+        logDebug << "close-no-write-event not recorded (read not allowed): "
                  << fpath;
         return;
     }
-
-    const auto & readCfg = Settings::instance().readEventSettings();
-
-    if(st.st_size > readCfg.maxFileSize){
-        logDebug << "close-no-write-event ignored: file too big:"
-                 << fpath;
+    const bool userHasWritePerm = userHasWritePermission(st);
+    const bool logGeneralReadEvent = generalReadSettingsSayLogIt(userHasWritePerm,
+                                                                 fpath);
+    bool logScriptEvent = scriptReadSettingsSayLogIt(userHasWritePerm, fpath,
+                                                     st, fd);
+    if(! logGeneralReadEvent && ! logScriptEvent){
         return;
     }
-
-    if(readCfg.onlyWritable &&
-       ! userHasWritePermission(st)){
-        logDebug << "close-no-write-event ignored: no write permission"
-                 << fpath;
-        return;
-    }
-
-    if( ! readCfg.includePaths.isSubPath(fpath, true)){
-        logDebug << "close-no-write-event ignored: file"
-                 << fpath << "is not a subpath of any included path";
-        return;
-    }
-    if( readCfg.excludePaths.isSubPath(fpath, true)){
-        logDebug << "close-no-write-event ignored: file"
-                 << fpath << "is a subpath of an excluded path";
-        return;
-    }
-
-    if(! readFileTypeMatches(readCfg, fd, fpath)){
-        logDebug << "close-no-write-event ignored: neither file-extension nor mime-type "
-                    "matches for path" << fpath;
-        return;
-    }
-    logDebug << "close-no-write-event recorded"
+    logDebug << "read-event recorded (collect script:" << logScriptEvent << ")"
              << fpath;
 
     auto & readEvent = m_readEvents[DevInodePair(st.st_dev, st.st_ino)] ;
@@ -261,15 +329,23 @@ void FileEventHandler::handleCloseNoWrite(int fd, bool enableReadActions)
     readEvent.size = st.st_size;
     readEvent.mode = st.st_mode;
 
-    if(enableReadActions){
+    assert(os::ltell(fd) == 0);
+    auto & sets = Settings::instance();
+    if(sets.hashSettings().hashEnable){
+        readEvent.hash =  m_hashControl.genPartlyHash(fd, st.st_size,
+                                                       sets.hashSettings().hashMeta);
+    }
+    if(logScriptEvent){
         assert(os::ltell(fd) == 0);
         readEvent.bytes = osutil::readWholeFile(fd, static_cast<int>(st.st_size) + 1024);
         // maybe_todo: To be really correct one would also need to check again,
         // if bytes.size > readCfg.maxFileSize. In practice this should not be too relevant...
         os::lseek(fd, 0, SEEK_SET);
         m_sizeOfCachedReadFiles += readEvent.bytes.size();
+    } else {
+        // should happen seldom: inode was reused, so override bytes just in case
+        readEvent.bytes = {};
     }
-
 }
 
 

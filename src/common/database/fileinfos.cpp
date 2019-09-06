@@ -1,13 +1,11 @@
 #include "fileinfos.h"
-#include "db_globals.h"
 
-FileWriteInfo::FileWriteInfo() :
-    size(0)
-{
+#include "util.h"
+#include "db_conversions.h"
 
-}
 
-bool FileWriteInfo::operator==(const FileWriteInfo &rhs) const
+bool
+FileWriteInfo::operator==(const FileWriteInfo &rhs) const
 {
     return mtime == rhs.mtime &&
             size == rhs.size &&
@@ -16,16 +14,8 @@ bool FileWriteInfo::operator==(const FileWriteInfo &rhs) const
             hash == rhs.hash;
 }
 
-
-
-FileReadInfo::FileReadInfo() :
-    idInDb(db::INVALID_INT_ID),
-    size(0),
-    mode(0)
-{}
-
-
-bool FileReadInfo::operator==(const FileReadInfo &rhs) const
+bool
+FileReadInfo::operator==(const FileReadInfo &rhs) const
 {
     if(idInDb != db::INVALID_INT_ID && rhs.idInDb != db::INVALID_INT_ID){
         return idInDb == rhs.idInDb;
@@ -35,5 +25,6 @@ bool FileReadInfo::operator==(const FileReadInfo &rhs) const
             size == rhs.size &&
             path == rhs.path &&
             name == rhs.name &&
-            mode == rhs.mode;
+            mode == rhs.mode &&
+            hash == rhs.hash;
 }

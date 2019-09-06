@@ -24,7 +24,7 @@ public:
             const QString& description,
             const QOptArgTrigger & optTrigger, const QString& defaultTriggerStr);
 
-    virtual ~QOptArg();
+    virtual ~QOptArg() = default;
 
     QString shortName() const;
 

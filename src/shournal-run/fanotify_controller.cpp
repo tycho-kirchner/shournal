@@ -81,6 +81,20 @@ bool fanotifyMarkWrapOnInit(int fanFd, uint64_t mask, const std::string& path_){
 
 }
 
+/// Fill param result with parentPaths and all sub-mountpaths, that is,
+/// all paths in allMountpaths, which are a sub-path of any parentPath,
+/// are added.
+void addPathsAndSubMountPaths(const PathTree& parentPaths,
+                              const PathTree& allMountpaths,
+                              StringSet& result){
+    for(const auto& p : parentPaths){
+        result.insert(p);
+        for(auto mountIt = allMountpaths.subpathIter(p); mountIt != allMountpaths.end(); ++mountIt){
+            result.insert(*mountIt);
+        }
+    }
+}
+
 
 } // anonymous namespace
 
@@ -125,8 +139,8 @@ int FanotifyController::fanFd() const
 }
 
 /// fanotify_mark all paths of interest, that is all paths
-/// which shall be observed for write-events (file modifications) or read events
-/// (script collection). We unshared the mount-namespace before, perform the
+/// which shall be observed for write-events (file modifications) or read events.
+/// We unshared the mount-namespace before, perform the
 /// mark by using mount-points.
 /// Also collect all mount-points, which are submounts of
 /// a desired path (if / shall be observed, e.g.
@@ -142,27 +156,21 @@ void FanotifyController::setupPaths(){
     auto & sets = Settings::instance();
     auto allMounts = mountController::generatelMountTree();
     StringSet allWritePaths;
-    for(const auto& p : sets.writeFileSettings().includePaths){
-        allWritePaths.insert(p);
-    }
-
-    for(const auto & path : sets.writeFileSettings().includePaths){
-        for(auto mountIt = allMounts.subpathIter(path); mountIt != allMounts.end(); ++mountIt){
-            allWritePaths.insert(*mountIt);
-        }
-    }
+    addPathsAndSubMountPaths(sets.writeFileSettings().includePaths,
+                             allMounts, allWritePaths);
 
     StringSet allReadPaths;
-    if(sets.readEventSettings().enable){
-        for(const auto& p : sets.readEventSettings().includePaths){
-            allReadPaths.insert(p);
-        }
-        for(const auto & path : sets.readEventSettings().includePaths){
-            for(auto mountIt = allMounts.subpathIter(path); mountIt != allMounts.end(); ++mountIt){
-                allReadPaths.insert(*mountIt);
-            }
-        }
+    // Script files (which shall be stored) and 'normal' read files are treated differently later -
+    // first mark unified paths from both categories for fanotify read-events.
+    if(sets.readFileSettins().enable){
+        addPathsAndSubMountPaths(sets.readFileSettins().includePaths,
+                                 allMounts, allReadPaths);
     }
+    if(sets.readEventScriptSettings().enable){
+        addPathsAndSubMountPaths(sets.readEventScriptSettings().includePaths,
+                                 allMounts, allReadPaths);
+    }
+
     m_readMountPaths.reserve(allReadPaths.size());
 
     uint64_t writeMask = FAN_CLOSE_WRITE;
@@ -217,7 +225,7 @@ bool FanotifyController::handleEvents()
         len = read(m_fanFd, buf, sizeof(buf));
         if (len == -1 && errno != EAGAIN) {
             const auto preamble = qtr("read from fanotify file descriptor failed:");
-            // TODO: file a bug to the fanotify-devs? According to man 7 fanotify
+            // maybe_todo: file a bug to the fanotify-devs? According to man 7 fanotify
             // there should be no permission check, when the kernel repoens the file
             // for fanotify...
             // Furthermore it is unclear whether other events in the queue after a
@@ -256,7 +264,7 @@ bool FanotifyController::handleEvents()
                                    "No event-processing takes place. "
                                    "Please recompile the application against the current "
                                    "Kernel").arg(metadata->vers, FANOTIFY_METADATA_VERSION);
-                // TODO: unregister from all events, etc....
+                // maybe_todo: unregister from all events?
                 return false;
             }
             // metadata->fd contains either FAN_NOFD, indicating a
@@ -391,28 +399,29 @@ void FanotifyController::handleSingleEvent(const struct fanotify_event_metadata&
 }
 
 /// Handle a 'read'-event.
-/// We must consider that already enough (see settings) read-events were consumed
-/// (scripts were cached). This might be true, even if this function is called the first
-/// time, because we have received fd's from the external shell-process before
-/// (which are *not* handled here). The first time this function is called and enough
-/// read-events were consumed we unregister from fanotify-read events (FAN_MARK_REMOVE).
-/// Remaining read events in the fanotify event-queue have to be still consumed though,
-/// that's what the ignore-flag is good for.
+/// If read 'script' files shall be stored, but not general read files,
+/// unregister from read events, as soon as the specified number of script
+/// files was collected.
 void FanotifyController::handleCloseNoWrite_safe(const fanotify_event_metadata &metadata){
     if(m_ReadEventsUnregistered){
+        // Do not edit: even if successfully unregistered,
+        // events in the fanotify event-queue may still need to be consumed.
         return;
     }
-    if(m_feventHandler.countOfCollectedReadFiles() >=
-            Settings::instance().readEventSettings().maxCountOfFiles) {
+    auto & sets = Settings::instance();
+    if(! sets.readFileSettins().enable && // never unregister, if general read files are logged
+         sets.readEventScriptSettings().enable &&
+            m_feventHandler.countOfCollectedReadFiles() >=
+            sets.readEventScriptSettings().maxCountOfFiles) {
         unregisterAllReadPaths();
         m_ReadEventsUnregistered = true;
         return;
     }
 
     try {
-        m_feventHandler.handleCloseNoWrite(metadata.fd);
-        // The count of cached read files might have been incremented, so we might be done with
-        // read events. For the sake
+        m_feventHandler.handleCloseRead(metadata.fd);
+        // The count of cached read (script-) files might have been incremented,
+        // so we might be done with read events. For the sake
         // of code-shortness only check that the *next* time we consume a read event.
     } catch (const std::exception & e) {
         logCritical << e.what();
@@ -431,7 +440,7 @@ void FanotifyController::handleModCloseWrite_safe(const fanotify_event_metadata 
 /// unregister read events for all previously marked paths.
 void FanotifyController::unregisterAllReadPaths()
 {
-    logDebug << "enough read files collected. Unregistering...";
+    logDebug << "enough read script-files collected. Unregistering...";
     for(const auto& p : m_readMountPaths){
         if (fanotify_mark(m_fanFd, FAN_MARK_REMOVE | FAN_MARK_MOUNT,
                           FAN_CLOSE_NOWRITE, AT_FDCWD,

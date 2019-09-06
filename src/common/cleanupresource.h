@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+#include "util.h"
+
 namespace private_namesapce {
 
 
@@ -28,6 +30,10 @@ struct CleanupResource
         m_enabled = val;
     }
 
+public:
+    Q_DISABLE_COPY(CleanupResource)
+    DEFAULT_MOVE(CleanupResource)
+
 private:
     F m_cleanF;
     bool m_enabled;
@@ -45,7 +51,6 @@ private_namesapce::CleanupResource<F> finally(F f, bool enable=true) __attribute
 /// Usage:
 /// char* buf = new char;
 /// auto deleter = finally([buf] {delete buf; });
-///
 template <typename F>
 private_namesapce::CleanupResource<F> finally(F f, bool enable){
     return private_namesapce::CleanupResource<F>(f, enable);

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.12)
 
 
-# version applied to all released files: shournal, shournal-run, libshournal-shellwatch.so
+# version applies to all released files: shournal, shournal-run, libshournal-shellwatch.so
 # and bash_integration.sh
 set(shournal_version "2.1")
 
@@ -140,9 +140,9 @@ find_package(Qt5Sql)
 find_package(Qt5Network)
 
 
-include_directories(extern/qt-ordered-map)
+include_directories(extern/tsl-ordered-map)
 
-add_subdirectory("extern/qt-ordered-map")
+add_subdirectory("extern/tsl-ordered-map")
 set(XXHASH_BUNDLED_MODE ON)
 add_subdirectory(extern/xxHash/cmake_unofficial EXCLUDE_FROM_ALL)
 

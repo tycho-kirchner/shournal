@@ -5,6 +5,7 @@
 
 #include "os.h"
 #include "fileeventhandler.h"
+#include "util.h"
 
 struct fanotify_event_metadata;
 
@@ -22,9 +23,8 @@ public:
     int fanFd() const;
 
 public:
-
-    FanotifyController(const FanotifyController&) = delete;
-    void operator=(const FanotifyController&) = delete;
+    Q_DISABLE_COPY(FanotifyController)
+    DISABLE_MOVE(FanotifyController)
 
 private:
 

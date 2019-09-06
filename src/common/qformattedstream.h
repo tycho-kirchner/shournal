@@ -27,6 +27,11 @@ public:
     void setMaxLineWidth(int maxLineWidth);
     void setStreamChunkSep(const QChar &streamChunkSep);
 
+    const QString& lineStart() const;
+    int maxLineWidth() const;
+    QChar streamChunkSep() const;
+
+
 private:
     void initCommon();
     void writeLineStart();

@@ -2,11 +2,13 @@
 #include <QStandardPaths>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QTextStream>
 
 #include "helper_for_test.h"
 #include "util.h"
 #include "app.h"
 #include "exccommon.h"
+#include "qfilethrow.h"
 
 namespace  {
 
@@ -57,4 +59,23 @@ std::shared_ptr<QTemporaryDir> testhelper::mkAutoDelTmpDir()
     }
     pDir->setAutoRemove(true);
     return pDir;
+}
+
+void testhelper::writeStringToFile(const QString &filepath, const QString &str)
+{
+    QFileThrow f(filepath);
+    f.open(QFile::WriteOnly | QFile::Text);
+
+    QTextStream stream(&f);
+    stream << str;
+}
+
+QString testhelper::readStringFromFile(const QString &fpath)
+{
+    QFileThrow f(fpath);
+    f.open(QFile::ReadOnly | QFile::Text);
+
+    QTextStream stream(&f);
+    return stream.readAll();
+
 }

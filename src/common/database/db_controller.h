@@ -19,14 +19,15 @@ typedef QVector<HashMeta> HashMetas;
 qint64 addCommand(const CommandInfo &cmd);
 void updateCommand(const CommandInfo &cmd);
 
-void addFileEvents(qint64 cmdId, const FileWriteEventHash &writeEvents,
+void addFileEvents(const CommandInfo &cmd, const FileWriteEventHash &writeEvents,
                    const FileReadEventHash &readEvents);
 
 int deleteCommand(const SqlQuery &query);
 
-std::unique_ptr<CommandQueryIterator> queryForCmd(const SqlQuery& query, bool reverseResultIter=false);
+std::unique_ptr<CommandQueryIterator> queryForCmd(const SqlQuery& sqlQ, bool reverseResultIter=false);
 
-FileReadInfo queryReadInfo(const qint64 id);
+FileReadInfo queryReadInfo_byId(qint64 id, const QueryPtr& query_=nullptr);
+FileReadInfos queryReadInfos_byCmdId(qint64 cmdId, const QueryPtr& query_=nullptr);
 
 HashMetas queryHashmetas(qint64 restrictingFilesize);
 
