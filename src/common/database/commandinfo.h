@@ -2,6 +2,7 @@
 
 #include <QString>
 #include <QVector>
+#include <QJsonObject>
 
 #include "hashmeta.h"
 #include "sessioninfo.h"
@@ -28,12 +29,14 @@ struct CommandInfo
     HashMeta hashMeta;
     SessionInfo sessionInfo;
 
-    FileWriteInfos fileWriteInfos;
-    FileReadInfos fileReadInfos;
-
     QDateTime startTime;
     QDateTime endTime;
     QString workingDirectory;
+
+    FileWriteInfos fileWriteInfos;
+    FileReadInfos fileReadInfos;
+
+    void write(QJsonObject &json) const;
 
     bool operator==(const CommandInfo& rhs) const;
 

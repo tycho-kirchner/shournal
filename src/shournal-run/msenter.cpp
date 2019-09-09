@@ -86,9 +86,6 @@ void msenter::run(const char* filename, char *commandArgv[], char **envp, int ta
         os::close(mntFd);
 
         // Drop root privileges, irrevocable.
-        // Do it before reopening files for security reasons (race condition in reopening) and
-        // because permission checks on NFS drives fail, if only owner has permissions.
-        // Further, e.g. O_NOATIME is only allowed, if effective uids match
         os::setuid(realUid);
 
         try {

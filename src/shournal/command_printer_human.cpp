@@ -1,3 +1,4 @@
+#include "command_printer_human.h"
 
 #include <sys/ioctl.h>
 #include <cstdio>
@@ -6,8 +7,9 @@
 #include <QDebug>
 #include <QDir>
 #include <QStandardPaths>
+#include <QJsonDocument>
 
-#include "pretty_print.h"
+#include "command_printer.h"
 #include "qformattedstream.h"
 #include "util.h"
 #include "qfilethrow.h"
@@ -17,25 +19,12 @@
 #include "excos.h"
 #include "os.h"
 #include "translation.h"
+#include "qoutstream.h"
 
-using translation::TrSnippets;
 
-PrettyPrint::PrettyPrint() :
-    m_indentlvl0(""),
-    m_indentlvl1("  "),
-    m_indentlvl2("     "),
-    m_indentlvl3("          "),
-    m_maxCountOfReadFileLines(8),
-    m_restoreReadFiles(false),
-    m_countOfRestoredFiles(0),
-    m_restoreDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation) +
-                 QDir::separator() +
-                 TrSnippets::instance().shournalRestore + "-" + os::getUserName<QString>())
-{}
-
-void PrettyPrint::printCommandInfosEvtlRestore(std::unique_ptr<CommandQueryIterator> &cmdIter)
-{    
-    struct winsize termWinSize;
+void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQueryIterator> &cmdIter)
+{
+    struct winsize termWinSize{};
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &termWinSize);
 
     QFormattedStream s(stdout);
@@ -84,8 +73,10 @@ void PrettyPrint::printCommandInfosEvtlRestore(std::unique_ptr<CommandQueryItera
 }
 
 
-void PrettyPrint::printReadFileEventEvtlRestore(QFormattedStream& s, const FileReadInfo& readInfo,
-                                           const QString &cmdIdStr){
+void
+CommandPrinterHuman::printReadFileEventEvtlRestore(QFormattedStream& s,
+                                                   const FileReadInfo& readInfo,
+                                                   const QString &cmdIdStr){
     s.setLineStart(m_indentlvl2);
     s << readInfo.path  + QDir::separator() + readInfo.name
       << "(" + m_userStrConv.bytesToHuman(readInfo.size) + ")" << "id" << QString::number(readInfo.idInDb) <<  + "\n";
@@ -94,8 +85,12 @@ void PrettyPrint::printReadFileEventEvtlRestore(QFormattedStream& s, const FileR
         // read files without storing them in the read files dir.
         return;
     }
+    if(m_restoreReadFiles){
+        createRestoreTopleveDirIfNeeded();
+    }
 
-    QFileThrow f(StoredFiles::getReadFilesDir() + QDir::separator() + QString::number(readInfo.idInDb));
+    bool printFileContentSuccess {false};
+    QFileThrow f(m_storedFiles.mkPathStringToStoredReadFile(readInfo));
     try {
         f.open(QFile::OpenModeFlag::ReadOnly);
         auto mtype = m_mimedb.mimeTypeForData(&f);
@@ -105,48 +100,24 @@ void PrettyPrint::printReadFileEventEvtlRestore(QFormattedStream& s, const FileR
             return;
         }
         printReadFile(s, f);
+        printFileContentSuccess = true;
 
         if(m_restoreReadFiles){
-            restoreReadFile(readInfo, cmdIdStr, f);
+            restoreReadFile_safe(readInfo, cmdIdStr, f);
         }
-
     } catch (const QExcIo& e) {
-        logWarning << qtr("Error while printing read file %1 with id %2: %3")
-                      .arg(readInfo.name).arg(readInfo.idInDb).arg(e.descrip());
+        if(printFileContentSuccess){
+            logWarning << e.what();
+        } else {
+            logWarning << qtr("Error while printing read file '%1' with id %2: %3")
+                          .arg(readInfo.name).arg(readInfo.idInDb).arg(e.descrip());
+        }
         return;
     }
 }
 
-void PrettyPrint::restoreReadFile(const FileReadInfo &readInfo, const QString &cmdIdStr,
-                                  const QFile &openReadFile)
-{
-    if(m_countOfRestoredFiles == 0){
-        // initially create restore dir
-        if(! m_restoreDir.mkpath(m_restoreDir.absolutePath())){
-            throw QExcIo(qtr("Failed to the create read-files restore directory at %1")
-                                 .arg(m_restoreDir.absolutePath()));
-        }
-    }
-    QDir fullDirPath(m_restoreDir.absoluteFilePath(qtr("command-id-") + cmdIdStr) + QDir::separator() +
-                  readInfo.path);
 
-    if(! fullDirPath.mkpath(fullDirPath.absolutePath())){
-        throw QExcIo(qtr("Failed to create the read-files restore directory for command-id %1")
-                             .arg(cmdIdStr));
-    }
-
-    const QString failMsg(qtr("Failed to restore read file with id %1:").arg(readInfo.idInDb));
-    try {
-        m_storedFiles.restoreReadFileAtDIr(readInfo, fullDirPath, openReadFile);
-        ++m_countOfRestoredFiles;
-    } catch (const os::ExcOs& e) {
-        logWarning << failMsg << e.what();
-    } catch(const QExcIo& e){
-         logWarning << failMsg << e.descrip();
-    }
-}
-
-void PrettyPrint::printReadFile(QFormattedStream &s, QFile &f)
+void CommandPrinterHuman::printReadFile(QFormattedStream &s, QFile &f)
 {
     QTextStream fstream(&f);
     int nLinesPrinted = 0;
@@ -163,18 +134,10 @@ void PrettyPrint::printReadFile(QFormattedStream &s, QFile &f)
     }
 }
 
-void PrettyPrint::setRestoreDir(const QDir &restoreDir)
-{
-    m_restoreDir = restoreDir;
-}
 
-void PrettyPrint::setRestoreReadFiles(bool restoreReadFiles)
-{
-    m_restoreReadFiles = restoreReadFiles;
-}
 
 /// Do not print more than that number of lines for each read file
-void PrettyPrint::setMaxCountOfReadFileLines(int maxCountOfReadFileLines)
+void CommandPrinterHuman::setMaxCountOfReadFileLines(int maxCountOfReadFileLines)
 {
     m_maxCountOfReadFileLines = maxCountOfReadFileLines;
 }

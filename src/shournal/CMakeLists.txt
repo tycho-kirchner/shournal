@@ -16,7 +16,9 @@ add_executable(${PROJECT_NAME}
     shournal.cpp # main
     argcontrol_dbdelete
     argcontrol_dbquery
-    pretty_print
+    command_printer
+    command_printer_human
+    command_printer_json
     )
 
 target_link_libraries(${PROJECT_NAME}

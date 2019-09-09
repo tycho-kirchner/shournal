@@ -255,10 +255,10 @@ static void cleanExcludePaths(const QVector<const PathTree*>& includePathtrees,
     }
 }
 
-static void cleanExcludePaths(const PathTree& includePaths, PathTree& excludePaths,
-                                 const QString& sectionName){
-    cleanExcludePaths( {&includePaths}, excludePaths, sectionName);
-}
+// static void cleanExcludePaths(const PathTree& includePaths, PathTree& excludePaths,
+//                                  const QString& sectionName){
+//     cleanExcludePaths( {&includePaths}, excludePaths, sectionName);
+// }
 
 static void cleanExcludePaths(const PathTree& includePaths,
                               const PathTree* optionalIncludePaths,
@@ -279,7 +279,15 @@ void Settings::loadSections(){
                                  "When loading paths, the following symbols may be "
                                  "specified:\n"
                                  "$HOME or ~ for your home directory\n"
-                                 "$CWD for the current working directory\n").arg(app::SHOURNAL)
+                                 "$CWD for the current working directory\n"
+                                 "In several sections, the key 'exclude_hidden'\n"
+                                 "can be set to true - in this case, a "
+                                 "file event is excluded, if it is below "
+                                 "*any* hidden directory or is hidden itself. A "
+                                 "explicitly included hidden file is not affected.\n"
+                                 "Please do not store custom comments in this file, "
+                                 "as those are lost each time shournal is updated to "
+                                 "a new version.").arg(app::SHOURNAL)
                              );
     loadSectWrite();
     loadSectRead();
@@ -368,20 +376,26 @@ void Settings::loadSectScriptFiles()
     m_scriptSettings.maxFileSize = sectScriptFiles->getFileSize("max_size", 500*1024) ;
     m_scriptSettings.maxCountOfFiles = static_cast<int>(sectScriptFiles->getValue<uint>(
                 "max_count_of_files", 3));
+    m_scriptSettings.excludeHidden = sectScriptFiles->getValue<bool>("exclude_hidden", true);
+    PathTree* hiddenPaths = (m_scriptSettings.excludeHidden) ?
+                &m_scriptSettings.includePathsHidden : nullptr;
+
     m_scriptSettings.includeExtensions = sectScriptFiles->getValues<StringSet>(
                 SECT_SCRIPTS_INCLUDE_FILE_EXTENSIONS, {"sh"}, false, "\n");
     m_scriptSettings.includeMimetypes = sectScriptFiles->getValues<MimeSet>(
                 "include_mime_types", {"application/x-shellscript"}, false, "\n");
 
-    // make user configurable? If so, make sure not bigger than sizeof(int)/2...
-    m_scriptSettings.flushToDiskTotalSize = 1024 * 1024 * 10;
+
 
     m_scriptSettings.includePaths = loadPaths(sectScriptFiles, SECT_SCRIPTS_INCLUDE_PATHS,
-                                              true, {"/"});
+                                              true, {"/"}, hiddenPaths);
     m_scriptSettings.excludePaths = loadPaths(sectScriptFiles, "exclude_paths",
                                                  true, {});
-    cleanExcludePaths(m_scriptSettings.includePaths, m_scriptSettings.excludePaths,
+    cleanExcludePaths(m_scriptSettings.includePaths, hiddenPaths, m_scriptSettings.excludePaths,
                          sectScriptFiles->sectionName());
+
+    // make user configurable? If so, make sure not bigger than sizeof(int)/2...
+    m_scriptSettings.flushToDiskTotalSize = 1024 * 1024 * 10;
 }
 
 void Settings::loadSectIgnoreCmd()
@@ -462,12 +476,11 @@ void Settings::loadSectHash()
 
     sectHash->setComments(qtr(
                           "Note: this section includes advanced settings and should not be "
-                          "changed in most cases. "
-                          "Changing %1 or %2 during the lifetime of the database "
-                          "might yield the necessity "
-                          "to hash (different parts of) "
-                          "the same file multiple times for file-queries.").
-                         arg(sect_hash_chunksize, sect_hash_maxCountReads));
+                          "changed at all in most cases and if so, only with a fresh database. "
+                          "%1 or %2 should *not* be changed during the lifetime of the database. "
+                          "Changing it is not a well tested feature and in any case causes overhead "
+                          "for hash-based database-queries.").
+                          arg(sect_hash_chunksize, sect_hash_maxCountReads));
 
     m_hashSettings.hashEnable = sectHash->getValue<bool>(sect_hash_enable, true, true);
     // Exclude negative values by using uint

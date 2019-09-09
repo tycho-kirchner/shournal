@@ -49,7 +49,9 @@ public:
         // store read files to disk, if...
         bool enable {false}; // .. enabled
         bool onlyWritable {true}; // .. user has write permission
+        bool excludeHidden {true}; // .. it is not hidden
         PathTree includePaths; // .. it is equal to or below an include path
+        PathTree includePathsHidden; // .. see above
         PathTree excludePaths; // .. it is not equal to or below an exclude path
         StringSet includeExtensions; // .. file extension, mimetype matches ( it's
         MimeSet includeMimetypes;    //   more complicated than that)

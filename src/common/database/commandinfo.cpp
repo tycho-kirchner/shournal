@@ -1,6 +1,7 @@
 
 #include <QHostInfo>
 #include <QString>
+#include <QJsonArray>
 
 #include "commandinfo.h"
 
@@ -38,6 +39,44 @@ CommandInfo::CommandInfo()
       text(""), // empty string, so QString.isNull() returns false -> no null-inserts into database
       returnVal(INVALID_RETURN_VAL)
 {}
+
+void CommandInfo::write(QJsonObject &json) const
+{
+    json["id"] = idInDb;
+    json["command"] = text;
+    json["returnValue"] = returnVal;
+    json["username"] = username;
+    json["hostname"] = hostname;
+
+    QJsonValue hashChunkSize;
+    QJsonValue hashMaxCountOfReads;
+    if(! hashMeta.isNull()){
+        hashChunkSize = hashMeta.chunkSize;
+        hashMaxCountOfReads = hashMeta.maxCountOfReads;
+    }
+    json["hashChunkSize"] = hashChunkSize;
+    json["hashMaxCountOfReads"] = hashMaxCountOfReads;
+    json["sessionUuid"] = QString::fromLatin1(sessionInfo.uuid.toBase64());
+    json["startTime"] = QJsonValue::fromVariant(startTime);
+    json["endTime"] = QJsonValue::fromVariant(endTime);
+    json["workingDir"] = workingDirectory;
+
+    QJsonArray fReadArr;
+    for(const auto& i : fileReadInfos){
+        QJsonObject fReadObj;
+        i.write(fReadObj);
+        fReadArr.append(fReadObj);
+    }
+    json["fileReadEvents"] = fReadArr;
+
+    QJsonArray fWriteArr;
+    for(const auto& i : fileWriteInfos){
+        QJsonObject fWriteObject;
+        i.write(fWriteObject);
+        fWriteArr.append(fWriteObject);
+    }
+    json["fileWriteEvents"] = fWriteArr;
+}
 
 bool CommandInfo::operator==(const CommandInfo &rhs) const
 {

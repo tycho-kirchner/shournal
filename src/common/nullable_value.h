@@ -82,3 +82,5 @@ bool operator==(const NullableValue<T>& lhs, const T& rhs) {
 }
 
 typedef NullableValue<uint64_t> HashValue;
+
+Q_DECLARE_METATYPE(HashValue)

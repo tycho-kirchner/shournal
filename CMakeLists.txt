@@ -7,8 +7,8 @@ set(shournal_version "2.1")
 
 # stay compatible with cmake-versions < 3.0 and don't really use the version-feature:
 if(CMAKE_VERSION VERSION_LESS "3.0")
+    project(shournal CXX) # no support for LANGUAGES
     set(CMAKE_PROJECT_VERSION ${shournal_version})
-    project(shournal LANGUAGES CXX)
 else()
     cmake_policy( SET CMP0048 NEW )
     project(shournal VERSION ${shournal_version} LANGUAGES CXX)

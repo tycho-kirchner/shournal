@@ -2,6 +2,7 @@
 
 #include <QString>
 #include <QDateTime>
+#include <QJsonObject>
 
 #include "nullable_value.h"
 #include "db_globals.h"
@@ -14,6 +15,8 @@ struct FileWriteInfo
     QString   path;
     QString   name;
     HashValue  hash;
+
+    void write(QJsonObject &json) const;
 
     bool operator==(const FileWriteInfo& rhs) const;
 };
@@ -32,6 +35,8 @@ struct FileReadInfo
     mode_t mode {};
     HashValue hash;
     bool isStoredToDisk {false};
+
+    void write(QJsonObject &json) const;
 
     bool operator==(const FileReadInfo& rhs) const;
 };

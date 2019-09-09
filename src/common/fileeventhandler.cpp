@@ -165,7 +165,7 @@ void FileEventHandler::handleCloseWrite(int fd)
     }
 
     if(! userHasWritePermission(st)){
-        logDebug << "closedwrite-event not recorded (no write permission):"
+        logDebug << "closedwrite-event ignored (no write permission):"
                  << filepath;
         return;
     }
@@ -174,18 +174,18 @@ void FileEventHandler::handleCloseWrite(int fd)
     auto & wsets = sets.writeFileSettings();
     if(wsets.excludeHidden && pathIsHidden(filepath) &&
             ! wsets.includePathsHidden.isSubPath(filepath, true)){
-        logDebug << "closedwrite-event not recorded (hidden file):"
+        logDebug << "closedwrite-event ignored (hidden file):"
                  << filepath;
         return;
     }
 
     if(! wsets.includePaths.isSubPath(filepath, true) ){
-        logDebug << "closedwrite-event not recorded (no subpath of include_dirs): "
+        logDebug << "closedwrite-event ignored (no subpath of include_dirs): "
                  << filepath;
         return;
     }
     if(wsets.excludePaths.isSubPath(filepath, true) ){
-        logDebug << "closedwrite-event not recorded (subpath of exclude_dirs): "
+        logDebug << "closedwrite-event ignored (subpath of exclude_dirs): "
                  << filepath;
         return;
     }
@@ -271,6 +271,13 @@ FileEventHandler::scriptReadSettingsSayLogIt(bool userHasWritePerm,
         return false;
     }
 
+    if(scriptCfg.excludeHidden && pathIsHidden(fpath) &&
+            ! scriptCfg.includePathsHidden.isSubPath(fpath, true)){
+        logDebug << "possible script-event ignored: hidden file:"
+                 << fpath;
+        return false;
+    }
+
     if( ! scriptCfg.includePaths.isSubPath(fpath, true)){
         logDebug << "possible script-event ignored: file"
                  << fpath << "is not a subpath of any included path";
@@ -308,7 +315,7 @@ void FileEventHandler::handleCloseRead(int fd)
     }
 
     if(! userHasReadPermission(st)){
-        logDebug << "close-no-write-event not recorded (read not allowed): "
+        logDebug << "read-event ignored (read not allowed): "
                  << fpath;
         return;
     }
@@ -320,7 +327,7 @@ void FileEventHandler::handleCloseRead(int fd)
     if(! logGeneralReadEvent && ! logScriptEvent){
         return;
     }
-    logDebug << "read-event recorded (collect script:" << logScriptEvent << ")"
+    logDebug << "closedread-event recorded (collect script:" << logScriptEvent << ")"
              << fpath;
 
     auto & readEvent = m_readEvents[DevInodePair(st.st_dev, st.st_ino)] ;

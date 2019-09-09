@@ -8,7 +8,7 @@ HashMeta::HashMeta(size_type chunks, size_type maxCountOfR)
 
 bool HashMeta::isNull() const
 {
-    return chunkSize == 0 && maxCountOfReads ==0;
+    return chunkSize == 0 && maxCountOfReads == 0;
 }
 
 bool HashMeta::operator==(const HashMeta &rhs) const

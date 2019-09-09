@@ -209,6 +209,7 @@ void handlePrepareCmd(){
         // Pass the socket to the external shournal process for communication purposes.
         std::unordered_set<int> forwardFs {sockets[0]};
         if(app::inIntegrationTestMode()){
+            // forward a pipe to async shournal so integration-test knows when it finished
             const char* pipeFdStr = getenv("_SHOURNAL_INTEGRATION_TEST_PIPE_FD");
             if(pipeFdStr == nullptr){
                 QIErr() << "app is set to integration test mode, but pipe-fd is not set...";

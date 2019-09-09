@@ -7,17 +7,17 @@
 #### What is it (good for)?
 *TL;DR*:
 * **Integrated tool** to increase the reproducibility of your work
-  on the shell:  what did you do when and where and what files were modified.
+  on the shell:  what did you do when and where and what files were modified/read.
 * **Stand-alone tool** to monitor file events of a command/process (tree),
   similar to <br>
-  `strace -e close $cmd`
+  `strace -f -e close $cmd`
   but **a lot** faster.
 
 *More details please*:  
 
 Using your shell's history is nice. But sometimes you want more:
-* What files were modified by a command? Or reverse: What shell-command(s)
-  were used to create/modify a certain file?
+* What files were modified or read by a command? Or reverse: What shell-command(s)
+  were used to create/modify or read from a certain file?
 * You executed a script. What was the script-content by the time it was called?
 * What other commands were executed during the same shell-session?
 * What about working directory, command start- and end-time or the
@@ -161,8 +161,8 @@ other boilerplate-code would have been necessary.
   good certainty (by file **content**).
   However, querying by path/file**name** works.
   If the file was appended *and* renamed, things get more complicated.
-* **To track written files, they are hashed. Is that slow for big files?**<br>
-  No, because per default only certain parts of the file are hashed.
+* **To track files, they can be hashed. Is that slow for big files?**<br>
+  No, because per default only certain small parts of the file are hashed.
 * **What does the following message mean and how to get rid of it?**:<br>
   `fanotify_mark: failed to add path /foobar ... Permission denied`.
   This message might be printed on executing a command with shournal.
@@ -177,14 +177,14 @@ other boilerplate-code would have been necessary.
   [mounts]
   ignore_no_permission = true
   ```
-  
+
 ## Configuration
 shournal stores a self-documenting config-file typically at
 ~/.config/shournal
 which is created on first run. It can be edited either directly with
 a plain text editor or via `--edit-cfg`.
 For completeness, the most important points are listed here as well.
-* Usually only file-write-events for specific paths are of interest.
+* In several sections, (include-/exclude-) paths can be edited.
   Put each path into a separate line, all paths being enclosed
   by triple quotes:
   ```
@@ -194,15 +194,14 @@ For completeness, the most important points are listed here as well.
   '''
   ```
   Each exclude_path should be a sub-path of an include path.
-* While currently all write-events occurring at the given paths are stored,
-  file read-events can be controlled in more detail. As already mentioned,
-  while for write-events only a few properties (filename, size, hash,...)
-  are saved, a read file matching the rule-set is stored as a whole
-  within shournal's database.
+* Write- and read events can be configured, so only events occurring at
+  specific paths are stored. Read files (e.g. scripts) can **further** be configured
+  to be stored within shournal's database.
   Files are only stored, if the configured max. file-size, file extension
-  (.sh) and mimetype (application/x-shellscript) matches.
+  (e.g. sh) and mimetype (e.g. application/x-shellscript) matches.
   To find a mimetype for a given file
-  you should use `shournal --print-mime test.sh`.
+  you should use   
+  `shournal --print-mime test.sh`.
   The correspondence of mimetype and file extension
   is explained in more detail within the config-file.
   Further, at your wish, read files are only stored if *you* have write permission for them
@@ -215,7 +214,7 @@ For completeness, the most important points are listed here as well.
 
 ## Disk-space - get rid of obsolete file-events
 Depending on the file-activity of the observed commands, shournal's
-database sooner or later grows. When you feel that enough time
+database will sooner or later grow. When you feel that enough time
 has passed and want to get rid of old events, this can be done by e.g.
 `shournal --delete --older-than 1y`
 which deletes all commands (and file-events) older than one year.
@@ -272,8 +271,7 @@ If the observed process A instructs the **not** observed process B
 via IPC to modify a file, the filesystem-event is not registered by shournal.
 
 Currently files may be reported by shournal as written, even though
-nothing was actually written to them, in case they were opened with
-*write*-permissions. By using the file content (hash) you should
+nothing was actually written to them. By using the file content (hash) you should
 be able to cover those cases.
 
 The provided timestamp is determined shortly after a modified file was
@@ -283,7 +281,8 @@ problem, if that other process was itself **not** observed.
 
 To cache write-events efficiently during execution, they are put into a device-inode-hashtable. Note that the kernel might reuse them.
 If you copy a file to a non-observed directory, delete it at the original location and the inode is reused during execution
-of the observed process, the filesystem-event is lost. Note that copying it to a observed location is fine though,
+of the observed process, the filesystem-event is lost.
+Note that copying it to a observed location is fine though,
 because copying a file is itself a file-modification-event.
 
 For further limitations please visit the fanotify manpage.
@@ -296,6 +295,16 @@ For further limitations please visit the fanotify manpage.
   - chmod it 000
   - close it --> the event is lost
 
+
+## Credits
+shournal makes use of great tools and libraries, most importantly the Qt-framework,
+xxhash, tsl::ordered_map and cmake and also the Linux-Kernel's *fanotify*.
+Thanks to the developers!
+
+The project arose as the practical part of my Bachelor thesis in computer science
+at the Fritz Lipmann Institute in Jena (Germany) in
+the Hoffmann Research Group: Computational Biology of Aging.
+Thanks for your great ideas and feedback!
 
 
 

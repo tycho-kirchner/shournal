@@ -15,7 +15,9 @@
 #include "logger.h"
 #include "qoutstream.h"
 #include "cpp_exit.h"
-#include "pretty_print.h"
+#include "command_printer.h"
+#include "command_printer_human.h"
+#include "command_printer_json.h"
 #include "console_dialog.h"
 #include "osutil.h"
 #include "translation.h"
@@ -27,18 +29,22 @@ using db_controller::QueryColumns;
 
 namespace  {
 [[noreturn]]
-void queryCmdPrintAndExit(PrettyPrint& prettyPrint, SqlQuery& sqlQ, bool reverseResultIter=false ){
+void
+queryCmdPrintAndExit(std::unique_ptr<CommandPrinter>& cmdPrinter,
+                          SqlQuery& sqlQ,
+                          bool reverseResultIter=false ){
     if(sqlQ.isEmpty()){
         QIErr() << qtr("No target fields given (empty query).");
         cpp_exit(1);
     }
     auto results = db_controller::queryForCmd(sqlQ, reverseResultIter);
-    prettyPrint.printCommandInfosEvtlRestore(results);
+    cmdPrinter->printCommandInfosEvtlRestore(results);
     cpp_exit(0);
 }
 
 [[noreturn]]
-void restoreSingleReadFile(QOptArg& argRestoreRfileId){
+void
+restoreSingleReadFile(QOptArg& argRestoreRfileId){
     auto fReadInfo = db_controller::queryReadInfo_byId(
                 static_cast<qint64>(argRestoreRfileId.getValue<uint64_t>())
                 );
@@ -215,6 +221,12 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     parser.addArg(&argShellSessionId);
 
 
+    QOptArg argOutputFormat("", "output-format",
+                            qtr("Specify the output format (human is default)."));
+    const char* OUTPUT_FORMAT_HUMAN = "human";
+    argOutputFormat.setAllowedOptions({OUTPUT_FORMAT_HUMAN, "json"});
+    parser.addArg(&argOutputFormat);
+
     // --------------------- End of Args -----------------------
 
     parser.parse(argc, argv);
@@ -222,9 +234,28 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     auto & trSnips = TrSnippets::instance();
 
     SqlQuery query;
-    PrettyPrint prettyPrint;
-    prettyPrint.setMaxCountOfReadFileLines(static_cast<int>(argMaxReadFileLines.getValue<uint>(5)));
-    prettyPrint.setRestoreReadFiles(argRestoreRfiles.wasParsed() || argRestoreRfilesAt.wasParsed());
+
+    std::unique_ptr<CommandPrinter> cmdPrinter;
+    if(argOutputFormat.wasParsed()){
+        switch(argOutputFormat.getOptions(1).first()[0].toLatin1()){
+        case 'h': cmdPrinter = std::unique_ptr<CommandPrinter>(new CommandPrinterHuman); break;
+        case 'j': cmdPrinter = std::unique_ptr<CommandPrinter>(new CommandPrinterJson);break;
+        default: throw QExcProgramming("Bad output format:" + argOutputFormat.getOptions(1).first());
+        }
+    } else {
+        cmdPrinter = std::unique_ptr<CommandPrinter>(new CommandPrinterHuman);
+    }
+    if(argMaxReadFileLines.wasParsed()){
+        auto cmdPrinterHuman = dynamic_cast<CommandPrinterHuman*>(cmdPrinter.get());
+        if(cmdPrinterHuman == nullptr){
+            QIErr() << qtr("Argument %1 is only allowed with output-format '%2'")
+                       .arg(argMaxReadFileLines.name(), OUTPUT_FORMAT_HUMAN);
+            cpp_exit(1);
+        }
+        cmdPrinterHuman->setMaxCountOfReadFileLines(int(argMaxReadFileLines.getValue<uint>(5)));
+    }
+    cmdPrinter->setRestoreReadFiles(argRestoreRfiles.wasParsed() || argRestoreRfilesAt.wasParsed());
+
     if(argRestoreRfilesAt.wasParsed()){
         QDir restoreDir(argRestoreRfilesAt.getValue<QString>());
         if(! restoreDir.exists()){
@@ -232,14 +263,14 @@ void argcontol_dbquery::parse(int argc, char *argv[])
             cpp_exit(1);
         }
         restoreDir.setPath(restoreDir.absolutePath() + QDir::separator() + trSnips.shournalRestore);
-        prettyPrint.setRestoreDir(restoreDir);
+        cmdPrinter->setRestoreDir(restoreDir);
     }
 
     if(argHistory.wasParsed()){
         query.setAscending(false);
         query.setLimit(static_cast<int>(argHistory.getValue<uint>()));
         query.setQuery(" 1 ");
-        queryCmdPrintAndExit(prettyPrint, query, true);
+        queryCmdPrintAndExit(cmdPrinter, query, true);
     }
 
     if(argRestoreRfileId.wasParsed()){
@@ -285,7 +316,7 @@ void argcontol_dbquery::parse(int argc, char *argv[])
                 case 'm': mtime = true; break;
                 case 'h': hash = true; break;
                 case 's': size = true; break;
-                default: assert(false); // impossible, already validated in argparser
+                default: throw QExcProgramming("Bad argTakeFromWFile option:" + opt);
                 }
             }
             file_query_helper::addWrittenFile(query, argWFile.getValue<QString>(),
@@ -296,6 +327,8 @@ void argcontol_dbquery::parse(int argc, char *argv[])
 
     }
 
+
+
     if( parser.rest().len != 0){
         QIErr() << qtr("Invalid parameters passed: %1.\n"
                        "Show help with --query --help").
@@ -303,7 +336,7 @@ void argcontol_dbquery::parse(int argc, char *argv[])
         cpp_exit(1);
     }
 
-    queryCmdPrintAndExit(prettyPrint, query);
+    queryCmdPrintAndExit(cmdPrinter, query);
 }
 
 

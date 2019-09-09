@@ -32,6 +32,11 @@ StoredFiles::StoredFiles()
     this->mkpath();
 }
 
+QString StoredFiles::mkPathStringToStoredReadFile(const FileReadInfo &info)
+{
+    return StoredFiles::getReadFilesDir() + QDir::separator() + QString::number(info.idInDb);
+}
+
 bool StoredFiles::deleteReadFile(const QString &fname)
 {
     return m_readFilesDir.remove(fname);

@@ -4,6 +4,14 @@
 #include "db_conversions.h"
 
 
+void FileWriteInfo::write(QJsonObject &json) const
+{
+    json["path"] = path + QDir::separator() + name;
+    json["size"] = size;
+    json["mtime"] = QJsonValue::fromVariant(mtime);
+    json["hash"] = QJsonValue::fromVariant(QVariant::fromValue(hash));
+}
+
 bool
 FileWriteInfo::operator==(const FileWriteInfo &rhs) const
 {
@@ -12,6 +20,18 @@ FileWriteInfo::operator==(const FileWriteInfo &rhs) const
             path == rhs.path &&
             name == rhs.name &&
             hash == rhs.hash;
+}
+
+////////////////////////////////////////////////////////////
+
+void FileReadInfo::write(QJsonObject &json) const
+{
+    json["id"] = idInDb;
+    json["path"] = path + QDir::separator() + name;
+    json["size"] = size;
+    json["mtime"] = QJsonValue::fromVariant(mtime);
+    json["hash"] = QJsonValue::fromVariant(QVariant::fromValue(hash));
+    json["isStoredToDisk"] = isStoredToDisk;
 }
 
 bool

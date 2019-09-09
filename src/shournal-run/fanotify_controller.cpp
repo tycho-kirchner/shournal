@@ -328,7 +328,7 @@ void FanotifyController::handleSingleEvent(const struct fanotify_event_metadata&
                           FAN_MODIFY ,
                           metadata.fd,
                           nullptr) == 0){
-            qDebug() << "added to ignore mask";
+            logDebug << "added to ignore mask";
         } else  {
             if(errno == ENOSPC){
                 m_markLimitReached = true;

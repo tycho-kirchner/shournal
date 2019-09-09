@@ -14,6 +14,8 @@ public:
 
     StoredFiles();
 
+    QString mkPathStringToStoredReadFile(const FileReadInfo& info);
+
     bool deleteReadFile(const QString& fname);
 
     void addReadFile(const QString& fname, const QByteArray& data);

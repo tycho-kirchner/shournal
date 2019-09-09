@@ -7,6 +7,7 @@
 #include <execinfo.h>
 
 #include "util.h"
+#include "nullable_value.h"
 
 #include "os.h"
 
@@ -35,24 +36,18 @@ QTextStream& operator<<(QTextStream& stream, const QStringRef &string){
 #endif
 
 
-namespace  {
-
-
-
-std::string qStringToStdString(const QString& str){
-    return str.toStdString();
-}
-
-QString stdStringToQString(const std::string& str){
-    return QString::fromStdString(str);
-}
-
-} // namespace
 
 bool registerQtConversionStuff()
 {
-    return QMetaType::registerConverter<QString, std::string>( qStringToStdString ) &&
-           QMetaType::registerConverter<std::string, QString>( stdStringToQString );
+    return QMetaType::registerConverter<QString, std::string>( [](const QString& str){
+        return str.toStdString();
+    }) &&  QMetaType::registerConverter<std::string, QString>( [](const std::string& str){
+        return QString::fromStdString(str);
+    }) && QMetaType::registerConverter<HashValue, QString>( [](const HashValue& val){
+        return ((val.isNull()) ? QString() : QString::number(val.value()));
+    }) && QMetaType::registerConverter<QString, HashValue>( [](const QString& val){
+        return ((val.isEmpty()) ? HashValue() : HashValue(qVariantTo_throw<HashValue::value_type>(val)));
+    }) ;
 }
 
 
