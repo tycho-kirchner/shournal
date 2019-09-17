@@ -7,7 +7,7 @@ void AttachedShell::handleEnable()
 
 /// This function is meant to be called only *once*
 /// per command sequence.
-bool AttachedShell::lastCmdWasValid()
+bool AttachedShell::cmdCounterJustIncremented()
 {
-    return true;
+    return false;
 }

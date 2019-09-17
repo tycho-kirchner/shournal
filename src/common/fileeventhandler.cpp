@@ -161,6 +161,8 @@ void FileEventHandler::handleCloseWrite(int fd)
     const auto st = os::fstat(fd);
     if(st.st_nlink == 0){
         // always ignore deleted files
+        logDebug << "closedwrite-event ignored (file deleted):"
+                 << filepath;
         return;
     }
 
@@ -311,6 +313,8 @@ void FileEventHandler::handleCloseRead(int fd)
     const auto st = os::fstat(fd);
     if(st.st_nlink == 0){
         // always ignore deleted files
+        logDebug << "read-event ignored (file deleted): "
+                 << fpath;
         return;
     }
 

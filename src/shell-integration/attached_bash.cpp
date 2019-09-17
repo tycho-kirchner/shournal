@@ -23,7 +23,7 @@ void AttachedBash::handleEnable()
 /// has changed since the last call of this function or handleEnable().
 /// This function is meant to be called only *once*
 /// per command sequence.
-bool AttachedBash::lastCmdWasValid()
+bool AttachedBash::cmdCounterJustIncremented()
 {
     if(*m_pExternCurrentCmdNumber == m_lastCmdNumber){
         return false;

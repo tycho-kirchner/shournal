@@ -76,12 +76,15 @@ pid_t event_process::handleFork()
 int event_process::handleExecve(const char *filename, char * const argv[], char * const envp[])
 {
     auto& g_shell = ShellGlobals::instance();
-    if(! g_shell.inSubshell ||
-            g_shell.watchState != E_WatchState::WITHIN_CMD ||
-            g_shell.ignoreEvents.test_and_set()){
+    if(g_shell.ignoreEvents.test_and_set()){
         return g_shell.orig_execve(filename, argv, envp);
     }
-   auto clearIgnEvents = finally([&g_shell] {g_shell.ignoreEvents.clear(); });
+    auto clearIgnEvents = finally([&g_shell] {g_shell.ignoreEvents.clear(); });
+
+    if(! g_shell.inSubshell ||
+         g_shell.watchState != E_WatchState::WITHIN_CMD){
+        return g_shell.orig_execve(filename, argv, envp);
+    }
 
     // No point in observing an unstattable executable.
     // Further, do not monitor suid-applications. Note: this is, of course, *not*

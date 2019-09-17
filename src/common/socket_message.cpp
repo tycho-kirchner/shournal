@@ -13,6 +13,7 @@ const char* socket_message::socketMsgToStr(E_SocketMsg msg){
     case E_SocketMsg::RETURN_VALUE: return "RETURN_VALUE";
     case E_SocketMsg::EMPTY: return "EMPTY";
     case E_SocketMsg::LOG_MESSAGE: return "LOG_MESSAGE";
+    case E_SocketMsg::CMD_START_DATETIME: return "CMD_START_DATETIME";
     case E_SocketMsg::ENUM_END: return "ENUM_END";
     }
     return "UNHANDLED ENUM CASE";

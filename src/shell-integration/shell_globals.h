@@ -19,6 +19,8 @@ typedef int (*execve_func_t)(const char *filename, char *const argv[],
                   char *const envp[]);
 
 typedef int (*open_func_t)(const char *pathname, int flags, mode_t mode);
+typedef char * (*strcpy_func_t)(char *, const char*);
+
 
 enum class E_WatchState {DISABLED, WITHIN_CMD, INTERMEDIATE, ENUM_END};
 
@@ -33,6 +35,7 @@ public:
     fork_func_t orig_fork {};
     execve_func_t orig_execve {};
     open_func_t orig_open {};
+    strcpy_func_t orig_strcpy {};
 
     std::atomic_flag ignoreEvents{};
 
@@ -50,6 +53,8 @@ public:
 
     SessionInfo sessionInfo;
     int shournalRootDirFd {-1};
+
+    QDateTime lastCmdStartTime {};
 
 public:
     ~ShellGlobals() = default;

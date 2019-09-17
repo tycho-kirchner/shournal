@@ -345,7 +345,7 @@ ShellRequest readCheckShellUpdateRequest(){
     auto shellRequest = static_cast<ShellRequest>(shellRequestInt);
 
     // Note: this logDebug is called BEFORE initialize logging.
-    // logDebug << "received shell request:" << shellRequestToStr(shellRequest);
+    // logDebug << "received shell request:" << int(shellRequest);
     return shellRequest;
 }
 
@@ -389,12 +389,14 @@ void handleDisableRequest(){
 void handleCleanupCmd(){
     auto& g_shell = ShellGlobals::instance();
 
-    if(! g_shell.pAttchedShell->lastCmdWasValid()){
+    auto clearCmdStartTime = finally([&g_shell] { g_shell.lastCmdStartTime = {}; });
+
+    if(g_shell.lastCmdStartTime.isNull()){
         logDebug << "last command was invalid";
 
         // If, for example, a user presses enter while the command-string is empty, or Ctrl+C
         // is pressed without a currently executing command,
-        // do not cleanup(setup) to avoid unnecessray overhead.
+        // do not cleanup(setup) to avoid unnecessary overhead.
         // Clear possible events mich might have had occurred meanwhile, e.g. because
         // of autocompletion.
         if(g_shell.watchState == E_WatchState::WITHIN_CMD){
@@ -438,6 +440,8 @@ void handleCleanupCmd(){
     }
     SocketCommunication::Messages messages;
     messages.push_back({int(E_SocketMsg::COMMAND), lastCommand});
+    QByteArray cmdStartDateTime = g_shell.lastCmdStartTime.toString(Qt::ISODate).toUtf8();
+    messages.push_back({int(E_SocketMsg::CMD_START_DATETIME), cmdStartDateTime});
     messages.push_back({int(E_SocketMsg::RETURN_VALUE), qBytesFromVar(returnVal)});
     g_shell.shournalSocket.sendMessages(messages);
 }

@@ -10,7 +10,7 @@ public:
     virtual ~AttachedShell() = default;
 
     virtual void handleEnable();
-    virtual bool lastCmdWasValid();
+    virtual bool cmdCounterJustIncremented();
 
 public:
     Q_DISABLE_COPY(AttachedShell)

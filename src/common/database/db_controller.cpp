@@ -201,8 +201,7 @@ qint64 db_controller::addCommand(const CommandInfo &cmd)
 
 
 /// update only relevant command fields, which are those that are not
-/// known from the beginning. The startTime changes in case of an empty entered command
-/// within the shell integration.
+/// known from the beginning.
 void db_controller::updateCommand(const CommandInfo &cmd)
 {
     assert(cmd.idInDb != db::INVALID_INT_ID);

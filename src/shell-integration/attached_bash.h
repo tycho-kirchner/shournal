@@ -16,7 +16,7 @@ public:
 
     void handleEnable() override;
 
-    bool lastCmdWasValid() override;
+    bool cmdCounterJustIncremented() override;
 
 private:
     int *m_pExternCurrentCmdNumber;

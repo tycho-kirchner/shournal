@@ -202,8 +202,7 @@ void FileWatcher::run()
             os::waitpid(msenterChildRet.pid);
         });
         m_sockCom.setSockFd(m_sockFd);
-        // signal caller, that we're done with setup, if set
-        // TODO: find a more accurate way (we start too early in general)
+        // should be overwritten later, null-constraint in db...
         cmdInfo.startTime = QDateTime::currentDateTime();
         setupShellLogger();
         int rootDirFd = os::open("/", O_RDONLY | O_DIRECTORY);
@@ -302,10 +301,15 @@ E_SocketMsg FileWatcher::processSocketEvent( CommandInfo& cmdInfo ){
         returnMsg = E_SocketMsg(msg.msgId);
 
         logDebug << "received message:"
-                 << socket_message::socketMsgToStr(E_SocketMsg(msg.msgId));
+                 << socket_message::socketMsgToStr(E_SocketMsg(msg.msgId))
+                 << msg.bytes;
         switch (E_SocketMsg(msg.msgId)) {
         case E_SocketMsg::COMMAND: {
             cmdInfo.text = msg.bytes;
+            break;
+        }
+        case E_SocketMsg::CMD_START_DATETIME: {
+            cmdInfo.startTime = QDateTime::fromString(QString::fromUtf8(msg.bytes), Qt::ISODate);
             break;
         }
         case E_SocketMsg::RETURN_VALUE: {
@@ -338,9 +342,6 @@ void FileWatcher::flushToDisk(CommandInfo& cmdInfo){
     try {
         if(cmdInfo.idInDb == db::INVALID_INT_ID ){
             if(cmdInfo.endTime.isNull()){
-                // maybe_todo: create a null-contraint for endTime,
-                // which is not straightforward in sqlite.
-                // See also: https://stackoverflow.com/questions/4007014/alter-column-in-sqlite
                 cmdInfo.endTime = QDateTime::currentDateTime();
             }
             cmdInfo.idInDb = db_controller::addCommand(cmdInfo);

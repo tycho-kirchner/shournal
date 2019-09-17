@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include "event_open.h"
+#include "event_other.h"
 #include "event_process.h"
 #include "staticinitializer.h"
 #include "shell_globals.h"
@@ -35,6 +36,7 @@ void initSymIfNeeded(){
             globals.orig_execve = reinterpret_cast<execve_func_t>(os::dlsym(RTLD_NEXT, "execve"));
             globals.orig_open = reinterpret_cast<open_func_t>(os::dlsym(RTLD_NEXT, "open"));
             // globals.orig_fopen = reinterpret_cast<fopen_func_t>(os::dlsym(RTLD_NEXT, "fopen"));
+            globals.orig_strcpy = reinterpret_cast<strcpy_func_t>(os::dlsym(RTLD_NEXT, "strcpy"));
 
             return;
         } catch(const os::ExcOs& ex){
@@ -55,28 +57,28 @@ extern "C" {
 LIBSHOURNAL_SHELLWATCH_EXPORT
 int open(const char *pathname, int flags, mode_t mode) {
     // std::cerr << __func__ << "\n";
+    initSymIfNeeded();
     try{
-        initSymIfNeeded();
         return event_open::handleOpen(pathname, flags, mode, false);
     } catch (const std::exception& ex ) {
         std::cerr << __func__ << " fatal: " << ex.what() << "\n";
     }
-    return -1;
+    return ShellGlobals::instance().orig_open(pathname, flags, mode);
 }
 
 
 LIBSHOURNAL_SHELLWATCH_EXPORT
 int open64(const char *pathname, int flags, mode_t mode) {
     // std::cerr << __func__ << "\n";
+    initSymIfNeeded();
     try{
-        initSymIfNeeded();
         // probably O_LARGEFILE should only be set, if we are running in 32
         // bit mode (using open64). It seems to do no harm though (see handleOpen).
         return event_open::handleOpen(pathname, flags, mode, true);
     } catch (const std::exception& ex ) {
         std::cerr << __func__ << " fatal: " << ex.what() << "\n";
     }
-    return -1;
+    return ShellGlobals::instance().orig_open(pathname, flags, mode);
 }
 
 // There seems to be no point in observing fopen - browsing the source-code
@@ -115,26 +117,38 @@ int open64(const char *pathname, int flags, mode_t mode) {
 
 LIBSHOURNAL_SHELLWATCH_EXPORT
 pid_t fork(){
+    initSymIfNeeded();
     try {
-        initSymIfNeeded();
         return event_process::handleFork();
     } catch (const std::exception& ex ) {
         std::cerr << __func__ << " fatal: " << ex.what() << "\n";
     }
-    return -1;
+    return ShellGlobals::instance().orig_fork();
 
 }
 
 LIBSHOURNAL_SHELLWATCH_EXPORT
 int execve(const char *filename, char *const argv[],
            char *const envp[]){
+    initSymIfNeeded();
     try {
-        initSymIfNeeded();
         return event_process::handleExecve(filename, argv, envp);
     } catch (const std::exception& ex ) {
         std::cerr << __func__ << " fatal: " << ex.what() << "\n";
     }
-    return -1;
+    return ShellGlobals::instance().orig_execve(filename, argv, envp);
+}
+
+
+LIBSHOURNAL_SHELLWATCH_EXPORT
+char *strcpy(char *dest, const char *src){
+    initSymIfNeeded();
+    try {
+        return event_other::handleStrcpy(dest, src);
+    } catch (const std::exception& ex ) {
+        std::cerr << __func__ << " fatal: " << ex.what() << "\n";
+    }
+    return ShellGlobals::instance().orig_strcpy(dest, src);
 }
 
 #ifdef __cplusplus

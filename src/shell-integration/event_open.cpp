@@ -55,8 +55,7 @@ int event_open::handleOpen(const char *pathname, int flags, mode_t mode, bool la
     }
 
     auto& g_shell = ShellGlobals::instance();
-    if(pathname[0] == '\0' ||
-            g_shell.ignoreEvents.test_and_set()){
+    if(g_shell.ignoreEvents.test_and_set()){
         return g_shell.orig_open(pathname, flags, mode);
     }
     auto clearIgnEvents = finally([&g_shell] { g_shell.ignoreEvents.clear(); });
