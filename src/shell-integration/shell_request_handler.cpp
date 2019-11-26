@@ -29,6 +29,7 @@
 #include "staticinitializer.h"
 #include "socket_message.h"
 #include "interrupt_handler.h"
+#include "conversions.h"
 
 using socket_message::E_SocketMsg;
 using socket_message::socketMsgToStr;
@@ -440,7 +441,8 @@ void handleCleanupCmd(){
     }
     SocketCommunication::Messages messages;
     messages.push_back({int(E_SocketMsg::COMMAND), lastCommand});
-    QByteArray cmdStartDateTime = g_shell.lastCmdStartTime.toString(Qt::ISODate).toUtf8();
+    const QByteArray cmdStartDateTime = g_shell.lastCmdStartTime.toString(
+                Conversions::dateIsoFormatWithMilliseconds()).toUtf8();
     messages.push_back({int(E_SocketMsg::CMD_START_DATETIME), cmdStartDateTime});
     messages.push_back({int(E_SocketMsg::RETURN_VALUE), qBytesFromVar(returnVal)});
     g_shell.shournalSocket.sendMessages(messages);
