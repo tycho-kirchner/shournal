@@ -311,6 +311,7 @@ E_SocketMsg FileWatcher::processSocketEvent( CommandInfo& cmdInfo ){
         case E_SocketMsg::CMD_START_DATETIME: {
             cmdInfo.startTime = QDateTime::fromString(QString::fromUtf8(msg.bytes),
                                                       Conversions::dateIsoFormatWithMilliseconds());
+            assert(! cmdInfo.startTime.isNull());
             break;
         }
         case E_SocketMsg::RETURN_VALUE: {
