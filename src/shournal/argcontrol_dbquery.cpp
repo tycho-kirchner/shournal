@@ -18,10 +18,11 @@
 #include "command_printer.h"
 #include "command_printer_human.h"
 #include "command_printer_json.h"
+#include "command_printer_html.h"
 #include "console_dialog.h"
 #include "osutil.h"
 #include "translation.h"
-#include "user_str_conversions.h"
+#include "conversions.h"
 
 using translation::TrSnippets;
 
@@ -220,12 +221,33 @@ void argcontol_dbquery::parse(int argc, char *argv[])
                         QOptSqlArg::cmpOpsEqNe());
     parser.addArg(&argShellSessionId);
 
+    const uint DEFAULT_wfilesMaxCount = 10;
+    QOptArg argWfilesMaxCount("wfc", "wfiles-max-count",
+                              qtr("Limit the number of rendered written files "
+                                  "per command (default is %1)").arg(DEFAULT_wfilesMaxCount));
+    parser.addArg(&argWfilesMaxCount);
+
+    const uint DEFAULT_rfilesMaxCount = 10;
+    QOptArg argRfilesMaxCount("rfc", "rfiles-max-count",
+                              qtr("Limit the number of rendered read files "
+                                  "per command (default is %1)").arg(DEFAULT_rfilesMaxCount));
+    parser.addArg(&argRfilesMaxCount);
+
+    QOptArg argOutputFile("o", "output",
+                          qtr("Specify an output file where the report "
+                              "is written to. Otherwise it is printed "
+                              "to stdout"));
+    parser.addArg(&argOutputFile);
 
     QOptArg argOutputFormat("", "output-format",
-                            qtr("Specify the output format (human is default)."));
+                            qtr("Specify the output format (human is default). "
+                                "If 'html' is used, %1 must also be specified")
+                            .arg(argOutputFile.name()));
     const char* OUTPUT_FORMAT_HUMAN = "human";
-    argOutputFormat.setAllowedOptions({OUTPUT_FORMAT_HUMAN, "json"});
+    argOutputFormat.setAllowedOptions({OUTPUT_FORMAT_HUMAN, "json", "html"});
     parser.addArg(&argOutputFormat);
+
+
 
     // --------------------- End of Args -----------------------
 
@@ -237,14 +259,33 @@ void argcontol_dbquery::parse(int argc, char *argv[])
 
     std::unique_ptr<CommandPrinter> cmdPrinter;
     if(argOutputFormat.wasParsed()){
-        switch(argOutputFormat.getOptions(1).first()[0].toLatin1()){
-        case 'h': cmdPrinter = std::unique_ptr<CommandPrinter>(new CommandPrinterHuman); break;
-        case 'j': cmdPrinter = std::unique_ptr<CommandPrinter>(new CommandPrinterJson);break;
+        switch(argOutputFormat.getOptions(1).first()[1].toLatin1()){
+        case 'u': cmdPrinter = std::unique_ptr<CommandPrinter>(new CommandPrinterHuman); break;
+        case 's': cmdPrinter = std::unique_ptr<CommandPrinter>(new CommandPrinterJson);break;
+        case 't': cmdPrinter = std::unique_ptr<CommandPrinter>(new CommandPrinterHtml);break;
         default: throw QExcProgramming("Bad output format:" + argOutputFormat.getOptions(1).first());
         }
     } else {
         cmdPrinter = std::unique_ptr<CommandPrinter>(new CommandPrinterHuman);
     }
+    cmdPrinter->setQueryString(argvToQStr(argc, argv));
+
+    cmdPrinter->setMaxCountWfiles(argWfilesMaxCount.getValue<uint>(DEFAULT_wfilesMaxCount));
+    cmdPrinter->setMaxCountRfiles(argRfilesMaxCount.getValue<uint>(DEFAULT_rfilesMaxCount));
+
+    if(argOutputFile.wasParsed()){
+        cmdPrinter->outputFile().setFileName(argOutputFile.getValue<QString>());
+        cmdPrinter->outputFile().open(QFile::OpenModeFlag::WriteOnly);
+    } else {
+        if(dynamic_cast<CommandPrinterHtml*>(cmdPrinter.get()) != nullptr){
+            QIErr() << qtr("For html-reports, please specify an output file "
+                           "(arg %1).").arg(argOutputFile.name());
+            cpp_exit(1);
+        }
+        cmdPrinter->outputFile().open(stdout, QFile::OpenModeFlag::WriteOnly);
+    }
+
+
     if(argMaxReadFileLines.wasParsed()){
         auto cmdPrinterHuman = dynamic_cast<CommandPrinterHuman*>(cmdPrinter.get());
         if(cmdPrinterHuman == nullptr){

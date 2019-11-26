@@ -4,14 +4,13 @@
 
 #include "command_printer_json.h"
 #include "command_query_iterator.h"
-#include "qoutstream.h"
 #include "logger.h"
 #include "util.h"
 
 
 void CommandPrinterJson::printCommandInfosEvtlRestore(std::unique_ptr<CommandQueryIterator> &cmdIter)
 {
-    QOut outstream;    
+    QTextStream outstream(&m_outputFile);
     {
         QJsonObject header;
         header["pathToReadFiles"] = StoredFiles::getReadFilesDir();

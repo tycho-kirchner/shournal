@@ -20,6 +20,15 @@ bool QFileThrow::open(QIODevice::OpenMode flags)
     return true;
 }
 
+bool QFileThrow::open(FILE *f, QIODevice::OpenMode ioFlags, QFileDevice::FileHandleFlags handleFlags)
+{
+    if(! QFile::open(f, ioFlags, handleFlags)){
+        throw QExcIo(qtr("Failed to open file: %1")
+                     .arg(this->errorString()));
+    }
+    return true;
+}
+
 bool QFileThrow::open(int fd, QIODevice::OpenMode ioFlags, QFileDevice::FileHandleFlags handleFlags)
 {
     if(! QFile::open(fd, ioFlags, handleFlags)){
@@ -40,6 +49,17 @@ bool QFileThrow::seek(qint64 offset)
     return true;
 }
 
+
+qint64 QFileThrow::read(char *data, qint64 maxSize){
+    auto ret = QFile::read(data, maxSize);
+    if(ret == -1){
+        throw QExcIo(qtr("Failed to read from file %1: %2")
+                     .arg(this->fileName(), this->errorString()));
+    }
+    return ret;
+}
+
+
 /// @throws QExcIo
 qint64 QFileThrow::write(const QByteArray &data, bool throwIfNotAllWritten)
 {
@@ -55,3 +75,5 @@ qint64 QFileThrow::write(const QByteArray &data, bool throwIfNotAllWritten)
     }
     return bytesWritten;
 }
+
+

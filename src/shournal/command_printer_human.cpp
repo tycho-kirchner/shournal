@@ -20,6 +20,8 @@
 #include "os.h"
 #include "translation.h"
 #include "qoutstream.h"
+#include "cmd_stats.h"
+#include "commandinfo.h"
 
 
 void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQueryIterator> &cmdIter)
@@ -27,11 +29,13 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
     struct winsize termWinSize{};
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &termWinSize);
 
-    QFormattedStream s(stdout);
+    QFormattedStream s(&m_outputFile);
 
     s.setMaxLineWidth((termWinSize.ws_col > 5) ? termWinSize.ws_col : 80 );
 
+    CmdStats cmdStats;
     while(cmdIter->next()){
+        cmdStats.collectCmd(cmdIter->value());
         s.setLineStart(m_indentlvl0);
         auto & cmd = cmdIter->value();
         s << qtr("cmd-id %1:").arg(cmd.idInDb);
@@ -45,28 +49,58 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
             s << qtr("session-uuid") << cmd.sessionInfo.uuid.toBase64() << "\n";
         }
 
+        printWriteInfos(s, cmd.fileWriteInfos);
+        printReadInfos(s, cmd);
+    }
+
+    cmdStats.eval();
+
+    // statistics with fewer elements is boring..
+    const int MIN_STATS_COUNT = 4;
+    if(cmdStats.cmdsWithMostFileMods().size() > MIN_STATS_COUNT){
+        s.setLineStart(m_indentlvl0);
+        s << qtr("\nCommands with most file modifications:\n");
         s.setLineStart(m_indentlvl1);
-        if(! cmd.fileWriteInfos.isEmpty()){
-            s << qtr("Written file(s):\n");
+        for(const auto& e : cmdStats.cmdsWithMostFileMods()){
+            s << qtr("cmd-id %1 modified %2 file(s) - %3\n")
+                 .arg(e.idInDb).arg(e.countOfFileMods).arg(e.cmdTxt);
         }
-        s.setLineStart(m_indentlvl2);
-        for(const auto& f : cmd.fileWriteInfos){
-            s << f.path  + QDir::separator() + f.name
-              << "(" + m_userStrConv.bytesToHuman(f.size) + ")"
-              << qtr("Hash:") << ((f.hash.isNull()) ? "-" : QString::number(f.hash.value()))
-              << "\n";
-        }
+
+    }
+
+    if(cmdStats.sessionMostCmds().size() > MIN_STATS_COUNT){
+        s.setLineStart(m_indentlvl0);
+        s << qtr("\nSessions with most commands:\n");
         s.setLineStart(m_indentlvl1);
-        if(! cmd.fileReadInfos.isEmpty()){
-            s << qtr("Read file(s):\n");
-        }
-        const QString cmdIdStr = QString::number(cmd.idInDb);
-        for(const auto & f : cmd.fileReadInfos){
-            printReadFileEventEvtlRestore(s, f, cmdIdStr);
+        for(const auto& e : cmdStats.sessionMostCmds()){
+            s << qtr("session-uuid %1 - %2 command(s)\n")
+                 .arg(e.cmdUuid.toBase64().data()).arg(e.cmdCount);
         }
     }
-    s.setLineStart(m_indentlvl0);
+
+    if(cmdStats.cwdCmdCounts().size() > MIN_STATS_COUNT){
+        s.setLineStart(m_indentlvl0);
+        s << qtr("\nWorking directories with most commands:\n");
+        s.setLineStart(m_indentlvl1);
+        for(const auto& e : cmdStats.cwdCmdCounts()){
+            s << qtr("%1 command(s) at %2\n")
+                 .arg(e.cmdCount).arg(e.workingDir);
+        }
+    }
+
+    if(cmdStats.dirIoCounts().size() > MIN_STATS_COUNT){
+        s.setLineStart(m_indentlvl0);
+        s << qtr("\nDirectories with most input/output-activity:\n");
+        s.setLineStart(m_indentlvl1);
+        for(const auto& e : cmdStats.dirIoCounts()){
+            s << qtr("Total %1 (%2 written, %3 read) files at %4\n")
+                 .arg(e.writeCount + e.readCount).arg(e.writeCount)
+                 .arg(e.readCount).arg(e.dir);
+        }
+    }
+
     if(m_countOfRestoredFiles > 0){
+        s.setLineStart(m_indentlvl0);
         s << qtr("%1 file(s) restored at %2").arg(m_countOfRestoredFiles)
              .arg(m_restoreDir.absolutePath()) << "\n";
     }
@@ -132,6 +166,52 @@ void CommandPrinterHuman::printReadFile(QFormattedStream &s, QFile &f)
             break;
         }
     }
+}
+
+void CommandPrinterHuman::printWriteInfos(QFormattedStream &s, const FileWriteInfos &fileWriteInfos)
+{
+    if(! fileWriteInfos.isEmpty()){
+        s.setLineStart(m_indentlvl1);
+        s << qtr("%1 written file(s):\n").arg(fileWriteInfos.size());
+        s.setLineStart(m_indentlvl2);
+        int counter = 0;
+        for(const auto& f : fileWriteInfos){
+            if(counter >= m_maxCountWfiles){
+                if(counter > 0){
+                    s << qtr("... and %1 more files.\n")
+                         .arg(fileWriteInfos.size() - m_maxCountWfiles);
+                }
+                break;
+            }
+            s << f.path  + QDir::separator() + f.name
+              << "(" + m_userStrConv.bytesToHuman(f.size) + ")"
+              << qtr("Hash:") << ((f.hash.isNull()) ? "-" : QString::number(f.hash.value()))
+              << "\n";
+            ++counter;
+        }
+    }
+}
+
+void CommandPrinterHuman::printReadInfos(QFormattedStream &s, const CommandInfo &cmd)
+{
+    s.setLineStart(m_indentlvl1);
+    if(! cmd.fileReadInfos.isEmpty()){
+        s << qtr("%1 read file(s):\n").arg(cmd.fileReadInfos.size());
+        const QString cmdIdStr = QString::number(cmd.idInDb);
+        int counter = 0;
+        for(const auto & f : cmd.fileReadInfos){
+            if(counter >= m_maxCountRfiles){
+                if(counter > 0){
+                    s << qtr("... and %1 more files.\n")
+                            .arg(cmd.fileReadInfos.size() - m_maxCountRfiles);
+                }
+                break;
+            }
+            printReadFileEventEvtlRestore(s, f, cmdIdStr);
+            ++counter;
+        }
+    }
+
 }
 
 

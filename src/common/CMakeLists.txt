@@ -98,16 +98,19 @@ SET(lib_shournal_common_files
     idmapentry
     interrupt_handler
     logger
+    limited_priority_queue
     pidcontrol
     pathtree
     qfddummydevice
     qfilethrow
     qoutstream
+    qresource_helper
     settings
+    stupidinject
     socket_message
     staticinitializer
     subprocess
-    user_str_conversions
+    conversions
     )
 
 set(database_files

@@ -23,7 +23,6 @@ namespace translation {
 
     public:
         Q_DISABLE_COPY(TrSnippets)
-        DEFAULT_MOVE(TrSnippets)
         ~TrSnippets() = default;
     private:
         TrSnippets() = default;

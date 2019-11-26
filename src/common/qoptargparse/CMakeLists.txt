@@ -12,7 +12,7 @@ add_library(lib_qoptargparse
     excoptargparse
     ../exccommon
     ../cpp_exit
-    ../user_str_conversions
+    ../conversions
  )
 
 

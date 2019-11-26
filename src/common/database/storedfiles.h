@@ -15,6 +15,7 @@ public:
     StoredFiles();
 
     QString mkPathStringToStoredReadFile(const FileReadInfo& info);
+    QString mkPathStringToStoredReadFile(qint64 idInDb);
 
     bool deleteReadFile(const QString& fname);
 

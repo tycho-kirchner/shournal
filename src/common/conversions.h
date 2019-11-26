@@ -5,24 +5,24 @@
 
 #include "exccommon.h"
 
-class ExcUserStrConversion : public QExcCommon
+class ExcConversion : public QExcCommon
 {
 public:
-     ExcUserStrConversion(const QString &text);
+     ExcConversion(const QString &text);
 };
 
 
 /// Parse datatypes from human input, display them human readable
-class UserStrConversions
+class Conversions
 {
 public:
     static const QString& relativeDateTimeUnitDescriptions();
-
-    UserStrConversions();
 
     qint64 bytesFromHuman(QString str);
     QString bytesToHuman(qint64 bytes);
 
     QDateTime relativeDateTimeFromHuman(const QString& str, bool subtractIt);
+
+    static const QString& dateIsoFormatWithMilliseconds();
 };
 

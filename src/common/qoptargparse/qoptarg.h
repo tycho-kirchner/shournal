@@ -26,9 +26,9 @@ public:
 
     virtual ~QOptArg() = default;
 
-    QString shortName() const;
+    const QString& shortName() const;
 
-    QString name() const;
+    const QString& name() const;
 
     virtual QString description() const;
 

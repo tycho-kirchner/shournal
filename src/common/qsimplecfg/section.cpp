@@ -2,7 +2,7 @@
 
 
 #include "section.h"
-#include "user_str_conversions.h"
+#include "conversions.h"
 
 qsimplecfg::Section::Section(const QString &sectionName) :
     m_sectionName(sectionName)
@@ -21,13 +21,13 @@ qint64 qsimplecfg::Section::getFileSize(const QString &key, const qint64 &defaul
                                         bool insertDefaultIfNotExist)
 {
     try {
-        UserStrConversions userStrConv;
+        Conversions userStrConv;
 
         return userStrConv.bytesFromHuman( this->getValue<QString>(
                                         key,
                                         userStrConv.bytesToHuman(defaultValue),
                                         insertDefaultIfNotExist));
-    } catch (const ExcUserStrConversion& ex) {
+    } catch (const ExcConversion& ex) {
         throw qsimplecfg::ExcCfg(ex.descrip() + " (key " + key + ')' );
     }
 }

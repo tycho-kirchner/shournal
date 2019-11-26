@@ -40,7 +40,7 @@
 #include "qfilethrow.h"
 #include "storedfiles.h"
 #include "qoutstream.h"
-#include "user_str_conversions.h"
+#include "conversions.h"
 #include "socket_message.h"
 
 using socket_message::E_SocketMsg;
@@ -342,6 +342,7 @@ void FileWatcher::flushToDisk(CommandInfo& cmdInfo){
     try {
         if(cmdInfo.idInDb == db::INVALID_INT_ID ){
             if(cmdInfo.endTime.isNull()){
+                // just a dummy, will be overridden later
                 cmdInfo.endTime = QDateTime::currentDateTime();
             }
             cmdInfo.idInDb = db_controller::addCommand(cmdInfo);

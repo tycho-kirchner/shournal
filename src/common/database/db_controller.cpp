@@ -82,8 +82,10 @@ insertFileReadEvents(const QueryPtr& query, const CommandInfo &cmd,
 /// parents, where all children died
 void
 deleteChildlessParents(const QueryPtr& query){
+    logDebug << "delete from hashmeta...";
     query->exec("delete from hashmeta where not exists "
                "(select 1 from cmd where cmd.hashmetaId=hashmeta.id)");
+    logDebug << "delete from session...";
     query->exec("delete from session where not exists "
                "(select 1 from cmd where cmd.sessionId=session.id)");
 
@@ -92,7 +94,7 @@ deleteChildlessParents(const QueryPtr& query){
     query->exec("select readFile.id from readFile where not exists "
                "(select 1 from readFileCmd where readFileCmd.readFileId=readFile.id)");
     StoredFiles storedFiles;
-
+    logDebug << "looping though read files to evtl. delete from filesystem...";
     while(query->next()){
         const QString fname = query->value(0).toString();
         if(! storedFiles.deleteReadFile(fname) ){
@@ -100,10 +102,12 @@ deleteChildlessParents(const QueryPtr& query){
                               "from the read files dir.").arg(fname);
         }
     }
+    logDebug << "delete from readFile...";
     query->exec("delete from readFile where not exists "
                "(select 1 from readFileCmd where readFileCmd.readFileId=readFile.id)");
 
     // Do it last -> foreign key in readFile
+    logDebug << "delete from env...";
     query->exec("delete from env where not exists (select 1 from cmd where "
                "cmd.envId=env.id)");
 }
@@ -250,6 +254,7 @@ int db_controller::deleteCommand(const SqlQuery &sqlQuery)
     auto query = db_connection::mkQuery();
     query->transaction();
 
+    logDebug << "deleting cmd" << sqlQuery.query();
     query->prepare("delete from cmd where " + sqlQuery.query());
     query->addBindValues(sqlQuery.values());
 
@@ -291,9 +296,8 @@ db_controller::queryForCmd(const SqlQuery &sqlQ, bool reverseResultIter){
             "left join `session` on cmd.sessionId=session.id "
             "where ";
 
-    // endTime is currently more accurate than startTime (at least
-    // when collected within the shell integration
-    const QString orderBy = "order by cmd.endTime " + sqlQ.ascendingStr() +
+    // do not change this -> order matters in html-plot...
+    const QString orderBy = "order by cmd.startTime " + sqlQ.ascendingStr() +
                             sqlQ.mkLimitString();
 
     if( ! reverseResultIter){

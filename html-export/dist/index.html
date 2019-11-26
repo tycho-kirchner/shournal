@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+  <style>
+    :root {
+      --annotation-font-family: monospace;
+      --annotation-fontsize-normal:
+    }
+
+    body, html {
+      margin-left:5px;
+      margin-right:5px;
+      margin-bottom:5px;
+      margin-top:5px;
+    }
+
+    .axis line,
+    .axis path {
+      stroke: #333;
+      fill: transparent;
+      shape-rendering: crispEdges;
+    }
+
+    .line-graph {
+      stroke: #555;
+      fill: transparent;
+    }
+
+    .unselectable {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    } 
+
+    .annotation,
+    #annotation_text_char {
+      fill: black;
+      font-size: 10px;
+      font-family: monospace; /* monospace for simple text-width-calculations */
+    }
+
+    .zoomButton {
+      display: block;
+      float: left;
+      margin: 0 3px -3px 0 !important;
+      padding: 0;
+      border: none;
+      width: 3ch;
+      background-color: #f5f5f5;
+      font-family: monospace;
+      font-size: 12px; /* use px, since we render svg in pixels ourselves. */
+      text-decoration: none;
+      font-weight: bold;
+      color: #565656;
+      cursor: pointer;
+    }
+
+    #topError{
+      color: red;
+      visibility: hidden;
+    }
+
+    #cmdListScroll {
+      width: 100%;
+      /* height:50vh; */
+      overflow: scroll;
+      position: relative;
+      /* do not remove */
+    }
+
+    .collapsibleCmd {
+      color: white;
+      cursor: pointer;
+      width: 100%;
+      border: none;
+      text-align: left;
+      outline: none;
+      font-size: 15px;
+    }
+
+    .active,
+    .collapsibleCmd:hover {
+      background-color: #555;
+    }
+
+    .collapsibleCmdContent {
+      padding: 0 18px;
+      /* max-height: 0;
+      overflow: hidden; */
+      transition: max-height 0.2s ease-out;
+      background-color: #f1f1f1;
+    }
+
+    #genericModalBody,
+    .modal-title{
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+  </style>
+</head>
+
+<body>
+  <h3>shournal report</h3>
+  <div id="topError"></div>
+  <div id="initialSpinner" class="d-flex justify-content-center">
+    <div class="spinner-border" role="status">
+      <span class="sr-only">Loading...</span>
+    </div>
+  </div>
+
+<!--The next line will be injected when generating from shournal, the
+    sample data is only included here to ease development. 
+    DO NOT EDIT. -->
+  <script src="SAMPLE_DATA.js"></script>
+  <script>
+    if(typeof commands === 'undefined'){
+      window.commands = JSON.parse(document.getElementById('commandJSON').innerHTML);
+    }  
+  </script>
+
+
+  <!-- Let this stay on top...-->
+  <span id="annotation_text_char" style="position: absolute; top: -100px;">A</span>
+
+  <!-- Generic dialog (for read files) -->
+  <div class="modal fade" id="genericModal" tabindex="-1" role="dialog" aria-labelledby="Read file" aria-hidden="true">
+    <div class="modal-dialog mw-100 w-75" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="genericModalTitle">Read file</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <!-- content added dynamically -->
+        <div class="modal-body" id="genericModalBody">...</div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    let scriptLoadError = '';
+    function setScriptLoadError(scriptname){
+      scriptLoadError = 'Failed to load external dependency ' + scriptname +
+        '. Please make sure to have a running internet connection.';
+    }
+  </script>
+  <!-- Load d3.js -->
+  <script onerror="setScriptLoadError('d3')" src="https://d3js.org/d3.v4.min.js"></script>
+  <!-- Load bootstrap js and its dependencies -->
+  <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+  <script onerror="setScriptLoadError('jq')" src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+  <script onerror="setScriptLoadError('popper')" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+  <script onerror="setScriptLoadError('bootstrap')" src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  <!-- To allow for a single generated html file, below script is injected
+     and written to the corresponding cpp-file(!) on build.
+     DO NOT EDIT. -->
+  <script src="main.js"></script>
+  </body>
+
+</html>

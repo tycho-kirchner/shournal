@@ -19,7 +19,7 @@
 #include "translation.h"
 #include "cflock.h"
 #include "qfilethrow.h"
-#include "user_str_conversions.h"
+#include "conversions.h"
 
 using Section_Ptr = qsimplecfg::Cfg::Section_Ptr;
 using qsimplecfg::ExcCfg;

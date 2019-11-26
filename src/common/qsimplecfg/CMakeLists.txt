@@ -10,7 +10,7 @@ SET(qsimplecfg_files
     exccfg
     ../exccommon
     ../cflock
-    ../user_str_conversions
+    ../conversions
     )
 
 add_library(lib_qsimplecfg

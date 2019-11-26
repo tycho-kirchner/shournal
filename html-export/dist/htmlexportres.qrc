@@ -1,0 +1,6 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource>
+    <file>index.html</file>
+    <file>main.js</file>
+</qresource>
+</RCC>

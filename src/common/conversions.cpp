@@ -4,12 +4,11 @@
 #include <QStringList>
 #include <QRegularExpression>
 
-#include "user_str_conversions.h"
+#include "conversions.h"
 #include "util.h"
 
-namespace  {
 
-QHash<QString, char> validTimeUnitHash(){
+static QHash<QString, char> validTimeUnitHash(){
     static const QHash<QString, char> units {
         {qtr("y"), 'y'}, // Year
         {qtr("m"), 'm'},   // month
@@ -22,23 +21,16 @@ QHash<QString, char> validTimeUnitHash(){
 }
 
 
-} // namespace
-
-
-ExcUserStrConversion::ExcUserStrConversion(const QString  & text) :
+ExcConversion::ExcConversion(const QString  & text) :
     QExcCommon(text, false)
 {}
 
 
 
-UserStrConversions::UserStrConversions()
-= default;
-
-
 
 /// @returns by comma separated list of valid relative time units with description
 /// (y: year, m: month, ...).
-const QString &UserStrConversions::relativeDateTimeUnitDescriptions()
+const QString &Conversions::relativeDateTimeUnitDescriptions()
 {
     static const auto s = qtr("y: year, m: month, d: day, h: hour, min: minute, s: second");
     return s;
@@ -46,8 +38,8 @@ const QString &UserStrConversions::relativeDateTimeUnitDescriptions()
 
 
 /// Transform user supplied byte-sizes ("3KiB", "2 MiB ", etc.) to int.
-/// @throws ExcUserStrConversion
-qint64 UserStrConversions::bytesFromHuman(QString str)
+/// @throws ExcConversion
+qint64 Conversions::bytesFromHuman(QString str)
 {
     str = str.simplified();
     str.replace( " ", "" );
@@ -55,13 +47,13 @@ qint64 UserStrConversions::bytesFromHuman(QString str)
     const QString errPreamble(qtr("Failed to convert bytesize '%1' - ").arg(str));
 
     if(str.isEmpty()){
-        throw ExcUserStrConversion(errPreamble + qtr("it is empty."));
+        throw ExcConversion(errPreamble + qtr("it is empty."));
     }
     if(str[str.size() - 1].isDigit()){
         // assuming bytes size
         qint64 bytes;
         if(! qVariantTo(str, &bytes)){
-            throw ExcUserStrConversion(errPreamble + qtr("it appears to be not an integer "
+            throw ExcConversion(errPreamble + qtr("it appears to be not an integer "
                                                          "although no unit was given."));
         }
         return bytes;
@@ -75,7 +67,7 @@ qint64 UserStrConversions::bytesFromHuman(QString str)
         }
     }
     if(unitIdx == -1){
-        throw ExcUserStrConversion(errPreamble + qtr("no digit was given"));
+        throw ExcConversion(errPreamble + qtr("no digit was given"));
     }
 
     const QString unit = str.mid(unitIdx);
@@ -83,7 +75,7 @@ qint64 UserStrConversions::bytesFromHuman(QString str)
 
     double bytesFloat;
     if(! qVariantTo(val, &bytesFloat)){
-        throw ExcUserStrConversion(errPreamble + qtr("conversion from string '%1' to float failed").arg(val));
+        throw ExcConversion(errPreamble + qtr("conversion from string '%1' to float failed").arg(val));
     }
     if(bytesFloat < 0){
         bytesFloat += -1;
@@ -96,7 +88,7 @@ qint64 UserStrConversions::bytesFromHuman(QString str)
         const QString validUnits(qtr("valid units include 'no unit', "
                                      "K (Kib), M (MiB), G (GiB) and T (TiB) "
                                      "but '%1' was given").arg(unit));
-        throw ExcUserStrConversion(errPreamble + validUnits);
+        throw ExcConversion(errPreamble + validUnits);
     }
 
     switch (unit[0].toLower().toLatin1()) {
@@ -111,7 +103,7 @@ qint64 UserStrConversions::bytesFromHuman(QString str)
 
 
 /// size to human readbale string (Kib, Mib, etc....)
-QString UserStrConversions::bytesToHuman(const qint64 bytes)
+QString Conversions::bytesToHuman(const qint64 bytes)
 {
     float s = bytes;
 
@@ -132,14 +124,14 @@ QString UserStrConversions::bytesToHuman(const qint64 bytes)
 
 /// @param subtractIt: if true, the parsed date is subtracted from current one,
 /// else it is added.
-/// @throws ExcUserStrConversion
-QDateTime UserStrConversions::relativeDateTimeFromHuman(const QString &str, bool subtractIt)
+/// @throws ExcConversion
+QDateTime Conversions::relativeDateTimeFromHuman(const QString &str, bool subtractIt)
 {
     static const QRegularExpression re(R"((\d+)(.+))");
     QRegularExpressionMatch match = re.match(str);
     const QString errPreamble(qtr("Failed to convert relative date(time) '%1' - ").arg(str));
     if (! match.hasMatch()) {
-        throw ExcUserStrConversion(errPreamble + qtr("It must be a digit followed by a timespec."));
+        throw ExcConversion(errPreamble + qtr("It must be a digit followed by a timespec."));
     }
 
     // must always succeed, otherwise regex would be broken
@@ -152,7 +144,7 @@ QDateTime UserStrConversions::relativeDateTimeFromHuman(const QString &str, bool
     if(matchedUnitIt == validUnits.end()){
         // don't use auto here: older version of qt do not support QList<QString>::join...
         QStringList units = validUnits.keys();
-        throw ExcUserStrConversion(errPreamble + qtr("%1 is not a valid timespec. Those are %2")
+        throw ExcConversion(errPreamble + qtr("%1 is not a valid timespec. Those are %2")
                                                     .arg(units.join(",")));
     }
 
@@ -174,5 +166,13 @@ QDateTime UserStrConversions::relativeDateTimeFromHuman(const QString &str, bool
     }
     return {};
 }
+
+const QString &Conversions::dateIsoFormatWithMilliseconds()
+{
+    static const QString f{"yyyy-MM-ddTHH:mm:ss.zzz"};
+    return f;
+}
+
+
 
 

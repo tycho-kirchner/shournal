@@ -1,0 +1,22 @@
+{
+  "name": "shournal-html-stats",
+  "version": "1.0.0",
+  "description": "interactively browse shournal's command history",
+  "private": true,
+  "scripts": {
+    "build": "webpack"
+  },
+  "keywords": [],
+  "author": "Tycho Kirchner",
+  "license": "ISC",
+  "devDependencies": {
+    "eslint": "^6.5.1",
+    "eslint-config-google": "^0.14.0",
+    "webpack": "^4.41.1",
+    "webpack-cli": "^3.3.9"
+  },
+  "dependencies": {
+    "async-mutex": "^0.1.4",
+    "tinyqueue": "^2.0.3"
+  }
+}

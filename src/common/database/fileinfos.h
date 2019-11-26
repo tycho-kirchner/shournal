@@ -24,8 +24,6 @@ struct FileWriteInfo
 
 struct FileReadInfo
 {
-    FileReadInfo() = default;
-
     qint64 idInDb { db::INVALID_INT_ID };
 
     QDateTime mtime;

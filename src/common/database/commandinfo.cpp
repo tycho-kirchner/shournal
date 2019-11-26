@@ -8,6 +8,7 @@
 #include "os.h"
 #include "settings.h"
 #include "db_globals.h"
+#include "conversions.h"
 
 /// Settings must be loaded beforehand!
 /// Fill commandInfo with those information independent from the current
@@ -40,42 +41,77 @@ CommandInfo::CommandInfo()
       returnVal(INVALID_RETURN_VAL)
 {}
 
-void CommandInfo::write(QJsonObject &json) const
+void CommandInfo::write(QJsonObject &json, bool withMilliseconds,
+                        const CmdJsonWriteCfg &writeCfg) const
 {
-    json["id"] = idInDb;
-    json["command"] = text;
-    json["returnValue"] = returnVal;
-    json["username"] = username;
-    json["hostname"] = hostname;
+    if(writeCfg.idInDb) json["id"] = idInDb;
+    if(writeCfg.text) json["command"] = text;
+    if(writeCfg.returnVal) json["returnValue"] = returnVal;
+    if(writeCfg.username) json["username"] = username;
+    if(writeCfg.hostname) json["hostname"] = hostname;
 
-    QJsonValue hashChunkSize;
-    QJsonValue hashMaxCountOfReads;
-    if(! hashMeta.isNull()){
-        hashChunkSize = hashMeta.chunkSize;
-        hashMaxCountOfReads = hashMeta.maxCountOfReads;
+    if(writeCfg.hashMeta) {
+        QJsonValue hashChunkSize;
+        QJsonValue hashMaxCountOfReads;
+        if(! hashMeta.isNull()){
+            hashChunkSize = hashMeta.chunkSize;
+            hashMaxCountOfReads = hashMeta.maxCountOfReads;
+        }
+        json["hashChunkSize"] = hashChunkSize;
+        json["hashMaxCountOfReads"] = hashMaxCountOfReads;
     }
-    json["hashChunkSize"] = hashChunkSize;
-    json["hashMaxCountOfReads"] = hashMaxCountOfReads;
-    json["sessionUuid"] = QString::fromLatin1(sessionInfo.uuid.toBase64());
-    json["startTime"] = QJsonValue::fromVariant(startTime);
-    json["endTime"] = QJsonValue::fromVariant(endTime);
-    json["workingDir"] = workingDirectory;
 
-    QJsonArray fReadArr;
-    for(const auto& i : fileReadInfos){
-        QJsonObject fReadObj;
-        i.write(fReadObj);
-        fReadArr.append(fReadObj);
+    // A null-session-QString becomes a quoted string in json, instead of null, so below
+    // effort is necessary (invalid session should always be null: in database, shournal and js-plot...).
+    if(writeCfg.sessionInfo){
+        json["sessionUuid"] = (sessionInfo.uuid.isNull()) ? QJsonValue() :
+                                                        QString::fromLatin1(sessionInfo.uuid.toBase64());
     }
-    json["fileReadEvents"] = fReadArr;
 
-    QJsonArray fWriteArr;
-    for(const auto& i : fileWriteInfos){
-        QJsonObject fWriteObject;
-        i.write(fWriteObject);
-        fWriteArr.append(fWriteObject);
+    if(withMilliseconds){
+        if(writeCfg.startEndTime){
+            json["startTime"] = startTime.toString(Conversions::dateIsoFormatWithMilliseconds());
+            json["endTime"] = endTime.toString(Conversions::dateIsoFormatWithMilliseconds());
+        }
+    } else {
+        if(writeCfg.startEndTime){
+            json["startTime"] = QJsonValue::fromVariant(startTime);
+            json["endTime"] = QJsonValue::fromVariant(endTime);
+        }
     }
-    json["fileWriteEvents"] = fWriteArr;
+    if(writeCfg.workingDirectory) json["workingDir"] = workingDirectory;
+
+    if(writeCfg.fileReadInfos){
+        QJsonArray fReadArr;
+        int idx = 0;
+        for(const auto& info : fileReadInfos){
+
+            QJsonObject fReadObj;
+            info.write(fReadObj);
+            fReadArr.append(fReadObj);
+            ++idx;
+            if(idx >= writeCfg.maxCountRFiles){
+                break;
+            }
+        }
+        json["fileReadEvents"] = fReadArr;
+    }
+
+    if(writeCfg.fileWriteInfos){
+        QJsonArray fWriteArr;
+        int idx = 0;
+        for(const auto& info : fileWriteInfos){
+            QJsonObject fWriteObject;
+            info.write(fWriteObject);
+            fWriteArr.append(fWriteObject);
+            ++idx;
+            if(idx >= writeCfg.maxCountWFiles){
+                break;
+            }
+        }
+        json["fileWriteEvents"] = fWriteArr;
+    }
+
 }
 
 bool CommandInfo::operator==(const CommandInfo &rhs) const

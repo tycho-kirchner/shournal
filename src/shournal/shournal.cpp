@@ -29,7 +29,7 @@
 #include "argcontrol_dbquery.h"
 #include "argcontrol_dbdelete.h"
 #include "qexcdatabase.h"
-#include "user_str_conversions.h"
+#include "conversions.h"
 #include "console_dialog.h"
 #include "qfilethrow.h"
 
@@ -220,7 +220,7 @@ int shournal_main(int argc, char *argv[])
     } catch (const ExcOptArgParse & ex) {
         QIErr() << qtr("Commandline seems to be erroneous:")
                 << ex.descrip();
-    } catch (const ExcUserStrConversion & ex) {
+    } catch (const ExcConversion & ex) {
         QIErr() << ex.descrip();
     }
     catch(const qsimplecfg::ExcCfg & ex){

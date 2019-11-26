@@ -1,2 +1,7 @@
 CMakeLists.txt.user*
 *.autosave
+package-lock.json
+html-export/node_modules
+html-export/dist/SAMPLE_DATA.js
+html-export/.vscode
+.eslintrc.js

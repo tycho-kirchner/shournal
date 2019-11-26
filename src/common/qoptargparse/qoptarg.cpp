@@ -8,7 +8,7 @@
 #include "exccommon.h"
 #include "excoptargparse.h"
 #include "util.h"
-#include "user_str_conversions.h"
+#include "conversions.h"
 
 
 /// @param shortName short name, one minus is added to the front (-e)
@@ -63,12 +63,12 @@ QOptArg::QOptArg(const QString &shortName,
 }
 
 
-QString QOptArg::shortName() const
+const QString &QOptArg::shortName() const
 {
     return m_shortName;
 }
 
-QString QOptArg::name() const
+const QString& QOptArg::name() const
 {
     return m_name;
 }
@@ -154,11 +154,11 @@ QVariantList QOptArg::getVariantByteSizes(const QVariantList &defaultValues)
     assert(m_isByteSizeArg);
     auto sizeStrs = getVariantValues<QString>(defaultValues);
     QVariantList sizes;
-    UserStrConversions userStrConv;
+    Conversions userStrConv;
     for(const auto& s : sizeStrs){
         try {
             sizes.push_back(userStrConv.bytesFromHuman(s.toString()));
-        } catch (const ExcUserStrConversion& e) {
+        } catch (const ExcConversion& e) {
             throw ExcOptArgParse(e.descrip() + " (arg " + m_name + ')' );
         }
     }
@@ -170,12 +170,12 @@ QVariantList QOptArg::getVariantRelativeDateTimes(const QVariantList &defaultVal
     assert(m_isRelativeDateTime);
     auto dateTimeStrs = getVariantValues<QString>(defaultValues);
     QVariantList dateTimes;
-    UserStrConversions userStrConv;
+    Conversions userStrConv;
     for(const auto& s : dateTimeStrs){
         try {
             dateTimes.push_back(userStrConv.relativeDateTimeFromHuman(s.toString(),
                                                                       m_relativeDateTimeSubtract));
-        } catch (const ExcUserStrConversion& e) {
+        } catch (const ExcConversion& e) {
             throw ExcOptArgParse(e.descrip() + " (arg " + m_name + ')' );
         }
     }
@@ -258,7 +258,7 @@ void QOptArg::setIsRelativeDateTime(bool isRelativeDateTime, bool subtractIt)
     m_isRelativeDateTime = isRelativeDateTime;
     m_relativeDateTimeSubtract = subtractIt;
     m_description += qtr(" Supported units include %1")
-                          .arg(UserStrConversions::relativeDateTimeUnitDescriptions());
+                          .arg(Conversions::relativeDateTimeUnitDescriptions());
 }
 
 

@@ -26,6 +26,7 @@ CommandPrinter::CommandPrinter() :
                  TrSnippets::instance().shournalRestore + "-" + os::getUserName<QString>())
 {}
 
+
 void CommandPrinter::createRestoreTopleveDirIfNeeded()
 {
     if(m_countOfRestoredFiles == 0){
@@ -66,14 +67,31 @@ void CommandPrinter::restoreReadFile_safe(const FileReadInfo &readInfo, const QS
     }
 }
 
+void CommandPrinter::setMaxCountRfiles(int maxCountRfiles)
+{
+    m_maxCountRfiles = maxCountRfiles;
+}
+
+void CommandPrinter::setMaxCountWfiles(int maxCountWfiles)
+{
+    m_maxCountWfiles = maxCountWfiles;
+}
+
+void CommandPrinter::setQueryString(const QString &queryString)
+{
+    m_queryString = queryString;
+}
+
 
 void CommandPrinter::setRestoreDir(const QDir &restoreDir)
 {
     m_restoreDir = restoreDir;
 }
 
-
-
+QFileThrow &CommandPrinter::outputFile()
+{
+    return m_outputFile;
+}
 
 
 void CommandPrinter::setRestoreReadFiles(bool restoreReadFiles)
