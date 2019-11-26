@@ -91,10 +91,13 @@ deleteChildlessParents(const QueryPtr& query){
 
     // delete stored read files (script files) in filesystem AND database
     query->setForwardOnly(true);
-    query->exec("select readFile.id from readFile where not exists "
-               "(select 1 from readFileCmd where readFileCmd.readFileId=readFile.id)");
+    query->prepare("select readFile.id from readFile where "
+        "readFile.isStoredToDisk=? and "
+        "not exists (select 1 from readFileCmd where readFileCmd.readFileId=readFile.id) ");
+    query->bindValue(0, true);
+    query->exec();
     StoredFiles storedFiles;
-    logDebug << "looping though read files to evtl. delete from filesystem...";
+    logDebug << "looping though read 'script' files to evtl. delete from filesystem...";
     while(query->next()){
         const QString fname = query->value(0).toString();
         if(! storedFiles.deleteReadFile(fname) ){
@@ -289,7 +292,7 @@ db_controller::queryForCmd(const SqlQuery &sqlQ, bool reverseResultIter){
                         "join writtenFile on cmd.id=writtenFile.cmdId " : "") +
             QString((sqlQ.containsTablename("readFile")) ?
                         "join readFileCmd on cmd.id=readFileCmd.cmdId "
-                        "join readFile on readFileCmd.readFileId=readFile.id ":
+                        "join readFile on readFileCmd.readFileId=readFile.id " :
                         "") +
             "join env on cmd.envId=env.id "
             "left join hashmeta on hashmeta.id=cmd.hashmetaId " // left joins last, if possible!
@@ -303,9 +306,10 @@ db_controller::queryForCmd(const SqlQuery &sqlQ, bool reverseResultIter){
     if( ! reverseResultIter){
         pQuery->setForwardOnly(true);
     }
-    pQuery->prepare(queryStr + sqlQ.query() + " group by cmd.id " + orderBy);
+    const QString fullQuery = queryStr + sqlQ.query() + " group by cmd.id " + orderBy;
+    pQuery->prepare(fullQuery);
     pQuery->addBindValues(sqlQ.values());
-
+    logDebug << "executing" << fullQuery;
     pQuery->exec();
     if(reverseResultIter){
         // place cursor right after the last record, so a call to "previous" points to last.
