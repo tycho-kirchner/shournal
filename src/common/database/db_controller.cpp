@@ -303,14 +303,18 @@ db_controller::queryForCmd(const SqlQuery &sqlQ, bool reverseResultIter){
     const QString orderBy = "order by cmd.startTime " + sqlQ.ascendingStr() +
                             sqlQ.mkLimitString();
 
-    if( ! reverseResultIter){
-        pQuery->setForwardOnly(true);
-    }
+    // we need the size (at other places) but QSQLITE does not support QSqlQuery::size.
+    // To use a workaround, forward mode must not be enabled.
+    // See also https://stackoverflow.com/a/26500811/7015849
+    // if( ! reverseResultIter){
+    //     pQuery->setForwardOnly(true);
+    // }
     const QString fullQuery = queryStr + sqlQ.query() + " group by cmd.id " + orderBy;
     pQuery->prepare(fullQuery);
     pQuery->addBindValues(sqlQ.values());
     logDebug << "executing" << fullQuery;
     pQuery->exec();
+
     if(reverseResultIter){
         // place cursor right after the last record, so a call to "previous" points to last.
         pQuery->last();

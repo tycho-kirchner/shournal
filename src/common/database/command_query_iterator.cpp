@@ -32,6 +32,11 @@ CommandInfo &CommandQueryIterator::value()
     return m_cmd;
 }
 
+int CommandQueryIterator::computeSize()
+{
+    return m_cmdQuery->computeSize();
+}
+
 
 
 void CommandQueryIterator::fillCommand()

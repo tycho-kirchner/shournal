@@ -131,6 +131,35 @@ void QSqlQueryThrow::rollback()
     this->exec("ROLLBACK");
 }
 
+/// QSQLITE does not support size(), this is a workaround
+/// which only works if forwardOnly is false.
+int QSqlQueryThrow::computeSize()
+{
+    if(this->isForwardOnly()){
+        throw QExcDatabase(qtr("attempted to compute size although forwardOnly "
+                               "is enabled."));
+    }
+    // see also https://stackoverflow.com/a/26500811/7015849
+    const int initialPos = this->at();    
+    const int size = (this->last()) ? this->at() + 1 : 0;
+    // restore initial pos
+    switch (initialPos) {
+    case QSql::BeforeFirstRow:
+        this->first();
+        this->previous();
+        break;
+    case QSql::AfterLastRow:
+        this->last();
+        this->next();
+        break;
+    default:
+        this->seek(initialPos);
+        break;
+    }
+    return size;
+
+}
+
 /// Insert values in a sql table, if these values do not already exist.
 /// Requires an existing column named `id`.
 /// If the value-combination does not exist, the insert-operation inserts

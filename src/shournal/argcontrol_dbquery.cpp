@@ -275,7 +275,6 @@ void argcontol_dbquery::parse(int argc, char *argv[])
 
     if(argOutputFile.wasParsed()){
         cmdPrinter->outputFile().setFileName(argOutputFile.getValue<QString>());
-        cmdPrinter->outputFile().open(QFile::OpenModeFlag::WriteOnly);
     } else {
         if(dynamic_cast<CommandPrinterHtml*>(cmdPrinter.get()) != nullptr){
             QIErr() << qtr("For html-reports, please specify an output file "

@@ -26,6 +26,14 @@
 
 void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQueryIterator> &cmdIter)
 {
+    if( cmdIter->computeSize() == 0){
+        QOut() << qtr("No results found matching the query.\n");
+        return;
+    }
+    if(! m_outputFile.isOpen()){
+        m_outputFile.open(QFile::OpenModeFlag::WriteOnly);
+    }
+
     struct winsize termWinSize{};
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &termWinSize);
 

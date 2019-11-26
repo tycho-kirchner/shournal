@@ -25,6 +25,8 @@ public:
     void commit();
     void rollback();
 
+    int computeSize();
+
 public:
     typedef QVector<QPair<const char*, QVariant> > ColnameValuePairs;
 

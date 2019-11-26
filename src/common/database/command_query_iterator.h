@@ -15,6 +15,8 @@ public:
 
     CommandInfo& value();
 
+    int computeSize();
+
 public:
     CommandQueryIterator(const CommandQueryIterator &) = delete ;
     void operator=(const CommandQueryIterator &) = delete ;

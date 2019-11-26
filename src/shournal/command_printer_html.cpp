@@ -16,16 +16,25 @@
 #include "cleanupresource.h"
 #include "stupidinject.h"
 #include "qresource_helper.h"
+#include "qoutstream.h"
 
 using qresource_helper::data_safe;
 
 
 void CommandPrinterHtml::printCommandInfosEvtlRestore(std::unique_ptr<CommandQueryIterator> &cmdIter)
 {
+    if( cmdIter->computeSize() == 0){
+        QOut() << qtr("No results found matching the query.\n");
+        return;
+    }
+
     Q_INIT_RESOURCE(htmlexportres);
     QResource indexHtmlResource("://index.html");
     QByteArray html_content = data_safe(indexHtmlResource);
 
+    if(! m_outputFile.isOpen()){
+        m_outputFile.open(QFile::OpenModeFlag::WriteOnly);
+    }
     QTextStream outstream(&m_outputFile);
 
     StupidInject inject;

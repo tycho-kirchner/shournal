@@ -10,6 +10,10 @@
 
 void CommandPrinterJson::printCommandInfosEvtlRestore(std::unique_ptr<CommandQueryIterator> &cmdIter)
 {
+    if(! m_outputFile.isOpen()){
+        m_outputFile.open(QFile::OpenModeFlag::WriteOnly);
+    }
+
     QTextStream outstream(&m_outputFile);
     {
         QJsonObject header;
