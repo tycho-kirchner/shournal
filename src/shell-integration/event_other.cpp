@@ -20,8 +20,9 @@ char *event_other::handleStrcpy(char *dest, const char *src)
     if(! g_shell.inSubshell &&
          g_shell.watchState == E_WatchState::WITHIN_CMD &&
          g_shell.pAttchedShell->cmdCounterJustIncremented()){
-        // we should always clean up, so...
-        assert(g_shell.lastCmdStartTime.isNull());
+
+        // lastCmdStartTime is usually null, except shournal-run fails
+        // to launch. Overwrite anyway.
         g_shell.lastCmdStartTime = QDateTime::currentDateTime();
     }
     return g_shell.orig_strcpy(dest, src);
