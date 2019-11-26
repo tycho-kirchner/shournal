@@ -40,6 +40,41 @@ static void newSqliteDbIfNeeded(){
     });
 }
 
+// called in case database- and application version is different
+static void handleDifferentVersions(const QVersionNumber& dbVersion,
+                                    QSqlQueryThrow& query){
+    assert(dbVersion != app::version());
+
+    if(dbVersion > app::version()){
+        logWarning << qtr("The database version (%1) is higher than the application version (%2). "
+                          "Note that downgrades of the database "
+                          "are *not* supported, so things may go wrong. Please update shournal "
+                          "(on this machine).")
+                      .arg(dbVersion.toString()).arg(app::version().toString());
+        return;
+    }
+    // the version is smaller -> performa all necessary updates
+
+    if(dbVersion < QVersionNumber{0, 9}){
+        logDebug << "updating db to 0.9...";
+        sqlite_database_scheme_updates::v0_9(query);
+    }
+    if(dbVersion < QVersionNumber{2, 1}){
+        logDebug << "updating db to 2.1...";
+        sqlite_database_scheme_updates::v2_1(query);
+    }
+
+    if(dbVersion < QVersionNumber{2, 2}){
+        logDebug << "updating db to 2.2...";
+        sqlite_database_scheme_updates::v2_2(query);
+    }
+
+    query.prepare("replace into version (id, ver) values (1, ?)");
+    query.addBindValue(app::version().toString());
+    query.exec();
+
+}
+
 /// @throws QExcDatabase
 static void openAndPrepareSqliteDb()
 {
@@ -81,29 +116,11 @@ static void openAndPrepareSqliteDb()
         }
     }
     const auto dbVersion = queryVersion(query);
-    if(dbVersion > app::version()){
-        logWarning << qtr("The database version (%1) is higher than the application version (%2). "
-                          "Note that downgrades of the database "
-                          "are *not* supported, so things may go wrong. Please update shournal "
-                          "(on this machine).")
-                      .arg(dbVersion.toString()).arg(app::version().toString());
-    }
-
     logDebug << "current db-version" << dbVersion.toString();
-    if(dbVersion < QVersionNumber{0, 9}){
-        logDebug << "updating db to 0.9...";
-        sqlite_database_scheme_updates::v0_9(query);
-    }
-    if(dbVersion < QVersionNumber{2, 1}){
-        logDebug << "updating db to 2.1...";
-        sqlite_database_scheme_updates::v2_1(query);
+    if(dbVersion != app::version()){
+        handleDifferentVersions(dbVersion, query);
     }
 
-    if(dbVersion < app::version()){
-        query.prepare("replace into version (id, ver) values (1, ?)");
-        query.addBindValue(app::version().toString());
-        query.exec();
-    }
 }
 
 

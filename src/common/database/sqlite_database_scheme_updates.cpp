@@ -52,3 +52,17 @@ void sqlite_database_scheme_updates::v2_1(QSqlQueryThrow &query)
     query.exec("alter table `readFile` add column `isStoredToDisk` INTEGER DEFAULT 1");
 
 }
+
+
+
+void sqlite_database_scheme_updates::v2_2(QSqlQueryThrow &query)
+{
+    // Create indeces to improve query and delete performance.
+    query.exec("CREATE INDEX IF NOT EXISTS `idx_writtenFile_cmdId` ON `writtenFile` (`cmdId`)");
+    query.exec("CREATE INDEX IF NOT EXISTS `idx_readFileCmd_cmdId` ON `readFileCmd` (`cmdId`)");
+    query.exec("CREATE INDEX IF NOT EXISTS `idx_readFileCmd_readFileId` ON `readFileCmd` (`readFileId`)");
+    query.exec("CREATE INDEX IF NOT EXISTS `idx_cmd_envId` ON `cmd` (`envId`)");
+    query.exec("CREATE INDEX IF NOT EXISTS `idx_cmd_sessionId` ON `cmd` (`sessionId`)");
+    query.exec("CREATE INDEX IF NOT EXISTS `idx_cmd_hashmetaId` ON `cmd` (`hashmetaId`)");
+    query.exec("CREATE INDEX IF NOT EXISTS `idx_readFile_envId` ON `readFile` (`envId`)");
+}
