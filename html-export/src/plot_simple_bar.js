@@ -8,17 +8,11 @@ import {ErrorNotImplemented} from './util';
  */
 export default class PlotSimpleBar {
   constructor() {
-    this._maxCountOfBars = 5;
-
     this._margin = { top: 20, right: 20, bottom: 60, left: 40 };
     this._width = 500 - this._margin.left - this._margin.right;
     this._height = 300 - this._margin.top - this._margin.bottom;
 
     this._maxBarWidth = 30;
-  }
-
-  setMaxCountOfBars(val){
-    this._maxCountOfBars = val;
   }
 
   generatePlot(data, siblingElement) {
