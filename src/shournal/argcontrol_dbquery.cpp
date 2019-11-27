@@ -198,7 +198,7 @@ void argcontol_dbquery::parse(int argc, char *argv[])
                         QOptSqlArg::cmpOpsText());
     parser.addArg(&argCmdText);
 
-    QOptSqlArg argCmdCwd("cmdcwd", "command-working-dir",
+    QOptSqlArg argCmdCwd("cwd", "command-working-dir",
                          qtr("Query for commands with matching working-directory."),
                           QOptSqlArg::cmpOpsText());
     parser.addArg(&argCmdCwd);
