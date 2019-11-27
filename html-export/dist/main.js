@@ -1660,17 +1660,11 @@ function _truncateAndSetLabelTxt(labelTxt, tspan, width) {
  */
 class plot_simple_bar_PlotSimpleBar {
   constructor() {
-    this._maxCountOfBars = 5;
-
     this._margin = { top: 20, right: 20, bottom: 60, left: 40 };
     this._width = 500 - this._margin.left - this._margin.right;
     this._height = 300 - this._margin.top - this._margin.bottom;
 
     this._maxBarWidth = 30;
-  }
-
-  setMaxCountOfBars(val){
-    this._maxCountOfBars = val;
   }
 
   generatePlot(data, siblingElement) {
@@ -2137,18 +2131,25 @@ async function generateMiscStats() {
     .style('padding-top', '20px')
     .style('display', 'inline-block');
 
-  const plotMostWrittenFiles = new plot_most_written_files_PlotMostWrittenFiles();
-  plotMostWrittenFiles.generatePlot(commands, miscStatElement);
+  if (mostFileMods.length > 0) {
+    const plotMostWrittenFiles = new plot_most_written_files_PlotMostWrittenFiles();
+    plotMostWrittenFiles.generatePlot(commands, miscStatElement);
+  }  
+  
+  if (sessionsMostCmds.length > 0) {
+    const plotCmdCountPerSession = new plot_cmdcount_per_session_PlotCmdCountPerSession();
+    plotCmdCountPerSession.generatePlot(commands, miscStatElement);
+  }
 
-  const plotCmdCountPerSession = new plot_cmdcount_per_session_PlotCmdCountPerSession();
-  plotCmdCountPerSession.generatePlot(commands, miscStatElement);
-
-  const plotCmdCountPerCwd = new plot_cmdcount_per_cwd_PlotCmdCountPerCwd();
-  plotCmdCountPerCwd.generatePlot(commands, miscStatElement);
-
-  const plotIoPerDir = new plot_io_per_dir_PlotIoPerDir();
-  plotIoPerDir.generatePlot(commands, miscStatElement);
-
+  if(cwdCmdCounts.length > 0){
+    const plotCmdCountPerCwd = new plot_cmdcount_per_cwd_PlotCmdCountPerCwd();
+    plotCmdCountPerCwd.generatePlot(commands, miscStatElement);
+  }
+ 
+  if (dirIoCounts.length > 0) {
+    const plotIoPerDir = new plot_io_per_dir_PlotIoPerDir();
+    plotIoPerDir.generatePlot(commands, miscStatElement);
+  }
 
   $('[data-toggle="tooltip"]').tooltip({
     delay: { show: 300, hide: 0 },

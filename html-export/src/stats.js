@@ -33,18 +33,25 @@ export async function generateMiscStats() {
     .style('padding-top', '20px')
     .style('display', 'inline-block');
 
-  const plotMostWrittenFiles = new PlotMostWrittenFiles();
-  plotMostWrittenFiles.generatePlot(commands, miscStatElement);
+  if (mostFileMods.length > 0) {
+    const plotMostWrittenFiles = new PlotMostWrittenFiles();
+    plotMostWrittenFiles.generatePlot(commands, miscStatElement);
+  }  
+  
+  if (sessionsMostCmds.length > 0) {
+    const plotCmdCountPerSession = new PlotCmdCountPerSession();
+    plotCmdCountPerSession.generatePlot(commands, miscStatElement);
+  }
 
-  const plotCmdCountPerSession = new PlotCmdCountPerSession();
-  plotCmdCountPerSession.generatePlot(commands, miscStatElement);
-
-  const plotCmdCountPerCwd = new PlotCmdCountPerCwd();
-  plotCmdCountPerCwd.generatePlot(commands, miscStatElement);
-
-  const plotIoPerDir = new PlotIoPerDir();
-  plotIoPerDir.generatePlot(commands, miscStatElement);
-
+  if(cwdCmdCounts.length > 0){
+    const plotCmdCountPerCwd = new PlotCmdCountPerCwd();
+    plotCmdCountPerCwd.generatePlot(commands, miscStatElement);
+  }
+ 
+  if (dirIoCounts.length > 0) {
+    const plotIoPerDir = new PlotIoPerDir();
+    plotIoPerDir.generatePlot(commands, miscStatElement);
+  }
 
   $('[data-toggle="tooltip"]').tooltip({
     delay: { show: 300, hide: 0 },
