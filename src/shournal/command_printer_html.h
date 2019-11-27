@@ -35,8 +35,6 @@ protected:
     void writeStatistics(QTextStream& outstream);
 
     QMimeDatabase m_mimedb;
-
-    CmdStats m_cmdStats;
     bool m_writeDatesWithMillisec{true};
 
 };

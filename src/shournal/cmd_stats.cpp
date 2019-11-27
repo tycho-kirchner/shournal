@@ -4,15 +4,15 @@
 
 /// Do not collect more than that many entries of each category
 CmdStats::CmdStats() :
-    m_countOfStats(5)
+    m_maxCountOfStats(5)
 {
-    m_cmdsWithMostFileModsQueue.setMaxSize(m_countOfStats);
+    m_cmdsWithMostFileModsQueue.setMaxSize(m_maxCountOfStats);
 }
 
-void CmdStats::setCountOfStats(const int &countOfStats)
+void CmdStats::setMaxCountOfStats(const int &val)
 {
-    m_countOfStats = countOfStats;
-    m_cmdsWithMostFileModsQueue.setMaxSize(countOfStats);
+    m_maxCountOfStats = val;
+    m_cmdsWithMostFileModsQueue.setMaxSize(val);
 }
 
 void CmdStats::collectCmd(const CommandInfo &cmd)
@@ -64,7 +64,7 @@ void CmdStats::eval()
     limited_priority_queue<SessionMostCmdsEntry,
                            SessionMostCmds,
                            cmpSessionMostCmdEntry> sessionMostCmdsPq;
-    sessionMostCmdsPq.setMaxSize(m_countOfStats);
+    sessionMostCmdsPq.setMaxSize(m_maxCountOfStats);
     for(const auto & el : m_sessionMostCmdsMap){
         sessionMostCmdsPq.push(el);
     }
@@ -74,7 +74,7 @@ void CmdStats::eval()
 
 
     limited_priority_queue<CwdCmdCount, CwdCmdCounts, cmpCwdCmdCount> cwdCmdCountQueue;
-    cwdCmdCountQueue.setMaxSize(m_countOfStats);
+    cwdCmdCountQueue.setMaxSize(m_maxCountOfStats);
     for(auto it=m_cwdCmdCountMap.begin(); it != m_cwdCmdCountMap.end(); ++it){
         // was not yet assigned because here it has to be assigned only once per
         // working dir
@@ -86,7 +86,7 @@ void CmdStats::eval()
 
 
     limited_priority_queue<DirIoCount, DirIoCounts, cmpDirIoCount> dirIoCountQueue;
-    dirIoCountQueue.setMaxSize(m_countOfStats);
+    dirIoCountQueue.setMaxSize(m_maxCountOfStats);
     for(auto it=m_dirIoCountMap.begin(); it != m_dirIoCountMap.end(); ++it){
         it.value().dir = it.key();
         dirIoCountQueue.push(it.value());

@@ -268,11 +268,13 @@ void CommandPrinterHtml::writeStatistics(QTextStream &outstream)
 {
     {
         QJsonArray jsonMostFileMods;
-        for(const auto& e : m_cmdStats.cmdsWithMostFileMods()){
-            QJsonObject o;
-            o["idx"] = e.idx;
-            o["countOfFileMods"] = e.countOfFileMods;
-            jsonMostFileMods.append(o);
+        if(m_cmdStats.cmdsWithMostFileMods().size() >= m_minCountOfStats) {
+            for(const auto& e : m_cmdStats.cmdsWithMostFileMods()){
+                QJsonObject o;
+                o["idx"] = e.idx;
+                o["countOfFileMods"] = e.countOfFileMods;
+                jsonMostFileMods.append(o);
+            }
         }
         outstream << "const mostFileMods = "
                   << QJsonDocument(jsonMostFileMods).toJson(QJsonDocument::Compact) << "\n";
@@ -280,11 +282,13 @@ void CommandPrinterHtml::writeStatistics(QTextStream &outstream)
 
     {
         QJsonArray jsonSessionsMostCmds;
-        for(const auto & e : m_cmdStats.sessionMostCmds()){
-            QJsonObject o;
-            o["idxFirstCmd"] = e.idx;
-            o["countOfCommands"] = e.cmdCount;
-            jsonSessionsMostCmds.append(o);
+        if(m_cmdStats.sessionMostCmds().size() >= m_minCountOfStats) {
+            for(const auto & e : m_cmdStats.sessionMostCmds()){
+                QJsonObject o;
+                o["idxFirstCmd"] = e.idx;
+                o["countOfCommands"] = e.cmdCount;
+                jsonSessionsMostCmds.append(o);
+            }
         }
         outstream << "const sessionsMostCmds = "
                   << QJsonDocument(jsonSessionsMostCmds).toJson(QJsonDocument::Compact) << "\n";
@@ -292,11 +296,13 @@ void CommandPrinterHtml::writeStatistics(QTextStream &outstream)
 
     {
         QJsonArray json;
-        for(const auto & e : m_cmdStats.cwdCmdCounts()){
-            QJsonObject o;
-            o["workingDir"] = e.workingDir;
-            o["countOfCommands"] = e.cmdCount;
-            json.append(o);
+        if(m_cmdStats.cwdCmdCounts().size() >= m_minCountOfStats) {
+            for(const auto & e : m_cmdStats.cwdCmdCounts()){
+                QJsonObject o;
+                o["workingDir"] = e.workingDir;
+                o["countOfCommands"] = e.cmdCount;
+                json.append(o);
+            }
         }
         outstream << "const cwdCmdCounts = "
                   << QJsonDocument(json).toJson(QJsonDocument::Compact) << "\n";
@@ -304,12 +310,14 @@ void CommandPrinterHtml::writeStatistics(QTextStream &outstream)
 
     {
         QJsonArray json;
-        for(const auto & e : m_cmdStats.dirIoCounts()){
-            QJsonObject o;
-            o["dir"] = e.dir;
-            o["readCount"] = e.readCount;
-            o["writeCount"] = e.writeCount;
-            json.append(o);
+        if(m_cmdStats.dirIoCounts().size() >= m_minCountOfStats) {
+            for(const auto & e : m_cmdStats.dirIoCounts()){
+                QJsonObject o;
+                o["dir"] = e.dir;
+                o["readCount"] = e.readCount;
+                o["writeCount"] = e.writeCount;
+                json.append(o);
+            }
         }
         outstream << "const dirIoCounts = "
                   << QJsonDocument(json).toJson(QJsonDocument::Compact) << "\n";

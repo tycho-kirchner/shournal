@@ -50,6 +50,12 @@ public:
     template <typename ContainerT>
     ContainerT getValues(const ContainerT& defaultValues={});
 
+    template <typename ContainerT>
+    ContainerT getValuesByDelim(const QString& delim=",", const ContainerT& defaultValues={},
+                                const int minValueSize=1,
+                                const int maxValueSize=std::numeric_limits<int>::max());
+
+
     template <typename T>
     QVariantList getVariantValues(const QVariantList& defaultValues={});
 
@@ -160,6 +166,37 @@ ContainerT QOptArg::getValues(const ContainerT& defaultValues){
     }
     return container;
 
+}
+
+/// for a *single* argument string, whose values are separated by a delimter (e.g. comma)
+/// argFoo 1,2,3
+template <typename ContainerT>
+ContainerT QOptArg::getValuesByDelim(const QString& delim, const ContainerT& defaultValues,
+                                     const int minValueSize, const int maxValueSize){
+    if(! m_hasValue){
+        throwgetValueCalledOnFlag(__func__);
+    }
+    if(m_vals.len == 0){
+        return defaultValues;
+    }
+    ContainerT container;
+    const auto splittedVals = QString(m_vals.argv[0]).split(delim, QString::SplitBehavior::SkipEmptyParts);
+    if(splittedVals.size() < minValueSize || splittedVals.size() > maxValueSize){
+         throw ExcOptArgParse(qtr("argument %1 requires at least %2 and at most %3 "
+                                  "parameters, separated by '%4' but %5 were given.")
+                                    .arg(m_name).arg(minValueSize).arg(maxValueSize)
+                                    .arg(delim).arg(splittedVals.size()));
+    }
+    for(const QString & val : splittedVals){
+        typename ContainerT::value_type t;
+        try {
+            qVariantTo_throw(val, &t, false);
+        } catch (const ExcQVariantConvert& ex) {
+            throw ExcOptArgParse(ex.descrip() + " (arg " + m_name + ')' );
+        }
+        container.push_back(t);
+    }
+    return container;
 }
 
 

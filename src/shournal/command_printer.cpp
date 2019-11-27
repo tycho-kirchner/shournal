@@ -67,9 +67,20 @@ void CommandPrinter::restoreReadFile_safe(const FileReadInfo &readInfo, const QS
     }
 }
 
+/// Do not output statistics, if less than 'val' entries
+void CommandPrinter::setMinCountOfStats(int val)
+{
+    m_minCountOfStats = val;
+}
+
 void CommandPrinter::setMaxCountRfiles(int maxCountRfiles)
 {
     m_maxCountRfiles = maxCountRfiles;
+}
+
+CmdStats &CommandPrinter::cmdStats()
+{
+    return m_cmdStats;
 }
 
 void CommandPrinter::setMaxCountWfiles(int maxCountWfiles)

@@ -2118,8 +2118,9 @@ async function generateMiscStats() {
     });
   }
 
-  if (commands.length < 5) {
-    // statistics are boring with so few commands...
+  if (mostFileMods.length === 0 && sessionsMostCmds.length === 0 && 
+      cwdCmdCounts.length === 0 && dirIoCounts.length === 0) {
+    // No stats to display...
     return;
   }
 

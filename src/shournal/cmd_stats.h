@@ -48,7 +48,7 @@ public:
 
     CmdStats();
 
-    void setCountOfStats(const int &countOfStats);
+    void setMaxCountOfStats(const int &val);
 
     void collectCmd(const CommandInfo& cmd);
 
@@ -101,7 +101,7 @@ private:
     DirIoCounts m_dirIoCounts;
 
 
-    int m_countOfStats;
+    int m_maxCountOfStats;
     int m_currentCmdIdx{0};
 };
 

@@ -242,11 +242,18 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     QOptArg argOutputFormat("", "output-format",
                             qtr("Specify the output format (human is default). "
                                 "If 'html' is used, %1 must also be specified")
-                            .arg(argOutputFile.name()));
+                            .arg(argOutputFile.name())); 
+
     const char* OUTPUT_FORMAT_HUMAN = "human";
     argOutputFormat.setAllowedOptions({OUTPUT_FORMAT_HUMAN, "json", "html"});
     parser.addArg(&argOutputFormat);
 
+    QOptArg argStatCounts("", "stat-counts",
+                          qtr("Specify the min. and max. number of entries "
+                              "for the overall statistics (e.g. commands with most file modifications) "
+                              "as a comma-separated list, e.g. '5,10' to display at least 5 but not more than"
+                              "10 entries."));
+    parser.addArg(&argStatCounts);
 
 
     // --------------------- End of Args -----------------------
@@ -272,6 +279,15 @@ void argcontol_dbquery::parse(int argc, char *argv[])
 
     cmdPrinter->setMaxCountWfiles(argWfilesMaxCount.getValue<uint>(DEFAULT_wfilesMaxCount));
     cmdPrinter->setMaxCountRfiles(argRfilesMaxCount.getValue<uint>(DEFAULT_rfilesMaxCount));
+    {
+        const auto statCounts = argStatCounts.getValuesByDelim<QVector<uint> >(",", {5,5}, 2,2);
+        if(statCounts[0] > statCounts[1]){
+            throw ExcOptArgParse(qtr("argument %1: min. cannot be greater than max. stat-count")
+                                 .arg(argStatCounts.name()));
+        }
+        cmdPrinter->setMinCountOfStats(statCounts[0]);
+        cmdPrinter->cmdStats().setMaxCountOfStats(statCounts[1]);
+    }
 
     if(argOutputFile.wasParsed()){
         cmdPrinter->outputFile().setFileName(argOutputFile.getValue<QString>());

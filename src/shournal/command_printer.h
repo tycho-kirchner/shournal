@@ -5,6 +5,7 @@
 #include "storedfiles.h"
 #include "conversions.h"
 #include "qfilethrow.h"
+#include "cmd_stats.h"
 
 
 class CommandQueryIterator;
@@ -27,9 +28,11 @@ public:
     virtual void setQueryString(const QString &queryString);
     virtual void setMaxCountWfiles(int maxCountWfiles);
     virtual void setMaxCountRfiles(int maxCountRfiles);
+    virtual CmdStats& cmdStats();
+    virtual void setMinCountOfStats(int val);
 
 protected:
-     Q_DISABLE_COPY(CommandPrinter)
+    Q_DISABLE_COPY(CommandPrinter)
 
     void createRestoreTopleveDirIfNeeded();
 
@@ -47,6 +50,8 @@ protected:
     QString m_queryString; // entered by user on commandline
     int m_maxCountWfiles{0}; // do not print more than that number of written files per command
     int m_maxCountRfiles{0};
+    CmdStats m_cmdStats;
+    int m_minCountOfStats;
 };
 
 

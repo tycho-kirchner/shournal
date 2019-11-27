@@ -20,7 +20,6 @@
 #include "os.h"
 #include "translation.h"
 #include "qoutstream.h"
-#include "cmd_stats.h"
 #include "commandinfo.h"
 
 
@@ -41,9 +40,8 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
 
     s.setMaxLineWidth((termWinSize.ws_col > 5) ? termWinSize.ws_col : 80 );
 
-    CmdStats cmdStats;
     while(cmdIter->next()){
-        cmdStats.collectCmd(cmdIter->value());
+        m_cmdStats.collectCmd(cmdIter->value());
         s.setLineStart(m_indentlvl0);
         auto & cmd = cmdIter->value();
         s << qtr("cmd-id %1:").arg(cmd.idInDb);
@@ -61,46 +59,44 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
         printReadInfos(s, cmd);
     }
 
-    cmdStats.eval();
+    m_cmdStats.eval();
 
-    // statistics with fewer elements is boring..
-    const int MIN_STATS_COUNT = 4;
-    if(cmdStats.cmdsWithMostFileMods().size() > MIN_STATS_COUNT){
+    if(m_cmdStats.cmdsWithMostFileMods().size() >= m_minCountOfStats){
         s.setLineStart(m_indentlvl0);
         s << qtr("\nCommands with most file modifications:\n");
         s.setLineStart(m_indentlvl1);
-        for(const auto& e : cmdStats.cmdsWithMostFileMods()){
+        for(const auto& e : m_cmdStats.cmdsWithMostFileMods()){
             s << qtr("cmd-id %1 modified %2 file(s) - %3\n")
                  .arg(e.idInDb).arg(e.countOfFileMods).arg(e.cmdTxt);
         }
 
     }
 
-    if(cmdStats.sessionMostCmds().size() > MIN_STATS_COUNT){
+    if(m_cmdStats.sessionMostCmds().size() >= m_minCountOfStats){
         s.setLineStart(m_indentlvl0);
         s << qtr("\nSessions with most commands:\n");
         s.setLineStart(m_indentlvl1);
-        for(const auto& e : cmdStats.sessionMostCmds()){
+        for(const auto& e : m_cmdStats.sessionMostCmds()){
             s << qtr("session-uuid %1 - %2 command(s)\n")
                  .arg(e.cmdUuid.toBase64().data()).arg(e.cmdCount);
         }
     }
 
-    if(cmdStats.cwdCmdCounts().size() > MIN_STATS_COUNT){
+    if(m_cmdStats.cwdCmdCounts().size() >= m_minCountOfStats){
         s.setLineStart(m_indentlvl0);
         s << qtr("\nWorking directories with most commands:\n");
         s.setLineStart(m_indentlvl1);
-        for(const auto& e : cmdStats.cwdCmdCounts()){
+        for(const auto& e : m_cmdStats.cwdCmdCounts()){
             s << qtr("%1 command(s) at %2\n")
                  .arg(e.cmdCount).arg(e.workingDir);
         }
     }
 
-    if(cmdStats.dirIoCounts().size() > MIN_STATS_COUNT){
+    if(m_cmdStats.dirIoCounts().size() >= m_minCountOfStats){
         s.setLineStart(m_indentlvl0);
         s << qtr("\nDirectories with most input/output-activity:\n");
         s.setLineStart(m_indentlvl1);
-        for(const auto& e : cmdStats.dirIoCounts()){
+        for(const auto& e : m_cmdStats.dirIoCounts()){
             s << qtr("Total %1 (%2 written, %3 read) files at %4\n")
                  .arg(e.writeCount + e.readCount).arg(e.writeCount)
                  .arg(e.readCount).arg(e.dir);
