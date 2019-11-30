@@ -33,11 +33,7 @@ namespace  {
 void
 queryCmdPrintAndExit(std::unique_ptr<CommandPrinter>& cmdPrinter,
                           SqlQuery& sqlQ,
-                          bool reverseResultIter=false ){
-    if(sqlQ.isEmpty()){
-        QIErr() << qtr("No target fields given (empty query).");
-        cpp_exit(1);
-    }
+                          bool reverseResultIter ){
     auto results = db_controller::queryForCmd(sqlQ, reverseResultIter);
     cmdPrinter->printCommandInfosEvtlRestore(results);
     cpp_exit(0);
@@ -101,7 +97,8 @@ void argcontol_dbquery::parse(int argc, char *argv[])
                                    ).arg(app::SHOURNAL) + "\n");
 
     QOptArg argHistory("", "history",
-                            qtr("Display the last N commands")
+                            qtr("Only display the last N commands, you may optionally "
+                                "filter by other parameters as well (like command-text)")
                             );
     parser.addArg(&argHistory);
 
@@ -320,14 +317,7 @@ void argcontol_dbquery::parse(int argc, char *argv[])
         }
         restoreDir.setPath(restoreDir.absolutePath() + QDir::separator() + trSnips.shournalRestore);
         cmdPrinter->setRestoreDir(restoreDir);
-    }
-
-    if(argHistory.wasParsed()){
-        query.setAscending(false);
-        query.setLimit(static_cast<int>(argHistory.getValue<uint>()));
-        query.setQuery(" 1 ");
-        queryCmdPrintAndExit(cmdPrinter, query, true);
-    }
+    }  
 
     if(argRestoreRfileId.wasParsed()){
         restoreSingleReadFile(argRestoreRfileId);
@@ -385,6 +375,30 @@ void argcontol_dbquery::parse(int argc, char *argv[])
 
 
 
+
+    // we always display commands in startDate-order, however,
+    // to allow for a performant history query (where the last
+    // N entries are queried) we traverse the result-set from
+    // end -> reverseResultIter = true AND query.ascending = false.
+    bool reverseResultIter=false;
+
+    // argHistory *must* be last, in case of an otherwise empty
+    // query, accept all (where 1).
+    if(argHistory.wasParsed()){
+        reverseResultIter = true;
+        query.setAscending(false);
+        query.setLimit(static_cast<int>(argHistory.getValue<uint>()));
+        if(query.isEmpty()){
+            // accept everything
+            query.setQuery(" 1 ");
+        }
+    }
+
+    if(query.isEmpty()){
+        QIErr() << qtr("No target fields given (empty query).");
+        cpp_exit(1);
+    }
+
     if( parser.rest().len != 0){
         QIErr() << qtr("Invalid parameters passed: %1.\n"
                        "Show help with --query --help").
@@ -392,7 +406,7 @@ void argcontol_dbquery::parse(int argc, char *argv[])
         cpp_exit(1);
     }
 
-    queryCmdPrintAndExit(cmdPrinter, query);
+    queryCmdPrintAndExit(cmdPrinter, query, reverseResultIter);
 }
 
 
