@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 
 # You must provide a valid path for shournals libshournal-shellwatch.so
 # SHOURNAL_PATH_LIB_SHELL_INTEGRATION="$HOME/.lib/libshournal-shellwatch.so"
