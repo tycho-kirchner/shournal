@@ -41,7 +41,9 @@ bool console_dialog::yesNo(const QString &question)
 /// @throws QExcIo, os::ExcOs
 int console_dialog::openFileInExternalEditor(const QString &filepath)
 {
+
     QString editor = getenv("EDITOR");
+    subprocess::Args_t args;
     if(editor.isEmpty()){
         if((editor=QStandardPaths::findExecutable("nano")).isEmpty())
             if((editor=QStandardPaths::findExecutable("vim")).isEmpty())
@@ -49,8 +51,26 @@ int console_dialog::openFileInExternalEditor(const QString &filepath)
                     throw QExcIo(qtr("No texteditor found, please set EDITOR "
                                      "environment variable."));
                 }
+        args.push_back(editor.toStdString());
+    } else {
+        // support also EDITOR-strings like e.g. 'geany -i' -> if we cannot find
+        // the executable, try to split by space
+        if((QStandardPaths::findExecutable(editor)).isEmpty() ){
+            const auto splitted = editor.split(' ', QString::SplitBehavior::SkipEmptyParts);
+            if(splitted.length() > 1){
+                for(const QString& s : splitted){
+                    args.push_back(s.toStdString());
+                }
+            } else {
+                // let it (probably) fail below:
+                args.push_back(editor.toStdString());
+            }
+        } else {
+            args.push_back(editor.toStdString());
+        }
     }
+    args.push_back(filepath.toStdString());
     Subprocess subproc;
-    subproc.call({editor.toStdString(), filepath.toStdString()});
+    subproc.call(args);
     return subproc.waitFinish();
 }
