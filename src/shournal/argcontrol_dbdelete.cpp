@@ -13,6 +13,7 @@
 #include "app.h"
 
 using argcontol_dbquery::addVariantSqlArgToQueryIfParsed;
+using argcontol_dbquery::addSimpleSqlArgToQueryIfParsed;
 using db_controller::QueryColumns;
 
 
@@ -26,6 +27,11 @@ void argcontrol_dbdelete::parse(int argc, char *argv[])
     QOptSqlArg argCmdId("cmdid", "command-id", qtr("Deletes command with given id."),
                           {E_CompareOperator::EQ} );
     parser.addArg(&argCmdId);
+
+    QOptSqlArg argCmdText("cmdtxt", "command-text", qtr("Delete commands with matching command-string."),
+                        QOptSqlArg::cmpOpsText());
+    parser.addArg(&argCmdText);
+
 
     QOptSqlArg argCmdDate("cmded", "command-end-date", qtr("Deletes commands given by end-date. Example:\n"
                                                   "%1 --delete --command-end-date -between "
@@ -59,6 +65,7 @@ void argcontrol_dbdelete::parse(int argc, char *argv[])
 
     addVariantSqlArgToQueryIfParsed<qint64>(query, argCmdId, cols.cmd_id);
     addVariantSqlArgToQueryIfParsed<QDateTime>(query, argCmdDate, cols.cmd_endtime);
+    addSimpleSqlArgToQueryIfParsed<QString>(query, argCmdText, cols.cmd_txt);
 
     if(argCmdOlderThan.wasParsed()){
         auto olderThanDates = argCmdOlderThan.getVariantRelativeDateTimes();
