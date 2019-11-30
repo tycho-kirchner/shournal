@@ -48,8 +48,7 @@ set(full_path_libshournal ${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME}/${libshou
 file(WRITE "${binary_dir_path_SOURCE_ME_bash}"
     "\
 export SHOURNAL_PATH_LIB_SHELL_INTEGRATION='${full_path_libshournal}'\n\
-source '${CMAKE_INSTALL_FULL_DATAROOTDIR}/${PROJECT_NAME}/bash_integration.sh' &&\n\
-    SHOURNAL_ENABLE\n\
+source '${CMAKE_INSTALL_FULL_DATAROOTDIR}/${PROJECT_NAME}/bash_integration.sh'\n\
 ")
 
 ########################## Installation ##########################
