@@ -273,8 +273,7 @@ int db_controller::deleteCommand(const SqlQuery &sqlQuery)
 
 
 /// @param reverseResultIter: if true, the returned Iterator will traverse the resultset in
-/// reverse order on continous 'next'-calls. Reversing the iterator might cause performance-issues,
-/// since the whole resultset will need to be stored in memory
+/// reverse order on continous 'next'-calls.
 std::unique_ptr<CommandQueryIterator>
 db_controller::queryForCmd(const SqlQuery &sqlQ, bool reverseResultIter){
     auto pQuery = db_connection::mkQuery();
