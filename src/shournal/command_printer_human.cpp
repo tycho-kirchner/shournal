@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <QJsonDocument>
+#include <QHostInfo>
 
 #include "command_printer.h"
 #include "qformattedstream.h"
@@ -40,6 +41,7 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
 
     s.setMaxLineWidth((termWinSize.ws_col > 5) ? termWinSize.ws_col : 80 );
 
+    const QString currentHostname = QHostInfo::localHostName();
     while(cmdIter->next()){
         m_cmdStats.collectCmd(cmdIter->value());
         s.setLineStart(m_indentlvl0);
@@ -51,8 +53,12 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
         s << cmd.startTime.toString( Qt::DefaultLocaleShortDate) << "-"
           << cmd.endTime.toString( Qt::DefaultLocaleShortDate) << ": "
           << cmd.text << "\n";
+        s << qtr("Working directory: %1\n").arg(cmd.workingDirectory);
         if(! cmd.sessionInfo.uuid.isNull()){
             s << qtr("session-uuid") << cmd.sessionInfo.uuid.toBase64() << "\n";
+        }
+        if(cmd.hostname != currentHostname){
+            s << qtr("Hostname: %1\n").arg(cmd.hostname);
         }
 
         printWriteInfos(s, cmd.fileWriteInfos);
@@ -174,48 +180,53 @@ void CommandPrinterHuman::printReadFile(QFormattedStream &s, QFile &f)
 
 void CommandPrinterHuman::printWriteInfos(QFormattedStream &s, const FileWriteInfos &fileWriteInfos)
 {
-    if(! fileWriteInfos.isEmpty()){
-        s.setLineStart(m_indentlvl1);
-        s << qtr("%1 written file(s):\n").arg(fileWriteInfos.size());
-        s.setLineStart(m_indentlvl2);
-        int counter = 0;
-        for(const auto& f : fileWriteInfos){
-            if(counter >= m_maxCountWfiles){
-                if(counter > 0){
-                    s << qtr("... and %1 more files.\n")
-                         .arg(fileWriteInfos.size() - m_maxCountWfiles);
-                }
-                break;
-            }
-            s << f.path  + QDir::separator() + f.name
-              << "(" + m_userStrConv.bytesToHuman(f.size) + ")"
-              << qtr("Hash:") << ((f.hash.isNull()) ? "-" : QString::number(f.hash.value()))
-              << "\n";
-            ++counter;
-        }
+    if(fileWriteInfos.isEmpty()){
+        return;
     }
+    s.setLineStart(m_indentlvl1);
+    const char dotOrColon = (m_maxCountWfiles == 0) ? '.' : ':';
+    s << qtr("%1 written file(s)%2\n").arg(fileWriteInfos.size()).arg(dotOrColon);
+    s.setLineStart(m_indentlvl2);
+    int counter = 0;
+    for(const auto& f : fileWriteInfos){
+        if(counter >= m_maxCountWfiles){
+            if(counter > 0){
+                s << qtr("... and %1 more files.\n")
+                     .arg(fileWriteInfos.size() - m_maxCountWfiles);
+            }
+            break;
+        }
+        s << f.path  + QDir::separator() + f.name
+          << "(" + m_userStrConv.bytesToHuman(f.size) + ")"
+          << qtr("Hash:") << ((f.hash.isNull()) ? "-" : QString::number(f.hash.value()))
+          << "\n";
+        ++counter;
+    }
+
 }
 
 void CommandPrinterHuman::printReadInfos(QFormattedStream &s, const CommandInfo &cmd)
 {
-    s.setLineStart(m_indentlvl1);
-    if(! cmd.fileReadInfos.isEmpty()){
-        s << qtr("%1 read file(s):\n").arg(cmd.fileReadInfos.size());
-        const QString cmdIdStr = QString::number(cmd.idInDb);
-        int counter = 0;
-        for(const auto & f : cmd.fileReadInfos){
-            if(counter >= m_maxCountRfiles){
-                if(counter > 0){
-                    s << qtr("... and %1 more files.\n")
-                            .arg(cmd.fileReadInfos.size() - m_maxCountRfiles);
-                }
-                break;
-            }
-            printReadFileEventEvtlRestore(s, f, cmdIdStr);
-            ++counter;
-        }
+    if(cmd.fileReadInfos.isEmpty()){
+        return;
     }
+    s.setLineStart(m_indentlvl1);
 
+    const char dotOrColon = (m_maxCountRfiles == 0) ? '.' : ':';
+    s << qtr("%1 read file(s)%2\n").arg(cmd.fileReadInfos.size()).arg(dotOrColon);
+    const QString cmdIdStr = QString::number(cmd.idInDb);
+    int counter = 0;
+    for(const auto & f : cmd.fileReadInfos){
+        if(counter >= m_maxCountRfiles){
+            if(counter > 0){
+                s << qtr("... and %1 more files.\n")
+                     .arg(cmd.fileReadInfos.size() - m_maxCountRfiles);
+            }
+            break;
+        }
+        printReadFileEventEvtlRestore(s, f, cmdIdStr);
+        ++counter;
+    }
 }
 
 
