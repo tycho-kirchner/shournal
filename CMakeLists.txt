@@ -82,6 +82,7 @@ function(hide_static_lib_symbols staticLib)
     set_target_properties(${staticLib} PROPERTIES CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 endfunction(hide_static_lib_symbols)
 
+
 # Below code could be used to strip *all* symbols, however, we do it only
 # for the shared lib to allow for meaningful stacktraces in shournal and shournal-run
 # CMP0063 NEW allows hiding symbols also in static libraries
@@ -136,7 +137,6 @@ find_package(Qt5Core)
 find_package(Qt5Sql)
 find_package(Qt5Network)
 
-
 include_directories(extern/tsl-ordered-map)
 
 add_subdirectory("extern/tsl-ordered-map")
@@ -155,9 +155,60 @@ if (test)
    add_subdirectory("test")
 endif()
 
+# install license
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+    RENAME copyright # following Lintian
+    DESTINATION ${CMAKE_INSTALL_FULL_DOCDIR}
+    )
+
+############## Package creation using 'cpack' ##############
+
+# generic
+set(CPACK_GENERATOR "DEB")
+set(CPACK_PACKAGE_VERSION ${shournal_version})
+set(CPACK_PACKAGE_CONTACT "Tycho Kirchner <tychokirchner@mail.de>")
+SET(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+# If CPACK_INSTALL_PREFIX is not set, let it default to CMAKE_INSTALL_PREFIX
+# see also: https://stackoverflow.com/a/7363073/7015849
+set(CPACK_SET_DESTDIR true)
 
 
 
+# deb specific
+# set(CPACK_GENERATOR "DEB")
+# Setting the filename to DEB-DEFAULT is *not* useless -> documentation
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/tycho-kirchner/shournal")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.2), libstdc++6 (>= 5.0), libgcc1, \
+libqt5core5a (>= 5.6), libqt5network5, libqt5sql5-sqlite, libcap2, uuid-runtime")
+# First line is summary, other lines
+# are extended description and must be indented
+set(CPACK_DEBIAN_PACKAGE_DESCRIPTION
+    "\
+File-journal for your shell\n\
+ Integrated tool to increase the reproducibility\n\
+ of your work on the shell: what did you do when and\n\
+ where and what files were modified/read.\
+")
+set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
+
+
+# generate the postinst based on the groupname
+set(debPostInstPath "${CMAKE_BINARY_DIR}/debian/postinst")
+FILE(WRITE "${debPostInstPath}"
+"#!/bin/sh\n\
+set -e\n\
+getent group ${MSENTER_GROUPNAME} || groupadd ${MSENTER_GROUPNAME}\n\
+")
+set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+    "${debPostInstPath}")
+set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION TRUE)
+
+
+# call it *after* setting above variables, otherwise
+# generic .gz's are generated.
+include(CPack)
 
 
 
