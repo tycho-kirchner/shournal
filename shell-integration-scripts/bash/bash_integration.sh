@@ -266,23 +266,23 @@ _shournal_verbose_history_check(){
 
     if ! [ -o history ]; then
         success=false
-        _shournal_warn "bash history is off. Please enable it: set -o history"
+        _shournal_error "bash history is off. Please enable it: set -o history"
     fi
 
     if [[ ${HISTSIZE-0} -lt 2 ]]; then
         success=false
-        _shournal_warn "bash HISTSIZE is too small (or not set). Please set it at least to 2: HISTSIZE=2"
+        _shournal_error "bash HISTSIZE is too small (or not set). Please set it at least to 2: HISTSIZE=2"
     fi
 
     if [[ ${HISTCONTROL-} == *"ignorespace"* || ${HISTCONTROL-} == *"ignoreboth"* ]]; then
         success=false
-        _shournal_warn "Commands with spaces are set to be ignored from history. Please disable that, " \
+        _shournal_error "Commands with spaces are set to be ignored from history. Please disable that, " \
                        "e.g. HISTCONTROL=ignoredups or HISTCONTROL=''"
     fi
 
     if [[ -n ${HISTIGNORE-} ]] ; then
         success=false
-        _shournal_warn "HISTIGNORE is not empty. Please unset it: unset HISTIGNORE"
+        _shournal_error "HISTIGNORE is not empty. Please unset it: unset HISTIGNORE"
     fi
 
     $success
