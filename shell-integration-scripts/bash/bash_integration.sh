@@ -1,7 +1,7 @@
-
+# bash-integration for shournal.
 # You must provide a valid path for shournals libshournal-shellwatch.so
-# SHOURNAL_PATH_LIB_SHELL_INTEGRATION="$HOME/.lib/libshournal-shellwatch.so"
-
+# before executing SHOURNAL_ENABLE, e.g.:
+# SHOURNAL_PATH_LIB_SHELL_INTEGRATION="/usr/local/lib64/shournal/libshournal-shellwatch.so"
 
 SHOURNAL_PRINT_VERSIONS() {
     echo "shournal bash integration version $_shournal_version"
