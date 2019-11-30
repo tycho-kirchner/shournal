@@ -1,6 +1,4 @@
 
-#include <cassert>
-
 #include <unordered_set>
 #include <QLinkedList>
 #include <QJsonObject>
@@ -101,7 +99,9 @@ void CommandPrinterHtml::printCommandInfosEvtlRestore(std::unique_ptr<CommandQue
 
 
         // write the cmd-data of the tempfile to html
-        assert(tmpCmdDataFile.seek(0));
+        if(! tmpCmdDataFile.seek(0)){
+            throw QExcIo("Failed to seek to 0 in cmdData tmpfile: " +  tmpCmdDataFile.errorString());
+        }
 
         QByteArray line;
         uint linecounter = 0;
