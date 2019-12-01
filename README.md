@@ -4,6 +4,8 @@
 
 ## A (file-) journal for your shell
 
+![Example session animation](images/shournal-example-session.gif)
+
 #### What is it (good for)?
 *TL;DR*:
 * **Integrated tool** to increase the reproducibility of your work
@@ -11,7 +13,8 @@
 * **Stand-alone tool** to monitor file events of a command/process (tree),
   similar to <br>
   `strace -f -e close $cmd`
-  but **a lot** faster.
+  but without the limitations imposed by ptrace-based solutions
+  and **a lot** faster.
 
 *More details please*:  
 
@@ -30,6 +33,13 @@ events it can be integrated really tight into the shell -
 you won't even notice it (;  
 See also: [shell-integration](./shell-integration-scripts)
 
+Besides output on the command-line in a human-readable format (or JSON)
+you can export (parts of) your command-history into
+a standalone html-file where it is displayed in an interactive
+time-line-plot. Further miscellaneous statistics are displayed in
+bar-plots, e.g. the commands with most file-modifications (see also above gif).
+
+
 *shournal* runs only on GNU/Linux.
 
 
@@ -37,7 +47,11 @@ See also: [shell-integration](./shell-integration-scripts)
 Please note: below examples make use of the
 [shell-integration](./shell-integration-scripts).<br>
 Otherwise `shournal --exec $cmd` and
-other boilerplate-code would have been necessary.
+other boilerplate-code would have been necessary.  
+Instead of printing the `--query`-results to terminal, you can also create
+fancy html-plots, by appending `--output-format html -o out.html`.
+Use an ordinary web-browser for display.
+
 
 * Create a file and ask shournal, how it came to be:
   ```
@@ -77,6 +91,27 @@ other boilerplate-code would have been necessary.
 
 
 ## Installation
+
+### Binary releases
+For Debian/Ubuntu-based distributions .deb-packages are available on the
+[release-page](https://github.com/tycho-kirchner/shournal/releases/latest).
+Only LTS-releases are supported, the packages are known to work on
+Debian 9 (Stretch), Debian 10 (Buster) and Ubuntu 18.04 (Bionic).
+Install deb-packages as usual, e.g.  
+`sudo apt install ./shournal_2.2_amd64.deb`
+
+**After installation**:
+To enable the shell-integration:
+
+* for *bash*: put the following to the end of your ~/.bashrc  
+`source /usr/share/shournal/SOURCE_ME.bash`  
+and run `SHOURNAL_ENABLE` afterwards.
+* for *other shells*: please open an issue, if you want your favorite
+  shell to be integrated as well (contributions welcome, zsh-support is planned).
+
+
+### Compile and install from source
+
   * Install gcc >= 5.0. Other compilers might work but are untested.
   * Install cmake >=3.0.2 and make
   * for safe generation of uuids it is recommend to install uuidd (uuid-runtime)
@@ -98,45 +133,59 @@ other boilerplate-code would have been necessary.
     ```
 
     CentOS (note: CentOS 7 as of July 2019 only ships with gcc 4.8
-    -> compile gcc >= 5.0 yourself):
+    -> compile gcc >= 5.0 yourself. cmake3 and cmake are seperate packages
+    where cmake in version 2 is the default. Please ensure to compile with cmake3):
     ```
-    yum install gcc-c++ cmake make qt5-qtbase-devel libuuid-devel libcap-devel uuidd
+    yum install gcc-c++ cmake3 make qt5-qtbase-devel libuuid-devel libcap-devel uuidd
     ```
 
   * In the source-tree-directory, enter the following commands to compile and install:
     ```
     mkdir -p build
     cd build
-    cmake  .. # defaults to -DCMAKE_BUILD_TYPE=Release
+    # if you later want to generate a deb-package, it is recommended
+    # to use /usr as prefix: -DCMAKE_INSTALL_PREFIX=/usr
+    cmake  ..
     make
     # as root:
     make install
+    # or if using a Debian-based distribution, generate a .deb-package:
+    cpack -G DEB
 
     ```
-  * Depending on your distribution, additional steps might be necessary to
-    enable the (recommended) uuidd-daemon. If systemd is in use, one may need to:
-    ```
-    systemctl enable uuidd
-    systemctl start uuidd
-    ```
 
-  * if you plan on using the shell-integration, you'll need the location of
-    `libshournal-shellwatch.so` which is typically within /usr/local/lib/shournal
-  * Add a group to your system, which is primarily needed for the shell-integration:
+**After compile and install**: if you created a .deb-package, please see
+[Binary releases](###binary-releases). **Otherwise:**
 
-    ```groupadd shournalmsenter```
+* Add a group to your system, which is primarily needed for the shell-integration:
 
-    However, *do not add any users to that group*. It is part of a permission check, where root adopts that gid (within shournal).
-    If you don't like the default group name, you can specify your own: at build time pass the following to cmake:
+  ```groupadd shournalmsenter```
 
-    ```-DMSENTER_GROUPNAME=$your_group_name```
+  However, *do not add any users to that group*. It is part of a permission check, where root adopts that gid (within shournal).
+  If you don't like the default group name, you can specify your own: at build time pass the following to cmake:
 
-  * Two executables were built: shournal and shournal-run. The latter is a setuid program, it has to be owned by root while having the setuid-bit set.
-    Typing `make install` as root does this automatically, to do so manually, enter as root:
-    ```
-    chown root shournal-run
-    chmod u+s  shournal-run
-    ```
+  ```-DMSENTER_GROUPNAME=$your_group_name```
+
+* Depending on your distribution, additional steps might be necessary to
+  enable the (recommended) uuidd-daemon. If systemd is in use, one may need to:
+  ```
+  systemctl enable uuidd
+  systemctl start uuidd
+  ```
+* To **uninstall**, after having installed with `make install`, you can
+  execute  
+  `xargs rm < install_manifest.txt`, but see
+  [here](https://stackoverflow.com/a/44649542/7015849) for the
+  limitations.
+
+To enable the shell-integration: perform the same procedure as described
+in [Binary releases](###binary-releases), however, the location of
+the `SOURCE_ME.$shell_name` scripts after `make install` is typically
+`/usr/local/share/shournal/`.
+
+
+
+
 
 ## FAQ
 * **Does shournal track file rename/move operations?**<br>
@@ -299,6 +348,9 @@ For further limitations please visit the fanotify manpage.
 ## Credits
 shournal makes use of great tools and libraries, most importantly the Qt-framework,
 xxhash, tsl::ordered_map and cmake and also the Linux-Kernel's *fanotify*.
+For the html-plot d3js, jquery, popper.js, bootstrap, webpack
+and others are used.
+
 Thanks to the developers!
 
 The project arose as the practical part of my Bachelor thesis in computer science
@@ -310,10 +362,14 @@ Thanks for your great ideas and feedback!
 
 # License
 The whole project is licensed under the GPL, v3 or later
-(see LICENSE file for details) **except** the libraries within
-`extern/`: please refer to the licenses within their
-respective directories.
-
+(see LICENSE file for details)  
+**except**
+* the libraries within
+  `extern/` → Please refer to the licenses within their
+    respective directories.
+* The javascript-libraries in the auto-generated
+  `html-export/dist/main.js` → the licenses are
+  stored in `html-export/dist/main.licenses.txt`.
 
 
 Copyleft (C) 2019, Tycho Kirchner
