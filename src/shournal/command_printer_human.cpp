@@ -34,12 +34,15 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
         m_outputFile.open(QFile::OpenModeFlag::WriteOnly);
     }
 
-    struct winsize termWinSize{};
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &termWinSize);
-
     QFormattedStream s(&m_outputFile);
-
-    s.setMaxLineWidth((termWinSize.ws_col > 5) ? termWinSize.ws_col : 80 );
+    struct winsize termWinSize{};
+    if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &termWinSize) == 0){
+        s.setMaxLineWidth((termWinSize.ws_col > 5) ? termWinSize.ws_col : 80 );
+    } else {
+        // this happens e.g. when the output is piped to grep
+        logDebug << "failed to determine terminal size, using max...";
+        s.setMaxLineWidth( std::numeric_limits<int>::max() );
+    }
 
     const QString currentHostname = QHostInfo::localHostName();
     while(cmdIter->next()){
