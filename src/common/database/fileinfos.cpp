@@ -6,6 +6,7 @@
 
 void FileWriteInfo::write(QJsonObject &json) const
 {
+    json["id"] = idInDb;
     json["path"] = path + QDir::separator() + name;
     json["size"] = size;
     json["mtime"] = QJsonValue::fromVariant(mtime);
@@ -15,6 +16,9 @@ void FileWriteInfo::write(QJsonObject &json) const
 bool
 FileWriteInfo::operator==(const FileWriteInfo &rhs) const
 {
+    if(idInDb != db::INVALID_INT_ID && rhs.idInDb != db::INVALID_INT_ID){
+        return idInDb == rhs.idInDb;
+    }
     return mtime == rhs.mtime &&
             size == rhs.size &&
             path == rhs.path &&

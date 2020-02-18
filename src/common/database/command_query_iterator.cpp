@@ -68,12 +68,13 @@ void CommandQueryIterator::fillCommand()
 
 void CommandQueryIterator::fillWrittenFiles()
 {
-    m_tmpQuery->prepare("select path,name,mtime,size,hash from writtenFile where cmdId=?");
+    m_tmpQuery->prepare("select id,path,name,mtime,size,hash from writtenFile where cmdId=?");
     m_tmpQuery->addBindValue(m_cmd.idInDb);
     m_tmpQuery->exec();
     while(m_tmpQuery->next()){
         int i=0;
         FileWriteInfo fInfo;
+        fInfo.idInDb = qVariantTo_throw<qint64>(m_tmpQuery->value(i++));
         fInfo.path = m_tmpQuery->value(i++).toString();
         fInfo.name = m_tmpQuery->value(i++).toString();
         fInfo.mtime = m_tmpQuery->value(i++).toDateTime();

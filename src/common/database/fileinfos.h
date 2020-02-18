@@ -10,6 +10,8 @@
 
 struct FileWriteInfo
 {
+    qint64 idInDb { db::INVALID_INT_ID };
+
     QDateTime mtime;
     qint64    size {};
     QString   path;
