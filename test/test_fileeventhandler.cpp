@@ -57,11 +57,15 @@ private slots:
     }
 
     void tWrite() {
-
         /// Primarily a test, if hashChunkSize and
         /// hashMaxCountOfReads are handled correctly
-        QTemporaryFile tmpFile;
-        QVERIFY(tmpFile.open());
+        // Don't use QTemporaryFile here, we need a regular
+        // file with st1.st_nlink > 0
+        char tmpFileName[] = "fileevent_test_XXXXXX";
+        int fd = mkstemp(tmpFileName);
+        QVERIFY(os::fstat(fd).st_nlink > 0);
+        auto rmTmpFile = finally([&tmpFileName] { remove(tmpFileName); });
+
         FileEventHandler fEventHandler;
 
         auto & sets = Settings::instance();
@@ -69,8 +73,6 @@ private slots:
 
         sets.m_hashSettings.hashEnable = true;
         sets.m_hashSettings.hashMeta = HashMeta(2, 2);
-
-        int fd = tmpFile.handle();
 
         std::string buf = "g";
         writeCompareBuf(buf, buf, fd, fEventHandler);
