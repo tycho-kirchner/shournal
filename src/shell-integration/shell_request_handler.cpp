@@ -511,6 +511,7 @@ void handleEnableRequest(){
     if(! madeSafe){
         logInfo << __func__ << qtr("session uuid not created 'safe'. Is the uuidd-daemon running?");
     }
+    os::setenv(QByteArray("SHOURNAL_SESSION_UUID"), g_shell.sessionInfo.uuid.toBase64());
 
     g_shell.pAttchedShell->handleEnable();
 }
