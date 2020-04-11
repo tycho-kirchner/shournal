@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.0.2)
 
 # version applies to all released files: shournal, shournal-run, libshournal-shellwatch.so
 # and bash_integration.sh
-set(shournal_version "2.2")
+set(shournal_version "2.3")
 
 cmake_policy( SET CMP0048 NEW )
 project(shournal VERSION ${shournal_version} LANGUAGES CXX)

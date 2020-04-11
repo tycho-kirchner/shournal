@@ -151,7 +151,7 @@ SHOURNAL_SET_VERBOSITY(){
 
 # Do *not* touch the next line. The version is updated automatically on build from cmake according
 # to the version set there
-_shournal_version=2.2
+_shournal_version=2.3
 
 # 0: debug, 1: info, 2: warning, 3: error
 [[ -z ${_shournal_bash_integration_log_level+x} ]] && _shournal_bash_integration_log_level=2
