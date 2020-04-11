@@ -374,8 +374,6 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     }
 
 
-
-
     // we always display commands in startDate-order, however,
     // to allow for a performant history query (where the last
     // N entries are queried) we traverse the result-set from
@@ -394,15 +392,15 @@ void argcontol_dbquery::parse(int argc, char *argv[])
         }
     }
 
-    if(query.isEmpty()){
-        QIErr() << qtr("No target fields given (empty query).");
+    if( parser.rest().len != 0){
+        QIErr() << qtr("Invalid parameters passed: «%1».\n"
+                       "Show help with --query --help").
+                   arg(argvToQStr(parser.rest().len, parser.rest().argv));
         cpp_exit(1);
     }
 
-    if( parser.rest().len != 0){
-        QIErr() << qtr("Invalid parameters passed: %1.\n"
-                       "Show help with --query --help").
-                   arg(argvToQStr(parser.rest().len, parser.rest().argv));
+    if(query.isEmpty()){
+        QIErr() << qtr("No target fields given (empty query).");
         cpp_exit(1);
     }
 
