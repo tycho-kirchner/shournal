@@ -113,7 +113,7 @@ and run `SHOURNAL_ENABLE` afterwards.
 ### Compile and install from source
 
   * Install gcc >= 5.0. Other compilers might work but are untested.
-  * Install cmake >=3.0.2 and make
+  * Install cmake >= 3.6 and make
   * for safe generation of uuids it is recommend to install uuidd (uuid-runtime)
   * install qt-dev, uuid-dev, qt-sqlite-driver, Qt version >= 5.6.
     *With a little effort, shournal could be modified to
