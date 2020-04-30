@@ -39,6 +39,11 @@ a standalone html-file where it is displayed in an interactive
 time-line-plot. Further miscellaneous statistics are displayed in
 bar-plots, e.g. the commands with most file-modifications (see also above gif).
 
+Using the external software
+[shournal-to-snakemake]( https://github.com/snakemake/shournal-to-snakemake)
+an observed shell-command-series can be directly transformed into rules for
+the [*Snakemake workflow engine*](https://github.com/snakemake/snakemake),
+a tool to *create reproducible and scalable data analyses*.
 
 *shournal* runs only on GNU/Linux.
 
