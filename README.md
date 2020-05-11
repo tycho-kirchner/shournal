@@ -16,7 +16,7 @@
   but without the limitations imposed by ptrace-based solutions
   and **a lot** faster.
 
-*More details please*:  
+*More details please*:
 
 Using your shell's history is nice. But sometimes you want more:
 * What files were modified or read by a command? Or reverse: What shell-command(s)
@@ -27,10 +27,10 @@ Using your shell's history is nice. But sometimes you want more:
   exit status ($?) ?
 
 *shournal* provides the answer to these questions while
-causing only a negligible overhead.   
+causing only a negligible overhead. <br>
 Besides its ability to monitor a whole process tree for file
 events it can be integrated really tight into the shell -
-you won't even notice it (;  
+you won't even notice it (; <br>
 See also: [shell-integration](./shell-integration-scripts)
 
 Besides output on the command-line in a human-readable format (or JSON)
@@ -50,9 +50,9 @@ a tool to *create reproducible and scalable data analyses*.
 
 ## Examples
 Please note: below examples make use of the
-[shell-integration](./shell-integration-scripts).<br>
+[shell-integration](./shell-integration-scripts). <br>
 Otherwise `shournal --exec $cmd` and
-other boilerplate-code would have been necessary.  
+other boilerplate-code would have been necessary. <br>
 Instead of printing the `--query`-results to terminal, you can also create
 fancy html-plots, by appending `--output-format html -o out.html`.
 Use an ordinary web-browser for display.
@@ -102,14 +102,14 @@ For Debian/Ubuntu-based distributions .deb-packages are available on the
 [release-page](https://github.com/tycho-kirchner/shournal/releases/latest).
 Only LTS-releases are supported, the packages are known to work on
 Debian 9 (Stretch), Debian 10 (Buster) and Ubuntu 18.04 (Bionic).
-Install deb-packages as usual, e.g.  
+Install deb-packages as usual, e.g. <br>
 `sudo apt install ./shournal_2.2_amd64.deb`
 
 **After installation**:
 To enable the shell-integration:
 
-* for *bash*: put the following to the end of your ~/.bashrc  
-`source /usr/share/shournal/SOURCE_ME.bash`  
+* for *bash*: put the following to the end of your ~/.bashrc <br>
+`source /usr/share/shournal/SOURCE_ME.bash` <br>
 and run `SHOURNAL_ENABLE` afterwards.
 * for *other shells*: please open an issue, if you want your favorite
   shell to be integrated as well (contributions welcome, zsh-support is planned).
@@ -150,7 +150,7 @@ and run `SHOURNAL_ENABLE` afterwards.
     cd build
     # if you later want to generate a deb-package, it is recommended
     # to use /usr as prefix: -DCMAKE_INSTALL_PREFIX=/usr
-    cmake  ..
+    cmake ..
     make
     # as root:
     make install
@@ -178,7 +178,7 @@ and run `SHOURNAL_ENABLE` afterwards.
   systemctl start uuidd
   ```
 * To **uninstall**, after having installed with `make install`, you can
-  execute  
+  execute <br>
   `xargs rm < install_manifest.txt`, but see
   [here](https://stackoverflow.com/a/44649542/7015849) for the
   limitations.
@@ -193,7 +193,7 @@ the `SOURCE_ME.$shell_name` scripts after `make install` is typically
 
 
 ## FAQ
-* **Does shournal track file rename/move operations?**<br>
+* **Does shournal track file rename/move operations?** <br>
   No, but most often it should not be a problem. Using the
   `--wfile` commandline-query-option, shournal finds the stored command
   by content (size, hash) and mtime, not by its name.
@@ -207,7 +207,7 @@ the `SOURCE_ME.$shell_name` scripts after `make install` is typically
   (`--wname bar` of course works). To use the bar_old *file name*
   (and not content) as basis for a successful query, in this case
   `--command-text -like '%bar_old%'` can be used.
-* **What happens to an appended file?**<br>
+* **What happens to an appended file?** <br>
   How to get a "modification history"?
   Please read above rename/move-text first.
   Appending to a file is currently handled as if a new one was created -
@@ -215,9 +215,9 @@ the `SOURCE_ME.$shell_name` scripts after `make install` is typically
   good certainty (by file **content**).
   However, querying by path/file**name** works.
   If the file was appended *and* renamed, things get more complicated.
-* **To track files, they can be hashed. Is that slow for big files?**<br>
+* **To track files, they can be hashed. Is that slow for big files?** <br>
   No, because per default only certain small parts of the file are hashed.
-* **What does the following message mean and how to get rid of it?**:<br>
+* **What does the following message mean and how to get rid of it?**: <br>
   `fanotify_mark: failed to add path /foobar ... Permission denied`.
   This message might be printed on executing a command with shournal.
   Most probably the administrator mounted a filesystem object for which you don't have
@@ -253,8 +253,8 @@ For completeness, the most important points are listed here as well.
   to be stored within shournal's database.
   Files are only stored, if the configured max. file-size, file extension
   (e.g. sh) and mimetype (e.g. application/x-shellscript) matches.
-  To find a mimetype for a given file
-  you should use   
+  To find a mimetype for a given file <br>
+  you should use <br>
   `shournal --print-mime test.sh`.
   The correspondence of mimetype and file extension
   is explained in more detail within the config-file.
@@ -367,7 +367,7 @@ Thanks for your great ideas and feedback!
 
 # License
 The whole project is licensed under the GPL, v3 or later
-(see LICENSE file for details)  
+(see LICENSE file for details) <br>
 **except**
 * the libraries within
   `extern/` → Please refer to the licenses within their

@@ -3,14 +3,14 @@
 
 ## TL;DR
 After setup, put `SHOURNAL_ENABLE` into your shell's rc (e.g. .bashrc)
-and log all configured meta-data (file events, etc.), *without further ado*.  
+and log all configured meta-data (file events, etc.), *without further ado*.
 
 * [Bash integration](./bash)
 
 ## Motivation
 
 For a general introduction about the meta-data *shournal* stores
-please visit the general [README](/../../).  
+please visit the general [README](/../../).
 
 Having to type *shournal* before every single command one wants
 to observe can be tiresome. Another typing-overhead would be
@@ -40,8 +40,8 @@ That's (almost) all. Forget about *shournal* until needed
 ( e.g. you want to know how a certain file was created).
 
 
-Further options are currently  
-`SHOURNAL_DISABLE` (disable the observation) and  
+Further options are currently <br>
+`SHOURNAL_DISABLE` (disable the observation) and <br>
 `SHOURNAL_SET_VERBOSITY` to change the default verbostiy ("dbg, info, warning, critical").
 For dbg, shournal must have been compiled with debugging symbols. A verbosity higher than
 *warning* is not recommended.
@@ -67,7 +67,7 @@ to restart your shell. A more elegant way than logout-login might be to `exec` y
   In the likely case that the variable was
   assigned *during that session*, you might be able to obtain its value.
   This of course only works, if SHOURNAL_ENABLE was called, *before*
-  a variable was assigned. Example:  
+  a variable was assigned. Example: <br>
   `shournal --query --shell-session-id 'L/932KZTEemRB/dOGB9LOA==' | grep var_name`
 * **What about new, nested shell-sessions**?<br>
   By *new shell-sessions* it is meant to call e.g. `bash` within an already
@@ -96,7 +96,7 @@ shournal-run is executed in the first place which enters a
 mount-namespace common to the whole *command sequence*.
 The so executed program is **not** using shournal's LD_PRELOAD'ed
 library any more, so the observation also works for
-statically linked executables.  
+statically linked executables. <br>
 The observed shell communicates with an external *shournal-run*-process
 via a socket. To not interfere with the file-descriptors, the shell creates,
 this socket is the highest allowed (free) descriptor (typically 1023).
@@ -107,7 +107,7 @@ below).
 
 ## Limitations
 * File-operations (redirections) which spread over **multiple** command-sequences
-  within the **interactive shell** are currently not tracked (reliably).  
+  within the **interactive shell** are currently not tracked (reliably). <br>
   Example:
   ```
   $ exec 3> /tmp/foo  # open fd 3.
@@ -118,8 +118,8 @@ below).
 * Filesystem-events of asynchronously launched processes, which close the inherited
   shournal-socket, might be lost, because an external shournal-run process
   waits until all instances of that socket are closed.
-  Steps to reproduce: In an *observed* shell-session enter  
-  `bash -c 'eval "exec $_SHOURNAL_SOCKET_NB>&-"; sleep 1; echo foo > bar' &`  
+  Steps to reproduce: In an *observed* shell-session enter <br>
+  `bash -c 'eval "exec $_SHOURNAL_SOCKET_NB>&-"; sleep 1; echo foo > bar' &` <br>
   Note that e.g. in *Python* processes launched via its
   *subprocess*-module do not inherit file descriptors by default.
   There seems to be no general solution to this problem, but in most cases
