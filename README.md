@@ -324,8 +324,9 @@ Processes can communicate via IPC (inter-process-communication).
 If the observed process A instructs the **not** observed process B
 via IPC to modify a file, the filesystem-event is not registered by shournal.
 
-Currently files may be reported by shournal as written, even though
-nothing was actually written to them. By using the file content (hash) you should
+For performance reasons, all files opened with write-permissions
+are reported as *written* by shournal, irrespective of whether
+the process actually wrote to it. By using file size and content (hash) you should
 be able to cover those cases.
 
 The provided timestamp is determined shortly after a modified file was
@@ -333,8 +334,10 @@ closed. Note that it is possible that some other process has
 written to it in between. This however is only a
 problem, if that other process was itself **not** observed.
 
-To cache write-events efficiently during execution, they are put into a device-inode-hashtable. Note that the kernel might reuse them.
-If you copy a file to a non-observed directory, delete it at the original location and the inode is reused during execution
+To cache write-events efficiently during execution, they are put into a
+device-inode-hashtable. Note that the kernel might reuse them.
+If you copy a file to a non-observed directory, delete it at the original
+location and the inode is reused during execution
 of the observed process, the filesystem-event is lost.
 Note that copying it to a observed location is fine though,
 because copying a file is itself a file-modification-event.
