@@ -112,7 +112,7 @@ FanotifyController::FanotifyController(FileEventHandler &feventHandler) :
 {
     // Create the file descriptor for accessing the fanotify API
     m_fanFd = fanotify_init(FAN_CLOEXEC | FAN_NONBLOCK,
-                       O_RDONLY | O_LARGEFILE);
+                       O_RDONLY | O_LARGEFILE | O_CLOEXEC | O_NOATIME);
     if (m_fanFd == -1) {
         throw ExcOs("fanotify_init failed:");
     }
