@@ -100,8 +100,8 @@ Use an ordinary web-browser for display.
 ### Binary releases
 For Debian/Ubuntu-based distributions .deb-packages are available on the
 [release-page](https://github.com/tycho-kirchner/shournal/releases/latest).
-Only LTS-releases are supported, the packages are known to work on
-Debian 9 (Stretch), Debian 10 (Buster) and Ubuntu 18.04 (Bionic).
+Only LTS-releases are officially supported, the packages are known to work on
+Debian 9 (Stretch), Debian 10 (Buster), Ubuntu 18.04 (Bionic) and Ubuntu 20.04 (Focal).
 Install deb-packages as usual, e.g. <br>
 `sudo apt install ./shournal_2.2_amd64.deb`
 
