@@ -6,6 +6,11 @@
 
 ![Example session animation](images/shournal-example-session.gif)
 
+*Note: for a more formal introduction please read
+[Bashing irreproducibility with
+shournal](https://doi.org/10.1101/2020.08.03.232843)
+on bioRxiv.*
+
 #### What is it (good for)?
 *TL;DR*:
 * **Integrated tool** to increase the reproducibility of your work
@@ -361,10 +366,13 @@ and others are used.
 
 Thanks to the developers!
 
-The project arose as the practical part of my Bachelor thesis in computer science
-at the Fritz Lipmann Institute in Jena (Germany) in
-the Hoffmann Research Group: Computational Biology of Aging.
-Thanks for your great ideas and feedback!
+The project arose in the Hoffmann Research
+Group: Computational Biology of Aging
+at the Fritz Lipmann Institute in Jena (Germany).
+Special thanks to
+Steve&nbsp;Hoffmann
+and Konstantin&nbsp;Riege - without you this project
+couldn't have been accomplished.
 
 
 
