@@ -258,8 +258,7 @@ For completeness, the most important points are listed here as well.
   to be stored within shournal's database.
   Files are only stored, if the configured max. file-size, file extension
   (e.g. sh) and mimetype (e.g. application/x-shellscript) matches.
-  To find a mimetype for a given file <br>
-  you should use <br>
+  To find a mimetype for a given file you should use <br>
   `shournal --print-mime test.sh`.
   The correspondence of mimetype and file extension
   is explained in more detail within the config-file.
