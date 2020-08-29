@@ -137,7 +137,12 @@ find_package(Qt5Core)
 find_package(Qt5Sql)
 find_package(Qt5Network)
 
-include_directories(extern/tsl-ordered-map)
+include_directories(
+    extern/tsl-ordered-map
+    extern/folly
+    extern/xxHash
+    )
+
 
 add_subdirectory("extern/tsl-ordered-map")
 set(XXHASH_BUNDLED_MODE ON)

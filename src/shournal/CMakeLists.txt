@@ -8,7 +8,6 @@ include_directories(
     ../common/oscpp
     ../common/database
     ../common/qsqlthrow
-    ../../extern/xxHash
     )
 
 add_executable(${PROJECT_NAME} ../../html-export/dist/htmlexportres.qrc

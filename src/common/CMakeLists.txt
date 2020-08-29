@@ -1,7 +1,6 @@
 
 
 include_directories(
-    ../../extern/xxHash
     oscpp
     qsqlthrow
     qsimplecfg

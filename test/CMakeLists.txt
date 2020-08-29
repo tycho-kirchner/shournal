@@ -5,7 +5,6 @@ include_directories(
     ../src/common/qsimplecfg
     ../src/common/oscpp
     ../src/common/qsqlthrow
-    ../extern/xxHash
     )
 
 enable_testing()

@@ -139,6 +139,11 @@ Str_t readlink (const Str_t & filename);
 template <class Str_t>
 Str_t readlinkat (int dirfd, const Str_t & filename);
 
+void readlinkat (int dirfd, const std::string & filename, std::string & output);
+
+template <class Str_t>
+void readlinkat (int dirfd, const Str_t & filename, Str_t & output);
+
 
 ssize_t read (int fd, void *buf, size_t nbytes, bool retryOnInterrupt=false);
 
@@ -215,14 +220,22 @@ void os::exec(const ContainerT &args, char * const envp[])
 template <class Str_t>
 Str_t os::readlinkat (int dirfd, const Str_t & filename){
     Str_t path;
-    path.resize(PATH_MAX);
-    char* buf = strDataAccess(path);
+    os::readlinkat(dirfd, filename, path);
+    return path;
+}
+
+
+
+
+template <class Str_t>
+void os::readlinkat (int dirfd, const Str_t & filename, Str_t & output){
+    output.resize(PATH_MAX);
+    char* buf = strDataAccess(output);
     ssize_t path_len = ::readlinkat(dirfd, filename.data(), buf, PATH_MAX);
     if (path_len == -1 ){
         throw ExcReadLink("readlinkat failed for file " + std::string(filename.data()));
     }
-    path.resize(static_cast<typename Str_t::size_type>(path_len));
-    return path;
+    output.resize(static_cast<typename Str_t::size_type>(path_len));
 }
 
 

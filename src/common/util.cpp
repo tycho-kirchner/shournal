@@ -36,8 +36,9 @@ QTextStream& operator<<(QTextStream& stream, const QStringRef &string){
 #endif
 
 
-
-bool registerQtConversionStuff()
+/// Initialize essential components which are used by all components, including
+/// unit-tests.
+bool shournal_common_init()
 {
     return QMetaType::registerConverter<QString, std::string>( [](const QString& str){
         return str.toStdString();

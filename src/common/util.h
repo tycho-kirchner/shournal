@@ -18,6 +18,15 @@
 #include <memory>
 
 #include "exccommon.h"
+#include "UninitializedMemoryHacks.h"
+
+
+FOLLY_DECLARE_STRING_RESIZE_WITHOUT_INIT(signed char)
+FOLLY_DECLARE_STRING_RESIZE_WITHOUT_INIT(unsigned char)
+FOLLY_DECLARE_STRING_RESIZE_WITHOUT_INIT(char16_t)
+FOLLY_DECLARE_STRING_RESIZE_WITHOUT_INIT(char32_t)
+FOLLY_DECLARE_STRING_RESIZE_WITHOUT_INIT(unsigned short)
+
 
 #define DISABLE_MOVE(Class) \
     Class(const Class &&) Q_DECL_EQ_DELETE;\
@@ -46,7 +55,7 @@ bool is_uninitialized(std::weak_ptr<T> const& weak) {
 
 Q_DECLARE_METATYPE(std::string)
 
-bool registerQtConversionStuff();
+bool shournal_common_init();
 
 namespace std {
 

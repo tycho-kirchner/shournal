@@ -7,7 +7,6 @@ include_directories(
     ../common/oscpp
     ../common/database
     ../common/qsqlthrow
-    ../../extern/xxHash
     )
 
 

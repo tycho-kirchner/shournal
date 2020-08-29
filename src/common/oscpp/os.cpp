@@ -749,6 +749,17 @@ int os::getFdDescriptorFlags(int fd)
     return statusflags;
 }
 
+
+void os::readlinkat(int dirfd, const std::string &filename, std::string &output){
+    folly::resizeWithoutInitialization(output, PATH_MAX);
+    const ssize_t path_len = ::readlinkat(dirfd, filename.data(), &output[0], PATH_MAX);
+    if (path_len == -1 ){
+        throw ExcReadLink("readlinkat failed for file " + std::string(filename.data()));
+    }
+    folly::resizeWithoutInitialization(output, static_cast<typename std::string::size_type>(path_len));
+}
+
+
 /// @return the number of bytes send
 /// @throws ExcOs
 size_t os::sendmsg(int fd, const msghdr *message, int flags)
@@ -838,6 +849,7 @@ void os::flock(int fd, int operation)
     }
 
 }
+
 
 
 

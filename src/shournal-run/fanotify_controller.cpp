@@ -84,12 +84,12 @@ bool fanotifyMarkWrapOnInit(int fanFd, uint64_t mask, const std::string& path_){
 /// Fill param result with parentPaths and all sub-mountpaths, that is,
 /// all paths in allMountpaths, which are a sub-path of any parentPath,
 /// are added.
-void addPathsAndSubMountPaths(const PathTree& parentPaths,
-                              const PathTree& allMountpaths,
+void addPathsAndSubMountPaths(const std::shared_ptr<PathTree>& parentPaths,
+                              const std::shared_ptr<PathTree>& allMountpaths,
                               StringSet& result){
-    for(const auto& p : parentPaths){
+    for(const auto& p : *parentPaths){
         result.insert(p);
-        for(auto mountIt = allMountpaths.subpathIter(p); mountIt != allMountpaths.end(); ++mountIt){
+        for(auto mountIt = allMountpaths->subpathIter(p); mountIt != allMountpaths->end(); ++mountIt){
             result.insert(*mountIt);
         }
     }
@@ -298,12 +298,12 @@ void FanotifyController::handleSingleEvent(const struct fanotify_event_metadata&
         m_overflowOccurred = true;
     }
 
-#ifndef NDEBUG
+/* #ifndef NDEBUG
     {
         auto st = os::fstat(metadata.fd);
         std::string path;
         try {
-            path = m_feventHandler.readLinkOfFd(metadata.fd);
+            path = os::readlink("/proc/self/fd/" + std::to_string(metadata.fd));
         } catch (const os::ExcOs& ex) {
             logDebug << ex.what();
             path = "UNKNOWN";
@@ -314,8 +314,7 @@ void FanotifyController::handleSingleEvent(const struct fanotify_event_metadata&
                  << " gid: " << st.st_gid;
     }
 
-#endif
-
+#endif */
     // Ignore further modify events for a filesystem-object (device/inode)
     // until it is closed.
     // Note that if only a small amount of data is written to a file,
@@ -337,7 +336,7 @@ void FanotifyController::handleSingleEvent(const struct fanotify_event_metadata&
                                  "modification event.";
             } else {
                 logWarning << "fanotify_mark add to ignore mask failed for file "
-                           << m_feventHandler.readLinkOfFd(metadata.fd);
+                           <<os::readlink("/proc/self/fd/" + std::to_string(metadata.fd));
             }
 
         }
@@ -387,7 +386,7 @@ void FanotifyController::handleSingleEvent(const struct fanotify_event_metadata&
             } else {
                 // Otherwise report the error.
                 logWarning << "fanotify_mark remove from ignore mask failed for file "
-                           << m_feventHandler.readLinkOfFd(metadata.fd);
+                           << os::readlink("/proc/self/fd/" + std::to_string(metadata.fd));
             }
         }
     } // if (closed_write)
