@@ -26,6 +26,10 @@
 #include "cleanupresource.h"
 #include "osutil.h"
 
+const int os::OPEN_WRONLY = O_WRONLY;
+const int os::OPEN_RDONLY = O_RDONLY;
+const int os::OPEN_RDWR = O_RDWR;
+
 
 static bool& retryOnInterrupt(){
     thread_local static bool retryIt = false;
@@ -50,19 +54,14 @@ os::stat_t os::fstat(int fd)
 }
 
 /// @throws ExcOs
-os::stat_t os::stat(const std::string &filename)
+os::stat_t os::stat(const char *filename)
 {
-    int fd = os::open(filename, O_RDONLY);
-    try {
-        auto stat = os::fstat(fd);
-        return stat;
-    } catch(...){
-        ::close(fd);
-        throw ;
+    os::stat_t st;
+    if(::stat(filename, &st) == -1){
+        throw ExcOs("stat " + std::string(filename) + " failed");
     }
+    return st;
 }
-
-
 
 /// @throws ExcOs
 void os::getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid)
@@ -152,23 +151,6 @@ int os::open(const char*  filename, int flags, bool clo_exec, mode_t mode){
 
 
 
-/// @throws ExcOs
-ssize_t os::read(int fd, void *buf, size_t nbytes, bool retryOnInterrupt)
-{
-    while (true) {
-        auto read = ::read(fd, buf, nbytes);
-        if(read == -1){
-            if(retryOnInterrupt && errno == EINTR){
-                continue;
-            }
-            throw ExcOs("read failed");
-        }
-        return read;
-    }
-}
-
-
-
 /// @param throwIfLessBytesWritten: if true, throw if the number of written bytes
 /// is less than requested (in param n)
 /// @throws ExcOs, ExcTooFewBytesWritten
@@ -229,6 +211,14 @@ pid_t os::fork()
     return pid;
 }
 
+
+/// @throws ExcOs
+void os::unlinkat(int dirfd, const char *pathname, int flags)
+{
+    if(::unlinkat(dirfd, pathname, flags) == -1){
+        throw ExcOs(std::string("unlinkat failed for ") + pathname);
+    }
+}
 
 /// @throws ExcOs
 void os::umount(const std::string &specialFile)
@@ -317,14 +307,14 @@ void os::mkpath(std::string s, mode_t mode)
 
 
 
-int os::openat(int dirfd, const char* filename, int flags, bool clo_exec, mode_t mode)
+int __os::openat(int dirfd, const char* filename, int flags, bool clo_exec, mode_t mode)
 {
     if(clo_exec){
         flags |= O_CLOEXEC;
     }
     int fd = ::openat(dirfd, filename, flags, mode);
     if(fd == -1){
-        throw ExcOs("openat " + std::string(filename) + " failed");
+        throw os::ExcOs("openat " + std::string(filename) + " failed");
     }
     return fd;
 }
@@ -531,11 +521,11 @@ void os::setgroups(const os::Groups &groups)
 }
 
 /// @throws ExcOs
-off_t os::lseek(int fd, off_t offset, int whence)
+off_t os::lseek (int fd, off_t offset, int whence)
 {
     off_t ret = ::lseek(fd, offset, whence);
     if(ret == -1){
-        throw ExcOs("lseek failed. fd: " + std::to_string(fd)
+        throw os::ExcOs("lseek failed. fd: " + std::to_string(fd)
                     + " offset: " + std::to_string(offset));
     }
     return ret;
@@ -749,16 +739,29 @@ int os::getFdDescriptorFlags(int fd)
     return statusflags;
 }
 
+/// @throws ExcOs
+ssize_t os::read(int fd, void *buf, size_t nbytes, bool retryOnInterrupt)
+{
+    while (true) {
+        auto read = ::read(fd, buf, nbytes);
+        if(read == -1){
+            if(retryOnInterrupt && errno == EINTR){
+                continue;
+            }
+            throw ExcOs("read failed");
+        }
+        return read;
+    }
+}
 
-void os::readlinkat(int dirfd, const std::string &filename, std::string &output){
+void os::readlinkat(int dirfd, const char *filename, std::string &output){
     folly::resizeWithoutInitialization(output, PATH_MAX);
-    const ssize_t path_len = ::readlinkat(dirfd, filename.data(), &output[0], PATH_MAX);
+    const ssize_t path_len = ::readlinkat(dirfd, filename, &output[0], PATH_MAX);
     if (path_len == -1 ){
-        throw ExcReadLink("readlinkat failed for file " + std::string(filename.data()));
+        throw ExcReadLink("readlinkat failed for file " + std::string(filename));
     }
     folly::resizeWithoutInitialization(output, static_cast<typename std::string::size_type>(path_len));
 }
-
 
 /// @return the number of bytes send
 /// @throws ExcOs

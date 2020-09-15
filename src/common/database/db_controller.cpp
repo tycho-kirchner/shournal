@@ -17,6 +17,7 @@
 #include "cleanupresource.h"
 #include "storedfiles.h"
 #include "interrupt_handler.h"
+#include "os.h"
 
 using namespace db_conversions;
 
@@ -24,48 +25,87 @@ namespace  {
 
 void
 insertFileWriteEvents(const QueryPtr& query, const CommandInfo &cmd,
-                const FileWriteEventHash &writeEvents )
+                FileWriteEvents &writeEvents )
 {
     query->prepare("insert into writtenFile (cmdId,path,name,mtime,size,hash) "
                   "values (?,?,?,?,?,?)");
-    for(const auto& fileEvent : writeEvents) {
+
+    FileWriteEvent* e;
+    while ((e = writeEvents.read()) != nullptr) {
         query->addBindValue(cmd.idInDb);
 
-        auto pathFnamePair =  splitAbsPath(QString::fromStdString(fileEvent.fullPath));
+        auto pathFnamePair =  splitAbsPath(QString(e->fullPath));
         query->addBindValue(pathFnamePair.first);
         query->addBindValue(pathFnamePair.second);
-        query->addBindValue(fromMtime(fileEvent.mtime));
+        query->addBindValue(fromMtime(e->mtime));
 
-        query->addBindValue(static_cast<qint64>(fileEvent.size));
-        query->addBindValue(fromHashValue(fileEvent.hash));
+        query->addBindValue(static_cast<qint64>(e->size));
+        HashValue hash;
+        if(! e->hashIsNull){
+            hash = e->hash;
+        }
+        query->addBindValue(fromHashValue(hash));
         query->exec();
     }
 }
 
+/// Move or copy the file captured along the read event e
+/// to the read files directory in shournal's database dir.
+void moveOrCopyToStoredFiles(const FileReadEvent& e, FileReadEvents& readEvents,
+                             const QByteArray& storedFilesDir,
+                             const QByteArray& idInDatabase, bool onSameDev){
+    const auto fullDestPath = storedFilesDir + '/' + idInDatabase;
+    const auto fullSrcPath = readEvents.makeStoredFilepath(e);
+    try {
+        if(onSameDev){
+            os::rename(fullSrcPath, fullDestPath);
+        } else {
+            os::sendfile(fullDestPath, fullSrcPath, e.size);
+        }
+    } catch (const os::ExcOs& ex) {
+        logCritical << QString("Failed to move or copy %1 to %2: %3")
+                       .arg(fullSrcPath.constData())
+                       .arg(fullDestPath.constData())
+                       .arg(ex.what());
+        throw;
+    }
+
+
+}
 
 void
 insertFileReadEvents(const QueryPtr& query, const CommandInfo &cmd,
                      const QVariant& envId, const QVariant& hashMetaId,
-                     const FileReadEventHash &readEvents )
+                     FileReadEvents &readEvents )
 {
     StoredFiles storedFiles;
+    const QByteArray storedFilesDir = storedFiles.getReadFilesDir().toUtf8();
+    const auto devTmpFiles = os::stat(strDataAccess(readEvents.getTmpDirPath())).st_dev;
+    const auto devStoredFiles = os::stat(strDataAccess(storedFiles.getReadFilesDir().toUtf8())).st_dev;
+    const bool tmpAndStoredFilesOnSameDev = devTmpFiles == devStoredFiles;
 
-    for(const auto& event : readEvents) {
-        const auto pathFnamePair =  splitAbsPath(QString::fromStdString(event.fullPath));
+    FileReadEvent* e;
+     while ((e = readEvents.read()) != nullptr) {
+        const auto pathFnamePair =  splitAbsPath(QString(e->fullPath));
         bool existed;
+        HashValue hash;
+        if(! e->hashIsNull){
+            hash = e->hash;
+        }
         const auto readFileId = query->insertIfNotExist("readFile", {
                                     {"envId", envId },
                                     {"name", pathFnamePair.second},
                                     {"path", pathFnamePair.first},
-                                    {"mtime",fromMtime(event.mtime)},
-                                    {"size", qint64(event.size)},
-                                    {"mode", event.mode},
-                                    {"hash", fromHashValue(event.hash)},
+                                    {"mtime",fromMtime(e->mtime)},
+                                    {"size", qint64(e->size)},
+                                    {"mode", e->mode},
+                                    {"hash", fromHashValue(hash)},
                                     {"hashmetaId", hashMetaId},
-                                    {"isStoredToDisk", ! event.bytes.isNull()}
+                                    {"isStoredToDisk", e->file_content_id != -1}
                                 }, &existed);
-        if(! existed && ! event.bytes.isNull()){
-            storedFiles.addReadFile(readFileId.toString(), event.bytes);
+        if(! existed && e->file_content_id != -1){
+            moveOrCopyToStoredFiles(*e, readEvents, storedFilesDir,
+                                    readFileId.toByteArray(), tmpAndStoredFilesOnSameDev);
         }
         query->prepare("insert into readFileCmd (cmdId, readFileId) values (?,?)");
         query->addBindValue(cmd.idInDb);
@@ -229,10 +269,11 @@ void db_controller::updateCommand(const CommandInfo &cmd)
 
 /// Add file events belonging to param cmd which must belong to a valid
 /// database entry (idInDb must valid)
-void db_controller::addFileEvents(const CommandInfo &cmd, const FileWriteEventHash &writeEvents,
-                                  const FileReadEventHash &readEvents)
+void db_controller::addFileEvents(const CommandInfo &cmd, FileWriteEvents &writeEvents,
+                                  FileReadEvents &readEvents)
 {
     assert(cmd.idInDb != db::INVALID_INT_ID);
+
     auto query = db_connection::mkQuery();
     query->transaction();
 

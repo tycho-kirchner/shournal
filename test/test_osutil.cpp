@@ -12,6 +12,10 @@ using namespace osutil;
 class OsutilTest : public QObject {
     Q_OBJECT
 private slots:
+    void initTestCase(){
+        logger::setup(__FILE__);
+    }
+
     void testReadWholeFile() {
         QTemporaryFile f;
         QVERIFY(f.open());

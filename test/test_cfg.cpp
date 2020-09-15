@@ -83,6 +83,10 @@ foo
     }
 
 private slots:
+    void initTestCase(){
+        logger::setup(__FILE__);
+    }
+
     void tgeneral() {
         auto file = writeToTmpConfigFile(CONFIG_TXT);
         QVERIFY(! file->fileName().isEmpty());

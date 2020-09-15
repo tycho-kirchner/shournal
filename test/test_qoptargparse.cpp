@@ -15,6 +15,10 @@
 class QOptArgparseTest : public QObject {
     Q_OBJECT
 private slots:
+    void initTestCase(){
+        logger::setup(__FILE__);
+    }
+
     void testIt() {
         QOptArgParse parser;
         QOptArg arg1("", "one", "");

@@ -19,6 +19,7 @@
 
 #include "exccommon.h"
 #include "UninitializedMemoryHacks.h"
+#include "strlight.h"
 
 
 FOLLY_DECLARE_STRING_RESIZE_WITHOUT_INIT(signed char)
@@ -54,6 +55,7 @@ bool is_uninitialized(std::weak_ptr<T> const& weak) {
 
 
 Q_DECLARE_METATYPE(std::string)
+Q_DECLARE_METATYPE(StrLight)
 
 bool shournal_common_init();
 
@@ -67,16 +69,22 @@ template<> struct hash<QString> {
 };
 }
 
+StrLight toStrLight(const QString& str);
+
 /// allow std::string to be printed via qDebug()
 QDebug& operator<<(QDebug& out, const std::string& str);
 
 
 
 /// Common functions to get raw data access for std::string and QByteArray
+const char* strDataAccess(const char* str);
+char* strDataAccess(char* str);
 char* strDataAccess(std::string& str);
 const char* strDataAccess(const std::string& str);
 char* strDataAccess(QByteArray& str);
 const char* strDataAccess(const QByteArray& str);
+char* strDataAccess(StrLight& str);
+const char* strDataAccess(const StrLight& str);
 
 int indexOfNonWhiteSpace(const QString& str);
 
@@ -210,6 +218,7 @@ bool qVariantTo(QVariant var, T* result) {
 
 // Don't forget to register converter functions when adding more types...
 bool qVariantTo(const std::string& str, QString* result);
+bool qVariantTo(const StrLight& str, QString* result);
 
 class ExcQVariantConvert : public QExcCommon
 {
@@ -270,8 +279,8 @@ QByteArray make_uuid(bool *madeSafe=nullptr);
 template<typename T>
 QPair<T, T> splitAbsPath(const T& path){
     QPair<T, T> pair;
-    const int lastSlash = path.lastIndexOf(QDir::separator());
-    if(lastSlash == -1 || lastSlash == path.size() - 1){
+    const int lastSlash = path.lastIndexOf('/');
+    if(lastSlash == -1 || lastSlash == int(path.size()) - 1){
         pair.first = path;
         return pair;
     }

@@ -64,7 +64,7 @@ class IntegrationTestShell : public QObject {
     Q_OBJECT
 
 private:
-    void writeReadIncludeDirToCfgFile(const QString& readIncludeDir){
+    void writeReadSettingsToCfgFile(const QString& readIncludeDir){
         auto & sets = Settings::instance();
         qsimplecfg::Cfg cfg;
         auto sectRead = cfg[Settings::SECT_READ_NAME];
@@ -74,7 +74,7 @@ private:
         cfg.store(cfgPath);
     }
 
-    void writeScriptSettingsoCfgFile(const QString& includePath, const QStringList& fileExtensions){
+    void writeScriptSettingToCfgFile(const QString& includePath, const QStringList& fileExtensions){
         auto & sets = Settings::instance();
         qsimplecfg::Cfg cfg;
         auto sectRead = cfg[Settings::SECT_SCRIPTS_NAME];
@@ -100,6 +100,8 @@ private:
             writeLine(writeFd, setupCommand);
         }
         writeLine(writeFd, "SHOURNAL_ENABLE");
+        writeLine(writeFd, "SHOURNAL_SET_VERBOSITY " +
+                  std::string(logger::msgTypeToStr(logger::getVerbosityLevel())));
 
         writeLine(writeFd, cmd);
         writeLine(writeFd, "SHOURNAL_DISABLE");
@@ -133,6 +135,26 @@ private:
     }
 
 private slots:
+
+    void initTestCase(){
+        logger::setup(__FILE__);
+    }
+
+    /// Called for each test.
+    void init(){
+        testhelper::deletePaths();
+        // Load settings and delete the config-file. That way,
+        // The version of the cfg-file is also set appropriately.
+        Settings::instance().load();
+        QFile(Settings::instance().cfgFilepath()).remove();
+    }
+
+    void cleanup(){
+
+    }
+
+
+
     void testWrite() {
         auto pTmpDir = testhelper::mkAutoDelTmpDir();
         auto tmpDirPath = pTmpDir->path().toStdString();
@@ -159,17 +181,18 @@ private slots:
         const auto setupCmd = AutoTest::globals().integrationSetupCommand;
 
         for(const auto& cmd : cmds){
-            testhelper::deletePaths();
+            testhelper::deleteDatabaseDir();
             cmdWrittenFileCheck(cmd, filepath, setupCmd);
         }
     }
+
 
     void testRead(){
         const auto setupCmd = AutoTest::globals().integrationSetupCommand;
 
         auto pTmpDir = testhelper::mkAutoDelTmpDir();
         // for read events only include our tempdir
-        writeReadIncludeDirToCfgFile(pTmpDir->path());
+        writeReadSettingsToCfgFile(pTmpDir->path());
 
         const QString fname = "foo1";
         const QString fullPath = pTmpDir->path() + '/' + fname;
@@ -198,12 +221,13 @@ private slots:
         QVERIFY(! cmdIter->next());
     }
 
+
     void testReadScript(){
         const auto setupCmd = AutoTest::globals().integrationSetupCommand;
 
         auto pTmpDir = testhelper::mkAutoDelTmpDir();
         // for read events only include our tempdir
-        writeScriptSettingsoCfgFile(pTmpDir->path(), {"sh"});
+        writeScriptSettingToCfgFile(pTmpDir->path(), {"sh"});
 
         const QString fname = "foo1.sh";
         const QString fullPath = pTmpDir->path() + '/' + fname;
@@ -239,6 +263,7 @@ private slots:
 
         QVERIFY(! cmdIter->next());
     }
+
 
 
 

@@ -19,8 +19,8 @@ typedef QVector<HashMeta> HashMetas;
 qint64 addCommand(const CommandInfo &cmd);
 void updateCommand(const CommandInfo &cmd);
 
-void addFileEvents(const CommandInfo &cmd, const FileWriteEventHash &writeEvents,
-                   const FileReadEventHash &readEvents);
+void addFileEvents(const CommandInfo &cmd, FileWriteEvents &writeEvents,
+                   FileReadEvents &readEvents);
 
 int deleteCommand(const SqlQuery &query);
 

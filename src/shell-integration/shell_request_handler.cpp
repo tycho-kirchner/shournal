@@ -227,6 +227,8 @@ void handlePrepareCmd(){
 
         subproc.setForwardFdsOnExec(forwardFs);
         subproc.call(args);
+        logDebug << "launched" << app::SHOURNAL_RUN
+                 << "(pid" << subproc.lastPid() << ")";
 
         os::close(sockets[0]);
         autocloseSocket0.setEnabled(false);
@@ -347,6 +349,8 @@ ShellRequest readCheckShellUpdateRequest(){
 
     // Note: this logDebug is called BEFORE initialize logging.
     // logDebug << "received shell request:" << int(shellRequest);
+    // QIErr() << "received shell request:" << int(shellRequest) << "(current state:"
+    //          << int(ShellGlobals::instance().watchState) << ")";
     return shellRequest;
 }
 
@@ -465,7 +469,7 @@ void handleEnableRequest(){
         QIErr::setPreambleCallback([]() { return "shournal shell-integration: "; });
         app::setupNameAndVersion();
         try {
-            if(! registerQtConversionStuff()){
+            if(! shournal_common_init()){
                 QIErr()  << qtr("Fatal error: failed to initialize custom Qt conversion functions");
             }
             shell_logger::setup();

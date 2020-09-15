@@ -65,7 +65,7 @@ int shournal_main(int argc, char *argv[])
     logger::setup(app::SHOURNAL);
 
     std::set_terminate(onterminate);
-    if(! registerQtConversionStuff()){
+    if(! shournal_common_init()){
         logCritical << qtr("Fatal error: failed to initialize custom Qt conversion functions");
         cpp_exit(1);
     }

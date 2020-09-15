@@ -19,6 +19,12 @@ CXXHash::~CXXHash()
     XXH64_freeState(m_pXXState);
 }
 
+void CXXHash::reserveBufSize(size_t n)
+{
+    assert(n > 0);
+    m_buf.resize(n);
+}
+
 /// @throws CXXHashError
 void CXXHash::reset(unsigned long long seed)
 {
@@ -37,55 +43,86 @@ void CXXHash::update(const void *buffer, size_t len)
     }
 }
 
-CXXHash::DigestResult CXXHash::digestWholeFile(int fd, int bufSize)
+CXXHash::DigestResult CXXHash::digestWholeFile(int fd, int chunksize)
 {
-    return this->digestFile(fd, bufSize, 0, std::numeric_limits<int>::max());
+    return this->digestFile(fd, chunksize, 0, std::numeric_limits<int>::max());
 }
 
 
 /// XXHASH-digest a whole file or parts of it at regular intervals.
 /// @param fd the fildescriptor of the file. Note that in general you would want
-///           to make sure, that the seed is at 0. After the function call the seed
-///           will be near EOF.
-/// @param bufSize size of the chunks read at once.
-/// @param seekstep count of bytes to be added to seed BEFORE the file was read.
-///                 This also means that if you actually want to skip bytes,
-///                 seekstep must be greater than bufSize. Otherwise NO SEEK is
+///           to make sure, that the offset is at 0. Note that the offset
+///           may be changed during the call.
+/// @param chunksize size of the chunks to read at once.
+/// @param seekstep Read chunks from the file every seekstep bytes. The read chunk
+///                 does not count into this, so if you actually want to skip bytes,
+///                 seekstep must be greater than chunksize. Otherwise NO SEEK is
 ///                 performed at all.
 /// @param maxCountOfReads stop reading and digest after that count of 'read'-
 ///                        operations.
-/// @returns the calculated hash, the count of bytes read and the actual count
-///          of reads which is never greater than param maxCountOfReads.
-///          If the actual count of reads is zero, the hash is invalid.
+/// @returns the calculated hash and the actual count of bytes read.
+///          If the count of bytes is zero, the hash is invalid.
 /// @throws ExcOs, CXXHashError
-CXXHash::DigestResult CXXHash::digestFile(int fd, int bufSize,
+CXXHash::DigestResult CXXHash::digestFile(int fd, int chunksize,
                                 off64_t seekstep, int maxCountOfReads)
 {
-    m_buf.resize(bufSize);
-    this->reset(0);
-    const bool doSeek = seekstep > bufSize;
+    /// Implementation detail:
+    /// Calling XXH64_update introduces some overhead, which can be avoided by
+    /// calling XXH64() directly with a sufficiently large buffer.
+    /// So, if our buffer is large enough, read the chunks from file
+    /// one by one into our own buffer. If it's full, call XXH64_update,
+    /// else do it alltogether at the end.
 
-    DigestResult res {0, 0, 0};
+    assert(maxCountOfReads > 0);
+    assert(chunksize > 0);
+    if(chunksize > int(m_buf.size())){
+        m_buf.resize(chunksize);
+    }
+    const bool doSeek = seekstep > chunksize;
+
+    DigestResult res;
     off64_t offset=0;
-
-    for(res.countOfReads=0; res.countOfReads < maxCountOfReads ; ++res.countOfReads) {
-        ssize_t readBytes = os::read(fd, m_buf.data(), static_cast<size_t>(m_buf.size()));
-        if(readBytes == 0) {
+    res.countOfbytes = 0;
+    char* bufRaw = m_buf.data();
+    char* bufRawEnd = bufRaw + m_buf.size();
+    bool updateNecessary = false;
+    for(int countOfReads=0; countOfReads < maxCountOfReads ; ++countOfReads) {
+        ssize_t readBytes = os::read(fd, bufRaw, static_cast<size_t>(chunksize));
+        bufRaw += readBytes;
+        res.countOfbytes += readBytes;
+        if(readBytes < chunksize) {
             break; // EOF
         }
-        res.countOfbytes += readBytes;
-
-        this->update(m_buf.data(), static_cast<size_t>(readBytes));
-
-        if( doSeek  ) {
+        if(bufRawEnd - bufRaw <= chunksize){
+            // not enough space for another read: flush buffer
+            if(! updateNecessary){
+                updateNecessary = true;
+                this->reset(0);
+            }
+            this->update(m_buf.data(), bufRaw - m_buf.data());
+            bufRaw = m_buf.data();
+        }
+        if( doSeek ) {
             offset += seekstep;
             os::lseek(fd, offset, SEEK_SET);
         }
     }
-
-    if(res.countOfReads > 0) {
-        res.hash = XXH64_digest(m_pXXState);
+    if(res.countOfbytes == 0){
+        res.hash = 0;
+        return res;
     }
+    // we read something
+    if(updateNecessary){
+        if(bufRaw != m_buf.data()){
+            this->update(m_buf.data(), bufRaw - m_buf.data());
+        }
+        res.hash = XXH64_digest(m_pXXState);
+        return res;
+    }
+    // No update was needed (all chunks fitted into buffer). Flush the whole buffer at once without
+    // xxhash state overhead (update/reset)
+    assert(bufRaw != m_buf.data());
+    res.hash = XXH64(m_buf.data(), bufRaw - m_buf.data(), 0 );
     return res;
 }
 

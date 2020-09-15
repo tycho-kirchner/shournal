@@ -36,17 +36,30 @@ QTextStream& operator<<(QTextStream& stream, const QStringRef &string){
 #endif
 
 
-/// Initialize essential components which are used by all components, including
+/// Initialize essential components which are used all over shournal, including
 /// unit-tests.
 bool shournal_common_init()
 {
-    return QMetaType::registerConverter<QString, std::string>( [](const QString& str){
+    return
+    QMetaType::registerConverter<QString, std::string>( [](const QString& str){
         return str.toStdString();
-    }) &&  QMetaType::registerConverter<std::string, QString>( [](const std::string& str){
+    }) &&
+    QMetaType::registerConverter<std::string, QString>( [](const std::string& str){
         return QString::fromStdString(str);
-    }) && QMetaType::registerConverter<HashValue, QString>( [](const HashValue& val){
+    }) &&
+
+    QMetaType::registerConverter<QString, StrLight>( [](const QString& str){
+        QByteArray b = str.toUtf8();
+        return StrLight(b.constData(), b.size());
+    }) &&
+    QMetaType::registerConverter<StrLight, QString>( [](const StrLight& str){
+        return QString::fromUtf8(str.constData(), int(str.size()));
+    }) &&
+
+    QMetaType::registerConverter<HashValue, QString>( [](const HashValue& val){
         return ((val.isNull()) ? QString() : QString::number(val.value()));
-    }) && QMetaType::registerConverter<QString, HashValue>( [](const QString& val){
+    }) &&
+    QMetaType::registerConverter<QString, HashValue>( [](const QString& val){
         return ((val.isEmpty()) ? HashValue() : HashValue(qVariantTo_throw<HashValue::value_type>(val)));
     }) ;
 }
@@ -56,6 +69,11 @@ QDebug &operator<<(QDebug &out, const std::string &str)
 {
     out << str.c_str();
     return out;
+}
+
+
+StrLight toStrLight(const QString &str){
+    return StrLight(str.toUtf8()) ;
 }
 
 
@@ -102,6 +120,14 @@ QByteArray make_uuid(bool *madeSafe){
     return uuid;
 }
 
+const char* strDataAccess(const char* str){
+    return str;
+}
+
+char* strDataAccess(char* str){
+    return str;
+}
+
 char *strDataAccess(std::string &str){
     return &str[0];
 }
@@ -117,6 +143,18 @@ char *strDataAccess(QByteArray &str){
 const char* strDataAccess(const QByteArray& str){
     return str.constData();
 }
+
+char *strDataAccess(StrLight &str)
+{
+    return str.data();
+}
+
+const char *strDataAccess(const StrLight &str)
+{
+    return str.constData();
+}
+
+
 
 
 
@@ -243,5 +281,13 @@ int indexOfNonWhiteSpace(const QString &str)
 bool qVariantTo(const std::string &str, QString *result) {
     *result = QString::fromStdString(str);
     return true;
-
 }
+
+bool qVariantTo(const StrLight& str, QString* result){
+    *result = QString::fromUtf8(str.constData(), int(str.size()));
+    return true;
+}
+
+
+
+

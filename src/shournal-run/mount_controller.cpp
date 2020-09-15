@@ -20,12 +20,9 @@
 #include "cleanupresource.h"
 
 
-using StringSet = Settings::StringSet;
-
-
 /// Return all mountpaths from /proc/self/mounts except the
 /// ones marked to be ignored (settings).
-PathTree mountController::generatelMountTree(){
+std::shared_ptr<PathTree> mountController::generatelMountTree(){
     auto & ignoreMountPaths = Settings::instance().getMountIgnorePaths();
     PathTree ignoreMountTree;
     for(const auto & path : ignoreMountPaths){
@@ -41,15 +38,15 @@ PathTree mountController::generatelMountTree(){
 
     // Determine which submounts shall be ignored and
     // collect the others
-    PathTree mountTree;
+    auto mountTree = std::make_shared<PathTree>();
     struct mntent* mnt_;
     while ((mnt_ = getmntent (mounts)) != nullptr) {
-        const std::string mntDir(mnt_->mnt_dir);
+        const StrLight mntDir(mnt_->mnt_dir);
         if(ignoreMountTree.isSubPath(mntDir, true)){
             logDebug << "ignoring mountpath" << mntDir.c_str();
             continue;
         }
-        mountTree.insert(mntDir);
+        mountTree->insert(mntDir);
     }
     return mountTree;
 }

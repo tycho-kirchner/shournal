@@ -42,12 +42,15 @@
 #include "qoutstream.h"
 #include "conversions.h"
 #include "socket_message.h"
+#include "stdiocpp.h"
 
 using socket_message::E_SocketMsg;
 using SocketMessages = fdcommunication::SocketCommunication::Messages;
 using subprocess::Subprocess;
 using osutil::closeVerbose;
 
+const int PRIO_FANOTIFY_POLL = 2;
+const int PRIO_DATABASE_FLUSH = 10;
 
 static void unshareOrDie(){
     try {
@@ -122,7 +125,8 @@ FileWatcher::FileWatcher() :
     m_commandFilename(nullptr),
     m_commandArgv(nullptr),
     m_commandEnvp(environ),
-    m_realUid(os::getuid())
+    m_realUid(os::getuid()),
+    m_storeToDatabase(true)
 {}
 
 void FileWatcher::setupShellLogger()
@@ -146,15 +150,25 @@ void FileWatcher::run()
     m_msenterGid = findMsenterGidOrDie();
     orig_mountspace_process::setupIfNotExist();
 
-    unshareOrDie();
-    FanotifyController fanotifyCtrl(m_fEventHandler);
+    unshareOrDie();    
+    auto fanotifyCtrl = FanotifyController_ptr(new FanotifyController);
 
     // We process events (filedescriptor-receive- and fanotify-events) with the
     // effective uid of the caller, because read events for files, for which
     // only the owner has read permission, usually fail for
     // root in case of NFS-storages. See also man 5 exports, look for 'root squashing'.
     os::seteuid(m_realUid);
-    fanotifyCtrl.setupPaths();
+    // fevent-handler sets up a temp dir in constructor - use user privileged
+    m_fEventHandler = std::make_shared<FileEventHandler>();
+    fanotifyCtrl->setFileEventHandler(m_fEventHandler);
+    fanotifyCtrl->setupPaths();
+
+    // We are indeed a non-interactive SCHED_BATCH-job
+    struct sched_param sched{};
+    sched.sched_priority = 0;
+    if(sched_setscheduler(getpid(), SCHED_BATCH | SCHED_RESET_ON_FORK, &sched) == -1){
+        logInfo << __FILE__ << "sched_setscheduler failed" << translation::strerror_l(errno) ;
+    }
 
     CommandInfo cmdInfo =  CommandInfo::fromLocalEnv();
     cmdInfo.sessionInfo.uuid = m_shellSessionUUID;
@@ -180,6 +194,7 @@ void FileWatcher::run()
         const char* cmdFilename = (m_commandFilename == nullptr) ? m_commandArgv[0]
                                                                  : m_commandFilename;
         proc.call(cmdFilename, m_commandArgv);
+        // *Must* be called after fork (resurce limits, etc.)
         std::future<E_SocketMsg> thread = std::async(&FileWatcher::pollUntilStopped, this,
                                                      std::ref(cmdInfo),
                                                      std::ref(fanotifyCtrl));
@@ -219,6 +234,9 @@ void FileWatcher::run()
     }
 
     cmdInfo.endTime = QDateTime::currentDateTime();
+    logDebug << "polling finished - about to cleanup and exit";
+
+    fanotifyCtrl.reset();
 
     switch (pollResult) {
     case E_SocketMsg::EMPTY: break; // Normal case
@@ -233,11 +251,9 @@ void FileWatcher::run()
     }
 
     QStringList missingFields;
-    if(cmdInfo.text.isEmpty() && cmdInfo.idInDb == db::INVALID_INT_ID){
-        // an empty command text should only occur, if the observed shell-session
-        // exits. In that case typically only a few file-events occur (e.g. .bash_history)
-        // so we have not pushed to database yet (id in db is still invalid).
-        // Therefor discard this command.
+    if(cmdInfo.text.isEmpty()){
+        // An empty command text should only occur, if the observed shell-session
+        // exits. Discard this command.
         logDebug << "command-text is empty, "
                     "not pushing to database...";
         cpp_exit(ret);
@@ -249,7 +265,9 @@ void FileWatcher::run()
         logDebug << "The following fields are empty: " << missingFields.join(", ");
     }
 
-    flushToDisk(cmdInfo);
+    if(m_storeToDatabase){
+        flushToDisk(cmdInfo);
+    }
     cpp_exit(ret);
 }
 
@@ -277,6 +295,11 @@ void FileWatcher::setSockFd(int sockFd)
 int FileWatcher::sockFd() const
 {
     return m_sockFd;
+}
+
+void FileWatcher::setStoreToDatabase(bool storeToDatabase)
+{
+    m_storeToDatabase = storeToDatabase;
 }
 
 void FileWatcher::setCommandFilename(char *commandFilename)
@@ -323,7 +346,7 @@ E_SocketMsg FileWatcher::processSocketEvent( CommandInfo& cmdInfo ){
             break;
 
         case E_SocketMsg::CLEAR_EVENTS:
-            m_fEventHandler.clearEvents();
+            m_fEventHandler->clearEvents();
             cmdInfo.startTime = QDateTime::currentDateTime();
             break;
         default: {
@@ -341,26 +364,22 @@ E_SocketMsg FileWatcher::processSocketEvent( CommandInfo& cmdInfo ){
 void FileWatcher::flushToDisk(CommandInfo& cmdInfo){
     assert(os::getegid() == os::getgid());
     assert(os::geteuid() == os::getuid());
-    try {
-        if(cmdInfo.idInDb == db::INVALID_INT_ID ){
-            if(cmdInfo.endTime.isNull()){
-                // just a dummy, will be overridden later
-                cmdInfo.endTime = QDateTime::currentDateTime();
-            }
-            cmdInfo.idInDb = db_controller::addCommand(cmdInfo);
-        } else {
-            db_controller::updateCommand(cmdInfo);
-        }
 
+    // Do not disturb other processes while we flush events to database
+    os::setpriority(PRIO_PROCESS, 0, PRIO_DATABASE_FLUSH);
+    try {
+        cmdInfo.idInDb = db_controller::addCommand(cmdInfo);
         StoredFiles::mkpath();
-        db_controller::addFileEvents(cmdInfo, m_fEventHandler.writeEvents(),
-                                     m_fEventHandler.readEvents() );
+        m_fEventHandler->writeEvents().fseekToBegin();
+        m_fEventHandler->readEvents().fseekToBegin();
+
+        db_controller::addFileEvents(cmdInfo, m_fEventHandler->writeEvents(),
+                                     m_fEventHandler->readEvents() );
     } catch (std::exception& e) {
         // May happen, e.g. if we run out of disk space...
         // We discard events anyway, so this error will not happen too soon again...
-        logCritical << qtr("Failed to store file-events to disk (they are lost): %1").arg(e.what());
+        logCritical << qtr("Failed to store (some) file-events to disk: %1").arg(e.what());
     }
-    m_fEventHandler.clearEvents();
 }
 
 
@@ -368,7 +387,20 @@ void FileWatcher::flushToDisk(CommandInfo& cmdInfo){
 /// @return: EMPTY, if stopped regulary
 ///          ENUM_END in case of an error
 E_SocketMsg FileWatcher::pollUntilStopped(CommandInfo& cmdInfo,
-                             FanotifyController& fanotifyCtrl){
+                             FanotifyController_ptr& fanotifyCtrl){
+
+    // To allow for more fanotify-events read at a time, increase
+    // RLIMIT_NOFILE
+    struct rlimit rlim{};
+    getrlimit(RLIMIT_NOFILE, &rlim);
+    const auto NO_FILE = fanotifyCtrl->getFanotifyMaxEventCount();
+    rlim.rlim_cur = NO_FILE;
+    if(setrlimit(RLIMIT_NOFILE, &rlim) == -1){
+        logInfo << qtr("Failed to set number of open files to %1 - %2")
+                   .arg(NO_FILE)
+                   .arg(translation::strerror_l(errno));
+    }
+
     // At least on centos 7 with Kernel 3.10 CAP_SYS_PTRACE is required, otherwise
     // EACCES occurs on readlink of the received file descriptors
     // Warning: changing euid from 0 to nonzero resets the effective capabilities,
@@ -380,8 +412,7 @@ E_SocketMsg FileWatcher::pollUntilStopped(CommandInfo& cmdInfo,
         caps->clearFlags(CAP_EFFECTIVE, eventProcessingCaps);
     });
 
-    // slightly increase priority to prevent fanotify queue overflows
-    os::setpriority(PRIO_PROCESS, 0, -2);
+    os::setpriority(PRIO_PROCESS, 0, PRIO_FANOTIFY_POLL);
     auto resetPriority = finally([] {
         os::setpriority(PRIO_PROCESS, 0, 0);
     });
@@ -394,7 +425,7 @@ E_SocketMsg FileWatcher::pollUntilStopped(CommandInfo& cmdInfo,
     fds[0].events = POLLIN;
 
     // Fanotify input
-    fds[1].fd = fanotifyCtrl.fanFd();
+    fds[1].fd = fanotifyCtrl->fanFd();
     fds[1].events = POLLIN;
     while (true) {
         // cleanly cpp_exit poll:
@@ -416,24 +447,13 @@ E_SocketMsg FileWatcher::pollUntilStopped(CommandInfo& cmdInfo,
         // Otherwise final fanotify-events might get lost!
         if (fds[1].revents & POLLIN) {
             // Fanotify events are available
-            fanotifyCtrl.handleEvents();
+            logDebug << "new fanotify events...";
+            fanotifyCtrl->handleEvents();
         }
         if (fds[0].revents & POLLIN) {
             if(processSocketEvent(cmdInfo) == E_SocketMsg::EMPTY){
                 return E_SocketMsg::EMPTY;
             }
-        }
-        auto & prefs = Settings::instance();
-
-        // Note: for a (more or less) short time, the size of cached files might be bigger than
-        // specified in settings. That should not be a problem though.
-        if(m_fEventHandler.sizeOfCachedReadFiles() >
-                prefs.readEventScriptSettings().flushToDiskTotalSize ||
-           m_fEventHandler.writeEvents().size() >
-                prefs.writeFileSettings().flushToDiskEventCount){
-            logInfo << qtr("flushing to disk.");
-            flushToDisk(cmdInfo);
-
         }
     }
 

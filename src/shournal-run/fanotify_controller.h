@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 
-#include "os.h"
 #include "fileeventhandler.h"
 #include "util.h"
 
@@ -12,8 +11,9 @@ struct fanotify_event_metadata;
 class FanotifyController
 {
 public:
-    FanotifyController(FileEventHandler& feventHandler);
+    FanotifyController();
     ~FanotifyController();
+    void setFileEventHandler(std::shared_ptr<FileEventHandler>&);
     void setupPaths();
 
     bool handleEvents();
@@ -21,6 +21,8 @@ public:
     bool overflowOccurred() const;
 
     int fanFd() const;
+
+    int getFanotifyMaxEventCount() const;
 
 public:
     Q_DISABLE_COPY(FanotifyController)
@@ -34,13 +36,16 @@ private:
     void unregisterAllReadPaths();
     void ignoreOwnPath(const QByteArray& p);
 
-    FileEventHandler& m_feventHandler;
+    std::shared_ptr<FileEventHandler> m_feventHandler;
 
     bool m_overflowOccurred;
     int m_fanFd;
     bool m_markLimitReached;
     bool m_ReadEventsUnregistered;
     std::vector<std::string> m_readMountPaths; // all mount paths initially marked for read-events
+    const Settings::WriteFileSettings& r_wCfg;
+    const Settings::ReadFileSettings& r_rCfg;
+    const Settings::ScriptFileSettings& r_scriptCfg;
 
 };
 

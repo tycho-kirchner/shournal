@@ -3,10 +3,11 @@
 
 #include <cstddef>
 #include <unistd.h>
-#include <QByteArray>
 #include <string>
+#include <limits>
 
 #include "xxhash.h"
+#include "strlight.h"
 
 /// A cpp interface around the needed c-functions of XXHASH and
 /// some other methods (digestFile).
@@ -20,6 +21,7 @@ public:
     public:
         explicit ExcCXXHash(const std::string & msg, int errorcode);
         const char *what () const noexcept override;
+
     private:
         std::string m_descrip;
         int m_errorcode;
@@ -27,18 +29,16 @@ public:
 
     struct DigestResult {
         XXH64_hash_t hash;
-        int countOfReads;
         off64_t countOfbytes;   // number of read bytes
     };
 
     CXXHash();
     ~CXXHash();
 
-    void reset(unsigned long long seed=0);
-    void update(const void* buffer, size_t len);
+    void reserveBufSize(size_t n);
 
-    DigestResult digestWholeFile(int fd, int bufSize);
-    DigestResult digestFile(int fd, int bufSize, off64_t seekstep,
+    DigestResult digestWholeFile(int fd, int chunksize);
+    DigestResult digestFile(int fd, int chunksize, off64_t seekstep,
                             int maxCountOfReads=std::numeric_limits<int>::max());
 
 public:
@@ -46,7 +46,13 @@ public:
     void operator=(const CXXHash&) = delete;
 
 private:
+    void reset(unsigned long long seed=0);
+    void update(const void* buffer, size_t len);
+
     XXH64_state_t * const m_pXXState;
-    QByteArray m_buf;
+    StrLight m_buf;
 };
+
+
+
 

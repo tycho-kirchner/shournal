@@ -6,6 +6,7 @@
 namespace testhelper {
 void setupPaths();
 void deletePaths();
+void deleteDatabaseDir();
 
 std::shared_ptr<QTemporaryDir> mkAutoDelTmpDir();
 

@@ -1,8 +1,5 @@
 
 #include "hashcontrol.h"
-#include "os.h"
-#include "settings.h"
-
 
 /// xxhash parts of a file (or the whole file in case of a small one) according to the
 /// specified hashmeta-parameters.
@@ -26,3 +23,10 @@ HashValue HashControl::genPartlyHash(int fd, qint64 filesize, const HashMeta &ha
     }
     return hashVal;
 }
+
+
+CXXHash &HashControl::getXXHash()
+{
+    return m_hash;
+}
+

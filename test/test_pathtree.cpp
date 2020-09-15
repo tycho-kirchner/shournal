@@ -14,8 +14,8 @@ class PathTreeTest : public QObject {
     Q_OBJECT
 
     void checkAllSubPathsExist(PathTree& tree,
-                               const std::string& parentPath,
-                               std::unordered_set<std::string> paths){
+                               const StrLight& parentPath,
+                               std::unordered_set<StrLight> paths){
         for(auto treeIt=tree.subpathIter(parentPath); treeIt != tree.end(); ++treeIt){
             auto it = paths.find(*treeIt);
             QVERIFY2(it != paths.end(), (*treeIt).c_str());
@@ -25,13 +25,13 @@ class PathTreeTest : public QObject {
     }
 
     void checkAllExist(PathTree& tree,
-                       std::unordered_set<std::string> paths){
+                       std::unordered_set<StrLight> paths){
         for(const auto & p : tree){
             auto it = paths.find(p);
             QVERIFY2(it != paths.end(), (p).c_str());
             paths.erase(it);
         }
-        std::string p = (paths.empty()) ? "" : *paths.begin();
+        auto p = (paths.empty()) ? "" : *paths.begin();
         QVERIFY2(paths.empty(), p.c_str());
     }
 
@@ -43,6 +43,10 @@ class PathTreeTest : public QObject {
 
 
 private slots:
+
+    void initTestCase(){
+        logger::setup(__FILE__);
+    }
 
     void testContains(){
         PathTree tree;
@@ -117,6 +121,11 @@ private slots:
         QVERIFY( tree2.isSubPath("/", true));
         QVERIFY(  tree2.isSubPath("/home"));
         QVERIFY(  tree2.isSubPath("/home/foo"));
+
+        auto tree3 = std::make_shared<PathTree>();
+        tree3->insert("/tmp/shournal-integration-test-AsKCoY");
+        QVERIFY( tree3->isSubPath("/tmp/shournal-integration-test-AsKCoY/foo1", false));
+
     }
 
     void testFindSub(){        
@@ -158,45 +167,11 @@ private slots:
         QVERIFY(tree.isSubPath("/home/user/foo"));
     }
 
-
-    void testCopy(){
-        PathTree t1;
-        t1.insert("/home/user");
-        t1.insert("/home/user/foo");
-        t1.insert("/media/cdrom");
-
-        PathTree t2(t1);
-        t1.clear();
-
-        checkAllExist(t2, {
-                          "/home/user",
-                          "/home/user/foo",
-                          "/media/cdrom",
-                      });
-
-        QVERIFY(t2.isSubPath("/home/user/foo"));
-        QVERIFY(t2.isParentPath("/home"));
-        QVERIFY(t2.isParentPath("/media"));
-        QVERIFY(! t2.isSubPath("/media/aha"));
-
-        t2.erase(t2.iter("/media"));
-
-        PathTree t3 = t2;
-        t2.clear();
-        checkAllExist(t3, {
-                          "/home/user",
-                          "/home/user/foo",
-                      });
-        QVERIFY(t3.isSubPath("/home/user/foo"));
-        QVERIFY(t3.isParentPath("/home"));
-
-    }
-
     void testIter(){
         PathTree tree;
         QVERIFY(tree.begin() == tree.end());
 
-        std::unordered_set<std::string> paths {
+        std::unordered_set<StrLight> paths {
             "/home/user/foodir",
             "/home/user/another",
             "/media/cdrom/aha",
@@ -212,7 +187,7 @@ private slots:
 
     void testErase(){
         PathTree tree;
-        const std::unordered_set<std::string> paths {
+        const std::unordered_set<StrLight> paths {
             "/home/user",
             "/home/user/sub1",
             "/home/user/sub2/subsub1",
@@ -282,3 +257,4 @@ private slots:
 DECLARE_TEST(PathTreeTest)
 
 #include "test_pathtree.moc"
+

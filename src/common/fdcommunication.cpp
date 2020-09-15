@@ -148,7 +148,12 @@ void SocketCommunication::sendMessages(const SocketCommunication::Messages &mess
         int *fdptr = reinterpret_cast<int*>(CMSG_DATA(cmsg) );
         memcpy(fdptr, fds.data(), fds.size() * sizeof(int));
     }
-    os::sendmsg(m_sockFd, &messageHeader);
+    try {
+        os::sendmsg(m_sockFd, &messageHeader);
+    } catch (const os::ExcOs& ex) {
+        QString msg = (messages.isEmpty()) ? "EMPTY message" : messages[0].bytes;
+        throw ExcFdComm(qtr("Failed to send «%1» - %2").arg(msg).arg(ex.what()));
+    }
 }
 
 int SocketCommunication::sockFd() const

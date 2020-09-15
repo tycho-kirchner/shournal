@@ -25,19 +25,17 @@ std::string &ExcCommon::descrip()
 
 
 QExcCommon::QExcCommon(QString text, bool collectStacktrace) :
-    m_descrip(std::move(text)),
-  m_local8Bit(m_descrip.toLocal8Bit())
+    m_descrip(std::move(text))
 {
     if(collectStacktrace){
-        const auto st = generate_trace_string();
-        m_descrip += "\n" + QString::fromStdString(st);
-        m_local8Bit += "\n" + QByteArray(st.c_str(), static_cast<int>(st.size()));
+       appendStacktraceToDescrip();
     }
 
 }
 
 const char *QExcCommon::what() const noexcept
 {
+    m_local8Bit = m_descrip.toLocal8Bit();
     return m_local8Bit.constData();
 }
 
@@ -50,6 +48,12 @@ void QExcCommon::setDescrip(const QString &descrip)
 {
     m_descrip = descrip;
     m_local8Bit = descrip.toLocal8Bit();
+}
+
+void QExcCommon::appendStacktraceToDescrip()
+{
+    const auto st = generate_trace_string();
+    m_descrip += "\n" + QString::fromStdString(st);
 }
 
 

@@ -30,7 +30,7 @@
 int osutil::countOpenFds() {
      int count = 0;
      for(const int fd : osutil::FdEntries()){
-         Q_UNUSED(fd);
+         Q_UNUSED(fd)
          count++;
      }
      return count;

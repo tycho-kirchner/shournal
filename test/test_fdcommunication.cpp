@@ -49,6 +49,9 @@ private:
 
 
 private slots:
+    void initTestCase(){
+        logger::setup(__FILE__);
+    }
 
     void tNormal() {
         auto sockets = makeSockets();

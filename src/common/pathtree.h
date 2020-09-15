@@ -1,12 +1,12 @@
 #pragma once
 
-#include <string>
-#include <sstream>
-#include <unordered_map>
-#include <unordered_set>
-#include <list>
 #include <vector>
 #include <memory>
+#include <unordered_set>
+#include <QHash>
+
+
+#include "strlight.h"
 
 
 /// Add a set of absolute file paths and
@@ -20,19 +20,20 @@ class PathTree
 private:
     struct _Dir;
     typedef std::shared_ptr<_Dir> _DirPtr;
-    typedef std::unordered_map<std::string, _DirPtr > _DirMap;
+    typedef QHash<StrLight, _DirPtr > _DirMap;
 
     struct _Dir {
-        _Dir() : isEnd(false){}
+        _Dir(const StrLight& name) :
+            isEnd(false),
+            name(name){}
 
         _DirMap children;
         std::weak_ptr<_Dir> parent; // break reference cycles !
         bool isEnd;
-        std::string name;
+        StrLight name;
     };
 
 public:
-    typedef std::unordered_set<std::string> UnorderdPaths;
 
     class iterator
     {
@@ -41,7 +42,7 @@ public:
         bool operator!=(const iterator& rhs) const;
 
         iterator& operator++ ();
-        std::string & operator*() { return d->currentPath; }
+        StrLight & operator*() { return d->currentPath; }
 
     private:
         struct CurrentDirInfo {
@@ -53,7 +54,7 @@ public:
         typedef std::vector<CurrentDirInfo> DirStack;
 
         iterator(_DirMap::const_iterator begin, _DirMap::const_iterator end,
-                 const std::string& path);
+                 const StrLight &path);
         iterator();
 
         void nextDir();
@@ -61,16 +62,15 @@ public:
         void nextEntryInParentDirs();
         bool nextSiblingIfExist(CurrentDirInfo& dirInfo);
 
-        void appendPath(const std::string& dirname);
+        void appendPath(const StrLight& dirname);
         void stripPath(size_t lastDirSize);
 
         struct PrivateData{
             DirStack dirStack; // last element always points to the current
                                // dir of iteration
-            std::string currentPath;
+            StrLight currentPath;
         };
         std::shared_ptr<PrivateData> d;
-
 
         friend class PathTree;
     };
@@ -79,47 +79,53 @@ public:
 
     const iterator begin() const;
     const iterator end() const ;
-    iterator iter(const std::string& path) const;
-    iterator subpathIter(const std::string& path) const;
+
+    iterator iter(const StrLight& path) const;
+    iterator subpathIter(const StrLight& path) const;
     iterator erase(iterator it);
 
 public:
     PathTree();
-    ~PathTree();
-    PathTree(const PathTree&);
-    PathTree& operator=( const PathTree& );
-
+    ~PathTree() = default;
+    PathTree(const PathTree&) = delete ;
+    PathTree& operator=( const PathTree& ) = delete ;
 
     void clear();
     bool isEmpty() const;
 
-    void insert(const std::string & path);
+    void insert(const StrLight& path);
     template<typename Iterator>
     void insert(Iterator first, Iterator last);
 
-    bool contains(const std::string & path) const;
+    bool contains(const StrLight & path) const;
 
-    bool isParentPath(const std::string& path, bool allowEquals=false) const ;
+    bool isParentPath(const StrLight &path, bool allowEquals=false) const ;
 
-    bool isSubPath(const std::string& path, bool allowEquals=false) const;
+    bool isSubPath(const StrLight &path, bool allowEquals=false) const;
 
     void printDbg();
 
 
 private:
+    static const char sep = '/';
+
     void commonConstructor();
 
     _DirPtr m_rootDir;
     _DirMap m_rootDirMapDummy;
-    static const char sep = '/';
+    mutable StrLight m_rawbuftmp;
+    std::unordered_set<StrLight> m_allPaths;
+    std::vector<size_t> m_orderedPathlenghts;
+    bool m_rootNodeIsContained;
 
-    void printRec(const _DirPtr &node, const std::string& dir="") const;
 
-    _DirPtr mkDirIfNotExist(_DirPtr& parent, const std::string& name);
+    void printRec(const _DirPtr &node, const StrLight &dir="") const;
 
-    _DirPtr findDir(const std::string &path) const;
+    _DirPtr mkDirIfNotExist(_DirPtr& parent, const StrLight &name);
 
-    static void recursiveCopy(_DirPtr &dst, const _DirPtr &src);    
+    _DirPtr findDir(const StrLight &path) const;
+
+    // static void recursiveCopy(_DirPtr &dst, const _DirPtr &src);
     static void recursiveClear(_DirPtr &dir);
 };
 

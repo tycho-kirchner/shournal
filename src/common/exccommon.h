@@ -27,9 +27,13 @@ public:
     QString descrip() const;
     void setDescrip(const QString &descrip);
 
-private:
+protected:
+    void appendStacktraceToDescrip();
+
     QString m_descrip;
-    QByteArray m_local8Bit;
+
+private:
+    mutable QByteArray m_local8Bit;
 };
 
 

@@ -50,6 +50,16 @@ void testhelper::deletePaths()
     }
 }
 
+void testhelper::deleteDatabaseDir()
+{
+    if(! QStandardPaths::isTestModeEnabled()){
+        throw QExcProgramming(QString(__func__) + " called while test mode disabled");
+    }
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::DataLocation);
+    QDir d(path);
+    d.removeRecursively();
+}
+
 
 std::shared_ptr<QTemporaryDir> testhelper::mkAutoDelTmpDir()
 {
@@ -79,3 +89,5 @@ QString testhelper::readStringFromFile(const QString &fpath)
     return stream.readAll();
 
 }
+
+

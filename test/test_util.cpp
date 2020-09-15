@@ -22,6 +22,10 @@ class UtilTest : public QObject {
 
 
 private slots:
+    void initTestCase(){
+        logger::setup(__FILE__);
+    }
+
     void testSplitAbsPath() {
         splitAbsPathTest<std::string>("/", "/", "");
         splitAbsPathTest<QString>("/", "/", "");

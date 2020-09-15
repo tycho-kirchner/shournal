@@ -16,7 +16,7 @@ public:
 
 
 namespace mountController {
-    PathTree generatelMountTree();
+    std::shared_ptr<PathTree> generatelMountTree();
 
 }
 

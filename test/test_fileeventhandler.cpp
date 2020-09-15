@@ -23,31 +23,39 @@
 #include "fileeventtypes.h"
 
 
-
+/// Write the content of buf to fd, let
+/// the FileEventHandler process that file and
+/// compare the partial hashes.
 void writeCompareBuf(const std::string & buf,
                      const std::string & hasStr,
-                     const int fd, FileEventHandler& fEventHandler){
+                     const int fd){
     ftruncate(fd, 0);
     write(fd, buf.c_str(), buf.size());
     lseek(fd, 0, SEEK_SET);
-    struct stat stat_ = os::fstat(fd);
-    DevInodePair devInodePair(stat_.st_dev, stat_.st_ino);
 
+    FileEventHandler fEventHandler;
     fEventHandler.handleCloseWrite(fd);
     lseek(fd, 0, SEEK_SET);
 
     uint64_t correctHash = XXH64(hasStr.c_str(), hasStr.size(), 0 );
-    QVERIFY(! fEventHandler.writeEvents().empty());
-    auto eventInfo = fEventHandler.writeEvents().find(devInodePair).value();
+    fEventHandler.writeEvents().fseekToBegin();
+    FileWriteEvent* e = fEventHandler.writeEvents().read();
+    QVERIFY(e != nullptr);
 
     auto path = osutil::findPathOfFd<std::string>(fd);
-    QCOMPARE(eventInfo.fullPath, path);
-    QCOMPARE(correctHash, eventInfo.hash.value());
+    //QIErr() << "std::string(e.fullPath), path" << QString(e.fullPath) << QString::fromStdString(path);
+    QCOMPARE(std::string(e->fullPath), path);
+    QVERIFY(! e->hashIsNull);
+    QCOMPARE(correctHash, e->hash);
 }
 
 class FileEventHandlerTest : public QObject {
     Q_OBJECT
 private slots:
+    void initTestCase(){
+        logger::setup(__FILE__);
+    }
+
     void init(){
         //testhelper::setupPaths();
     }
@@ -66,38 +74,37 @@ private slots:
         QVERIFY(os::fstat(fd).st_nlink > 0);
         auto rmTmpFile = finally([&tmpFileName] { remove(tmpFileName); });
 
-        FileEventHandler fEventHandler;
 
         auto & sets = Settings::instance();
-        sets.m_wSettings.includePaths.insert("/");
+        sets.m_wSettings.includePaths->insert("/");
 
         sets.m_hashSettings.hashEnable = true;
         sets.m_hashSettings.hashMeta = HashMeta(2, 2);
 
         std::string buf = "g";
-        writeCompareBuf(buf, buf, fd, fEventHandler);
+        writeCompareBuf(buf, buf, fd);
 
         buf = "gh";
-        writeCompareBuf(buf, buf, fd, fEventHandler);
+        writeCompareBuf(buf, buf, fd);
 
         buf = "abc";
-        writeCompareBuf(buf, buf, fd, fEventHandler);
+        writeCompareBuf(buf, buf, fd);
 
         buf = "abcd";
-        writeCompareBuf(buf, buf, fd, fEventHandler);
+        writeCompareBuf(buf, buf, fd);
 
         // only 2 chars (hashChunkSize) each at index 0 and
         // 10/hashMaxCountOfReads = 5 should be read and used for hash
-        writeCompareBuf("ab___cd___", "abcd", fd, fEventHandler);
+        writeCompareBuf("ab___cd___", "abcd", fd);
 
         sets.m_hashSettings.hashMeta = HashMeta(3, 2);
-        writeCompareBuf("abc__def___", "abcdef", fd, fEventHandler);
+        writeCompareBuf("abc__def___", "abcdef", fd);
 
         sets.m_hashSettings.hashMeta = HashMeta(1, 2);
-        writeCompareBuf("a____d_____", "ad", fd, fEventHandler);
+        writeCompareBuf("a____d_____", "ad", fd);
 
         sets.m_hashSettings.hashMeta = HashMeta(1, 3);
-        writeCompareBuf("a__b__c___", "abc", fd, fEventHandler);
+        writeCompareBuf("a__b__c___", "abc", fd);
 
     }
 
@@ -106,7 +113,7 @@ private slots:
 
         auto & readSettings = Settings::instance().m_scriptSettings;
         readSettings.enable = true;
-        readSettings.includePaths.insert("/"); // todo: mk unique path
+        readSettings.includePaths->insert("/"); // todo: mk unique path
         readSettings.maxFileSize = 50000;
         readSettings.onlyWritable = true;
         readSettings.includeExtensions = {};
@@ -121,3 +128,4 @@ private slots:
 DECLARE_TEST(FileEventHandlerTest)
 
 #include "test_fileeventhandler.moc"
+

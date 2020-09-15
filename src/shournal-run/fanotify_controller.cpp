@@ -35,7 +35,13 @@
 using ExcCXXHash = CXXHash::ExcCXXHash;
 using os::ExcOs;
 using StringSet = Settings::StringSet;
-using osutil::closeVerbose;
+
+// Max number of fanotify events which can be consumed
+// with a single read(2). Note that the max number of open
+// fd's is also adjusted, however, since we already
+// have some other fd's open, the actual max number of
+// events will be a little lower.
+const int FANOTIFY_MAX_EVENT_COUNT = 4096;
 
 namespace  {
 
@@ -88,9 +94,11 @@ void addPathsAndSubMountPaths(const std::shared_ptr<PathTree>& parentPaths,
                               const std::shared_ptr<PathTree>& allMountpaths,
                               StringSet& result){
     for(const auto& p : *parentPaths){
-        result.insert(p);
+        // TODO: avoid needless conversion
+        result.insert(p.c_str());
         for(auto mountIt = allMountpaths->subpathIter(p); mountIt != allMountpaths->end(); ++mountIt){
-            result.insert(*mountIt);
+            // TODO: avoid needless conversion
+            result.insert((*mountIt).constData());
         }
     }
 }
@@ -103,19 +111,24 @@ void addPathsAndSubMountPaths(const std::shared_ptr<PathTree>& parentPaths,
 
 /// Initialize fanotify's filedescriptor (requires root)
 /// @throws ExcOs
-FanotifyController::FanotifyController(FileEventHandler &feventHandler) :
-    m_feventHandler(feventHandler),
+FanotifyController::FanotifyController() :
     m_overflowOccurred(false),
     m_fanFd(-1),
     m_markLimitReached(false),
-    m_ReadEventsUnregistered(false)
+    m_ReadEventsUnregistered(false),
+    r_wCfg(Settings::instance().writeFileSettings()),
+    r_rCfg(Settings::instance().readFileSettings()),
+    r_scriptCfg(Settings::instance().readEventScriptSettings())
 {
     // Create the file descriptor for accessing the fanotify API
     m_fanFd = fanotify_init(FAN_CLOEXEC | FAN_NONBLOCK,
                        O_RDONLY | O_LARGEFILE | O_CLOEXEC | O_NOATIME);
+
     if (m_fanFd == -1) {
         throw ExcOs("fanotify_init failed:");
     }
+
+
 }
 
 FanotifyController::~FanotifyController(){
@@ -128,6 +141,7 @@ FanotifyController::~FanotifyController(){
 
 
 
+
 bool FanotifyController::overflowOccurred() const
 {
     return m_overflowOccurred;
@@ -137,6 +151,17 @@ int FanotifyController::fanFd() const
 {
     return m_fanFd;
 }
+
+int FanotifyController::getFanotifyMaxEventCount() const
+{
+    return FANOTIFY_MAX_EVENT_COUNT;
+}
+
+void FanotifyController::setFileEventHandler(std::shared_ptr<FileEventHandler> & feventHandler)
+{
+    m_feventHandler = feventHandler;
+}
+
 
 /// fanotify_mark all paths of interest, that is all paths
 /// which shall be observed for write-events (file modifications) or read events.
@@ -152,29 +177,27 @@ int FanotifyController::fanFd() const
 ///   are also reported [and need to be filtered out later]).
 void FanotifyController::setupPaths(){
     m_ReadEventsUnregistered = false;
-
-    auto & sets = Settings::instance();
     auto allMounts = mountController::generatelMountTree();
     StringSet allWritePaths;
-    addPathsAndSubMountPaths(sets.writeFileSettings().includePaths,
+    addPathsAndSubMountPaths(r_wCfg.includePaths,
                              allMounts, allWritePaths);
 
     StringSet allReadPaths;
     // Script files (which shall be stored) and 'normal' read files are treated differently later -
     // first mark unified paths from both categories for fanotify read-events.
-    if(sets.readFileSettins().enable){
-        addPathsAndSubMountPaths(sets.readFileSettins().includePaths,
+    if(r_rCfg.enable){
+        addPathsAndSubMountPaths(r_rCfg.includePaths,
                                  allMounts, allReadPaths);
     }
-    if(sets.readEventScriptSettings().enable){
-        addPathsAndSubMountPaths(sets.readEventScriptSettings().includePaths,
+    if(r_scriptCfg.enable){
+        addPathsAndSubMountPaths(r_scriptCfg.includePaths,
                                  allMounts, allReadPaths);
     }
 
     m_readMountPaths.reserve(allReadPaths.size());
 
     uint64_t writeMask = FAN_CLOSE_WRITE;
-    if(! sets.writeFileSettings().onlyClosedWrite){
+    if(! r_wCfg.onlyClosedWrite){
         writeMask |= FAN_MODIFY;
     }
     uint64_t readMask = FAN_CLOSE_NOWRITE;
@@ -207,6 +230,8 @@ void FanotifyController::setupPaths(){
     ignoreOwnPath(db_connection::getDatabaseDir().toUtf8());
     ignoreOwnPath(StoredFiles::getReadFilesDir().toUtf8());
     ignoreOwnPath(logger::logDir().toUtf8());
+    assert(m_feventHandler != nullptr);
+    ignoreOwnPath(m_feventHandler->getTmpDirPath().toUtf8());
 }
 
 
@@ -216,7 +241,7 @@ void FanotifyController::setupPaths(){
 bool FanotifyController::handleEvents()
 {
     struct fanotify_event_metadata *metadata;
-    struct fanotify_event_metadata buf[8192];
+    struct fanotify_event_metadata buf[FANOTIFY_MAX_EVENT_COUNT];
     ssize_t len;
 
     // Loop while events can be read from fanotify file descriptor
@@ -249,8 +274,15 @@ bool FanotifyController::handleEvents()
         if (len <= 0) {
             return true;
         }
+        if(static_cast<size_t>(len) / sizeof(fanotify_event_metadata) < FANOTIFY_MAX_EVENT_COUNT / 8 ){
+            // Avoid reading too few events at a time (read-overhead). This sleep ensures
+            // the next read won't happen too soon.
+            usleep(1000*50);
+        }
+
         logDebug << "read"
-                 << static_cast<size_t>(len) / sizeof(fanotify_event_metadata) << "events";
+                 << len << "bytes ("
+                 << static_cast<size_t>(len) / sizeof(fanotify_event_metadata) << "events)";
 
         // Point to the first event in the buffer
         metadata = buf;
@@ -275,15 +307,12 @@ bool FanotifyController::handleEvents()
                 m_overflowOccurred = true;
             } else {
                 handleSingleEvent(*metadata);
-                closeVerbose(metadata->fd);
+                ::close(metadata->fd);
             }
             // Advance to next event
             metadata = FAN_EVENT_NEXT(metadata, len);
         } // while (FAN_EVENT_OK(metadata, len))
     } // while true
-    // maybe_todo: add option for small delay to allow for
-    // the accumulation of events within fanotify
-    //usleep(1000 * 10);
 }
 
 
@@ -298,7 +327,7 @@ void FanotifyController::handleSingleEvent(const struct fanotify_event_metadata&
         m_overflowOccurred = true;
     }
 
-/* #ifndef NDEBUG
+ #ifndef NDEBUG
     {
         auto st = os::fstat(metadata.fd);
         std::string path;
@@ -314,7 +343,7 @@ void FanotifyController::handleSingleEvent(const struct fanotify_event_metadata&
                  << " gid: " << st.st_gid;
     }
 
-#endif */
+#endif
     // Ignore further modify events for a filesystem-object (device/inode)
     // until it is closed.
     // Note that if only a small amount of data is written to a file,
@@ -341,13 +370,11 @@ void FanotifyController::handleSingleEvent(const struct fanotify_event_metadata&
 
         }
     }
-    auto & sets = Settings::instance();
-
     if (closed_write) {
         // CLOSE_WRITE might also occur, if nothing was written.
         // However, if the file was modifed (and variable 'modified' is false)
         // removing the MODIFY from the ignore mask should succeed.
-        if(modified || sets.writeFileSettings().onlyClosedWrite){
+        if(r_wCfg.onlyClosedWrite || modified){
             // modifed event and closed_write event have both occurred
             // ( OR we are interested in every closed-write-event).
             handleModCloseWrite_safe(metadata);
@@ -407,18 +434,17 @@ void FanotifyController::handleCloseNoWrite_safe(const fanotify_event_metadata &
         // events in the fanotify event-queue may still need to be consumed.
         return;
     }
-    auto & sets = Settings::instance();
-    if(! sets.readFileSettins().enable && // never unregister, if general read files are logged
-         sets.readEventScriptSettings().enable &&
-            m_feventHandler.countOfCollectedReadFiles() >=
-            sets.readEventScriptSettings().maxCountOfFiles) {
+    if(! r_rCfg.enable && // never unregister, if general read files are logged
+         r_scriptCfg.enable &&
+            m_feventHandler->readEvents().getStoredFilesCounter() >=
+            r_scriptCfg.maxCountOfFiles) {
         unregisterAllReadPaths();
         m_ReadEventsUnregistered = true;
         return;
     }
 
     try {
-        m_feventHandler.handleCloseRead(metadata.fd);
+        m_feventHandler->handleCloseRead(metadata.fd);
         // The count of cached read (script-) files might have been incremented,
         // so we might be done with read events. For the sake
         // of code-shortness only check that the *next* time we consume a read event.
@@ -430,7 +456,7 @@ void FanotifyController::handleCloseNoWrite_safe(const fanotify_event_metadata &
 
 void FanotifyController::handleModCloseWrite_safe(const fanotify_event_metadata & metadata){
     try {
-        m_feventHandler.handleCloseWrite( metadata.fd );
+        m_feventHandler->handleCloseWrite( metadata.fd );
     } catch (const std::exception & e) {
         logCritical << e.what();
     }
@@ -461,7 +487,7 @@ void FanotifyController::ignoreOwnPath(const QByteArray& p){
                       p.constData()) == -1){
         // should never happen...
         logCritical << "fanotify_mark: failed to ignore our own path: "
-                    << strerror(errno);
+                    << translation::strerror_l(errno);
     }
 }
 

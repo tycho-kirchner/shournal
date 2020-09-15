@@ -30,6 +30,9 @@ static QVersionNumber queryVersion(QSqlQueryThrow& query){
 
 static void newSqliteDbIfNeeded(){
     static StaticInitializer loader( [](){
+        // maybe_todo: according to documentation of QSqlDatabase, rather
+        // call QSqlDatabase::database() instead of storing the database
+        // ourselves.
         g_db = new QSqlDatabase(QSqlDatabase::addDatabase("QSQLITE"));
         if(! g_db->isValid()){
             throw QExcDatabase(qtr("Failed to add qt's sqlite database driver. "

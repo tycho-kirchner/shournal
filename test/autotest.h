@@ -7,11 +7,16 @@
 #include <QSharedPointer>
 #include <QStandardPaths>
 
+#include <memory>
+
 #include "qoutstream.h"
 #include "subprocess.h"
 #include "qoptargparse/qoptargparse.h"
 #include "app.h"
 #include "helper_for_test.h"
+#include "settings.h"
+#include "logger.h"
+
 
 class ShournalTestGlobals {
 public:
@@ -66,27 +71,52 @@ inline void addTest(QObject* object)
 
 inline int run(int argc, char *argv[])
 {
-    bool integrationMode = false;
-    if(argc > 1) {
-        if(strcmp(argv[1], "--integration") == 0){
-            integrationMode = true;
-        } else {
-            QIErr() << "first arg must be '--integration' or nothing.";
-            exit(1);
-        }
+    if(! shournal_common_init()){
+        QIErr() << qtr("Fatal error: failed to initialize custom Qt conversion functions");
+        exit(1);
     }
-    if(integrationMode){
+    logger::setup("shournal-test");
+    logger::setVerbosityLevel(QtMsgType::QtWarningMsg);
+
+    // ignore first arg (command to this app)
+    --argc;
+    ++argv;
+
+    QOptArgParse parser;
+    QOptArg argVerbosity("", "verbosity", qtr("How much shall be printed to stderr. Note that "
+                                              "for 'dbg' shournal must not be a 'Release'-build, "
+                                              "dbg-messages are lost in Release-mode."));
+    argVerbosity.setAllowedOptions({"dbg",
+                                #if QT_VERSION >= QT_VERSION_CHECK(5, 5, 0)
+                                    "info",
+                                #endif
+                                    "warning", "critical"});
+    parser.addArg(&argVerbosity);
+
+    QOptArg argIntegrationTest("", "integration",
+                               "Run integration tests, instead of normal tests", false);
+    parser.addArg(&argIntegrationTest);
+
+
+    QOptArg argShell("", "shell", "The shell used for the intgeration tests, including"
+                                  " arguments, separated by whitespace");
+    argShell.addRequiredArg(&argIntegrationTest);
+    parser.addArg(&argShell);
+
+    parser.parse(argc, argv);
+
+    if(argVerbosity.wasParsed()){
+        QByteArray verbosity = argVerbosity.getOptions(1).first().toLocal8Bit();
+        logger::setVerbosityLevel(verbosity.constData());
+    }
+
+    if(argIntegrationTest.wasParsed()){
         os::setenv<QByteArray>("_SHOURNAL_IN_INTEGRATION_TEST_MODE", "true");
         app::setupNameAndVersion();
         if(! app::inIntegrationTestMode()){
             QIErr() << "Failed to enable integration test mode.";
             exit(1);
         }
-
-        QOptArgParse parser;
-        QOptArg argShell("", "shell", "the shell and arguments, separated by whitespace");
-        parser.addArg(&argShell);
-        parser.parse(argc - 2, argv + 2);
 
         if(! argShell.wasParsed()){
             QIErr() << "missing argument" << argShell.name();
@@ -116,7 +146,7 @@ inline int run(int argc, char *argv[])
 
     foreach (QObject* test, testList())
     {
-        if(integrationMode){
+        if(argIntegrationTest.wasParsed()){
             if(! test->objectName().startsWith("IntegrationTest")){
                 continue;
             }

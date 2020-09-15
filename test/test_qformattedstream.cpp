@@ -8,6 +8,10 @@
 class QFormattedtStreamTest : public QObject {
     Q_OBJECT
 private slots:
+    void initTestCase(){
+        logger::setup(__FILE__);
+    }
+
     void testIt() {
         QString str;
         QFormattedStream s(&str);

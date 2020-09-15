@@ -145,8 +145,7 @@ void Settings::addIgnoreCmd(QString cmd, bool warnIfNotFound, const QString & ig
 
 /// @param hiddenPaths: if not null, store hidden paths in the passed tree, instead
 /// of the returned one.
-PathTree
-Settings::loadPaths(Section_Ptr& section,
+std::shared_ptr<PathTree> Settings::loadPaths(Section_Ptr& section,
           const QString& keyName,
           bool eraseSubpaths,
           const std::unordered_set<QString> & defaultValues,
@@ -154,7 +153,7 @@ Settings::loadPaths(Section_Ptr& section,
     auto rawPaths = section->getValues<std::unordered_set<QString> >(keyName,
                                               defaultValues,
                                               false, "\n");
-    PathTree tree;
+    auto tree = std::make_shared<PathTree>();
     for(const auto& p : rawPaths){
         QString canonicalPath = p;
         if(canonicalPath.startsWith("$CWD")){
@@ -181,11 +180,11 @@ Settings::loadPaths(Section_Ptr& section,
         }
 
         PathTree* currentTree =(hiddenPaths != nullptr &&
-                                canonicalPath.contains("/.")) ? hiddenPaths : &tree;
-        auto pStr = canonicalPath.toStdString();
+                                canonicalPath.contains("/.")) ? hiddenPaths : tree.get();
+        auto canoicalPathLight = toStrLight(canonicalPath);
         // avoid adding needless parent/subpaths
         if(eraseSubpaths){
-            if(currentTree->isSubPath(pStr)){
+            if(currentTree->isSubPath(canoicalPathLight)){
                 logDebug<< keyName << "ignore" << canonicalPath
                          << "because it is a subpath";
                 continue;
@@ -193,14 +192,14 @@ Settings::loadPaths(Section_Ptr& section,
             }
             // the new path might be a parent path:
             // erase its children (if any)
-            auto subPathIt = currentTree->subpathIter(pStr);
+            auto subPathIt = currentTree->subpathIter(canoicalPathLight);
             while(subPathIt != currentTree->end() ){
                 logDebug << keyName << "ignore" << *subPathIt
                          << "because it is a subpath";
                 subPathIt = currentTree->erase(subPathIt);
             }
         }
-        currentTree->insert(pStr);
+        currentTree->insert(canoicalPathLight);
     }
     return tree;
 }
@@ -235,9 +234,9 @@ static QVersionNumber readLegacyConfigFileVersion(){
 /// Remove all paths from excludePaths which are not sub-paths
 /// of any tree in includePathtrees. Print a warning in this case.
 static void cleanExcludePaths(const QVector<const PathTree*>& includePathtrees,
-                              PathTree& excludePaths,
+                              std::shared_ptr<PathTree>& excludePaths,
                               const QString& sectionName){
-    for(auto it=excludePaths.begin(); it != excludePaths.end();){
+    for(auto it=excludePaths->begin(); it != excludePaths->end();){
         bool isSubPath = false;
         for(const PathTree* includePaths : includePathtrees){
             if(includePaths->isSubPath(*it)){
@@ -250,7 +249,7 @@ static void cleanExcludePaths(const QVector<const PathTree*>& includePathtrees,
         } else {
             logWarning << qtr("section %1: ignore exclude-path %2 - it is not a sub-path "
                               "of any include-path").arg(sectionName).arg((*it).c_str());
-            it = excludePaths.erase(it);
+            it = excludePaths->erase(it);
         }
     }
 }
@@ -260,14 +259,14 @@ static void cleanExcludePaths(const QVector<const PathTree*>& includePathtrees,
 //     cleanExcludePaths( {&includePaths}, excludePaths, sectionName);
 // }
 
-static void cleanExcludePaths(const PathTree& includePaths,
+static void cleanExcludePaths(const std::shared_ptr<PathTree>& includePaths,
                               const PathTree* optionalIncludePaths,
-                              PathTree& excludePaths,
+                              std::shared_ptr<PathTree>& excludePaths,
                               const QString& sectionName){
     if(optionalIncludePaths != nullptr){
-        cleanExcludePaths( {&includePaths, optionalIncludePaths}, excludePaths, sectionName);
+        cleanExcludePaths( {includePaths.get(), optionalIncludePaths}, excludePaths, sectionName);
     }
-    cleanExcludePaths( {&includePaths}, excludePaths, sectionName);
+    cleanExcludePaths( {includePaths.get()}, excludePaths, sectionName);
 }
 
 void Settings::loadSections(){
@@ -307,7 +306,7 @@ void Settings::loadSectWrite()
                                      "Default is to observe all paths.\n"
                                      ));
     m_wSettings.excludeHidden = sectWriteEvents->getValue<bool>("exclude_hidden", true);
-    PathTree* hiddenPaths = (m_wSettings.excludeHidden) ? &m_wSettings.includePathsHidden : nullptr;
+    PathTree* hiddenPaths = (m_wSettings.excludeHidden) ? m_wSettings.includePathsHidden.get() : nullptr;
     m_wSettings.includePaths = loadPaths(
                 sectWriteEvents, "include_paths", true, {"/"}, hiddenPaths);
     m_wSettings.excludePaths = loadPaths(
@@ -334,7 +333,7 @@ void Settings::loadSectRead()
     m_rSettings.enable = sectReadEvents->getValue<bool>(SECT_READ_KEY_ENABLE, true);
     m_rSettings.onlyWritable = sectReadEvents->getValue<bool>("only_writable", true);
     m_rSettings.excludeHidden = sectReadEvents->getValue<bool>("exclude_hidden", true);
-    PathTree* hiddenPaths = (m_rSettings.excludeHidden) ? &m_rSettings.includePathsHidden : nullptr;
+    PathTree* hiddenPaths = (m_rSettings.excludeHidden) ? m_rSettings.includePathsHidden.get() : nullptr;
     m_rSettings.includePaths = loadPaths(
                 sectReadEvents, SECT_READ_KEY_INCLUDE_PATHS, true, {"$HOME"}, hiddenPaths);
     m_rSettings.excludePaths = loadPaths(
@@ -378,9 +377,9 @@ void Settings::loadSectScriptFiles()
                 "max_count_of_files", 3));
     m_scriptSettings.excludeHidden = sectScriptFiles->getValue<bool>("exclude_hidden", true);
     PathTree* hiddenPaths = (m_scriptSettings.excludeHidden) ?
-                &m_scriptSettings.includePathsHidden : nullptr;
+                m_scriptSettings.includePathsHidden.get() : nullptr;
 
-    m_scriptSettings.includeExtensions = sectScriptFiles->getValues<StringSet>(
+    m_scriptSettings.includeExtensions = sectScriptFiles->getValues<StrLightSet>(
                 SECT_SCRIPTS_INCLUDE_FILE_EXTENSIONS, {"sh"}, false, "\n");
     m_scriptSettings.includeMimetypes = sectScriptFiles->getValues<MimeSet>(
                 "include_mime_types", {"application/x-shellscript"}, false, "\n");
@@ -454,7 +453,7 @@ void Settings::loadSectMount()
                           );
     m_mountIgnoreNoPerm = sectMount->getValue<bool>("ignore_no_permission", false);
 
-    m_mountIgnorePaths = sectMount->getValues<StringSet>(sect_mount_ignore,
+    m_mountIgnorePaths = sectMount->getValues<StrLightSet>(sect_mount_ignore,
                                                        {},
                                                        false, "\n");
 
@@ -488,6 +487,15 @@ void Settings::loadSectHash()
                 sectHash->getValue<uint>(sect_hash_chunksize, 4096, true));
     m_hashSettings.hashMeta.maxCountOfReads = static_cast<HashMeta::size_type>(
                 sectHash->getValue<uint>(sect_hash_maxCountReads, 20, true));
+    if(m_hashSettings.hashEnable){
+        if(m_hashSettings.hashMeta.chunkSize < 8 ||
+                m_hashSettings.hashMeta.chunkSize > 1024 * 40 ||
+                m_hashSettings.hashMeta.maxCountOfReads < 1){
+            throw ExcCfg(qtr("Invalid hashsettings. Must be:"
+                             " 8 >= %1 <= 40KiB  and %2 < 1")
+                         .arg(sect_hash_chunksize, sect_hash_maxCountReads));
+        }
+    }
 }
 
 /// @return true if the config file existed and was successfully parsed
@@ -560,7 +568,7 @@ void Settings::handleUnequalVersions(Settings::ReadVersionReturn &readVerResult)
     }
 }
 
-/// Store the config to disk. Note that this is nly done for new versions,
+/// Store the config to disk. Note that this is only done for new versions,
 /// that's why the version file is also updated alongside.
 void Settings::storeCfg(QFileThrow &cfgVersionFile)
 {
@@ -651,7 +659,7 @@ void Settings::load()
 
 
 
-const Settings::StringSet &Settings::getMountIgnorePaths()
+const Settings::StrLightSet &Settings::getMountIgnorePaths()
 {
     assert(m_settingsLoaded);
     return m_mountIgnorePaths;
@@ -680,7 +688,7 @@ const Settings::WriteFileSettings &Settings::writeFileSettings() const
     return m_wSettings;
 }
 
-const Settings::ReadFileSettings &Settings::readFileSettins() const
+const Settings::ReadFileSettings &Settings::readFileSettings() const
 {
     return m_rSettings;
 }

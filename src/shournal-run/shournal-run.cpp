@@ -101,7 +101,7 @@ int shournal_run_main(int argc, char *argv[])
 
     std::set_terminate(onterminate);
 
-    if(! registerQtConversionStuff()){
+    if(! shournal_common_init()){
         logCritical << qtr("Fatal error: failed to initialize custom Qt conversion functions");
         cpp_exit(1);
     }
@@ -175,6 +175,10 @@ int shournal_run_main(int argc, char *argv[])
     argShellSessionUUID.setInternalOnly(true);
     parser.addArg(&argShellSessionUUID);
 
+    QOptArg argNoDb("", "no-db", qtr("For debug purposes: do not write to"
+                                     "database after event processing"), false);
+    parser.addArg(&argNoDb);
+
     try {
         parser.parse(argc, argv);
 
@@ -245,6 +249,9 @@ int shournal_run_main(int argc, char *argv[])
             // for correct storing of command in db (no duplicate first arg
             // if not necessary!)
             fwatcher.setCommandFilename(argExecFilename.vals().argv[0]);
+        }
+        if(argNoDb.wasParsed()){
+            fwatcher.setStoreToDatabase(false);
         }
 
 

@@ -16,10 +16,12 @@ add_subdirectory(qsqlthrow)
 
 add_library(lib_util
     util
+    util_performance
     )
 
 add_library(lib_util_shared
     util
+    util_performance
     )
 
 set_property(TARGET lib_util_shared PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -105,6 +107,9 @@ SET(lib_shournal_common_files
     qoutstream
     qresource_helper
     settings
+    stdiocpp
+    strlight
+    strlight_util
     stupidinject
     socket_message
     staticinitializer

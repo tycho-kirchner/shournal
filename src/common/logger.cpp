@@ -21,7 +21,8 @@
 namespace  {
 QString g_logPreamble;
 const QtMsgType DEFAULT_VERBOSITY = QtMsgType::QtWarningMsg;
-int g_verbosityLevel=DEFAULT_VERBOSITY;
+QtMsgType g_verbosityLvl = DEFAULT_VERBOSITY;
+int g_verbosityLvlOrdinal=logger::msgTypeToOrdinal(DEFAULT_VERBOSITY);
 pid_t g_pid;
 
 
@@ -33,7 +34,7 @@ void messageHandler(QtMsgType msgType, const QMessageLogContext &context, const 
 
 #ifndef NDEBUG
     if (msgType == QtDebugMsg) {
-        if(typeOrdinal >= g_verbosityLevel){
+        if(typeOrdinal >= g_verbosityLvlOrdinal){
             QErr() << g_logPreamble << " Dbg: "
                  << "(" << QFileInfo(context.file).fileName() <<":" << context.line << ") "
                  << " pid " << g_pid << ": "  << msg << '\n' ;
@@ -49,7 +50,7 @@ void messageHandler(QtMsgType msgType, const QMessageLogContext &context, const 
                 "yyyy-MM-dd HH:mm:ss");
     QString msgTypeStr = logger::msgTypeToStr(msgType);
 
-    if(typeOrdinal >= g_verbosityLevel){
+    if(typeOrdinal >= g_verbosityLvlOrdinal){
         QErr() << g_logPreamble << " "<<dateTime<<' '<< msgTypeStr<<": "<<msg<< "\n";
     }
     if(logger::getLogRotate().file().isOpen()){
@@ -94,13 +95,21 @@ void logger::disableLogToFile()
 
 void logger::setVerbosityLevel(QtMsgType lvl)
 {
-    g_verbosityLevel = msgTypeToOrdinal(lvl);
+    g_verbosityLvl = lvl;
+    g_verbosityLvlOrdinal = msgTypeToOrdinal(lvl);
 }
 
 void logger::setVerbosityLevel(const char *str)
 {
     setVerbosityLevel(strToMsgType(str));
 }
+
+
+QtMsgType logger::getVerbosityLevel()
+{
+    return g_verbosityLvl;
+}
+
 
 
 logger::LogRotate &logger::getLogRotate()
@@ -154,7 +163,7 @@ int logger::msgTypeToOrdinal(QtMsgType msgType)
     static StaticInitializer initOnFirstCall( [&msgType](){
         logWarning << "msgTypeToOrdinal" << "unknown messagetype" << msgType;
     });
-    return DEFAULT_VERBOSITY;
+    return 2;
 }
 
 

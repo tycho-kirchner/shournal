@@ -30,6 +30,8 @@ public:
     int sockFd() const;
 
 
+    void setStoreToDatabase(bool storeToDatabase);
+
 private:
     struct MsenterChildReturnValue {
         MsenterChildReturnValue(pid_t p, int pipeWrite) :
@@ -37,11 +39,13 @@ private:
         pid_t pid;
         int pipeWriteEnd;
     };
+    typedef std::unique_ptr<FanotifyController> FanotifyController_ptr;
+
     static const int RECEIVE_BUF_SIZE = 1024*1024;
 
     int m_sockFd;
     logger::LogRotate m_shellLogger;
-    FileEventHandler m_fEventHandler;
+    std::shared_ptr<FileEventHandler> m_fEventHandler;
     gid_t m_msenterGid;
     fdcommunication::SocketCommunication m_sockCom;
     QByteArray m_shellSessionUUID;
@@ -51,10 +55,11 @@ private:
     char ** m_commandEnvp;
     uid_t m_realUid;
     fdcommunication::SocketCommunication::Messages m_sockMessages;
+    bool m_storeToDatabase;
 
     MsenterChildReturnValue setupMsenterTargetChildProcess();
     socket_message::E_SocketMsg pollUntilStopped(CommandInfo& cmdInfo,
-                                 FanotifyController& fanotifyCtrl);
+                                 FanotifyController_ptr& fanotifyCtrl);
     socket_message::E_SocketMsg processSocketEvent( CommandInfo& cmdInfo );
     void flushToDisk(CommandInfo& cmdInfo);
 

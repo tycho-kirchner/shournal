@@ -59,6 +59,8 @@ void enableLogToFile(const QString &filename);
 void disableLogToFile();
 void setVerbosityLevel(QtMsgType lvl);
 void setVerbosityLevel(const char* str);
+QtMsgType getVerbosityLevel();
+
 
 LogRotate& getLogRotate();
 

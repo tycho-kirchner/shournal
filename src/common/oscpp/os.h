@@ -18,6 +18,16 @@
 #include "excos.h"
 #include "util.h"
 
+
+/// Private functions - internal use
+namespace __os {
+
+int openat(int dirfd, const char* filename, int flags, bool clo_exec, mode_t mode);
+
+}
+
+
+
 /// Simple wrappers for several os calls
 /// which throw exceptions on error.
 namespace os {
@@ -26,6 +36,10 @@ void setRetryOnInterrupt(bool val);
 
 // read/write by owner, read only by group and others
 static const int DEFAULT_CREAT_FLAGS = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+
+extern const int OPEN_WRONLY;
+extern const int OPEN_RDONLY;
+extern const int OPEN_RDWR;
 
 class ExcKernelVersionParse : public std::exception
 {
@@ -54,7 +68,7 @@ void *dlsym (void *handle, const char *symbol);
 pid_t fork();
 
 stat_t fstat(int fd);
-stat_t stat(const std::string & filename);
+stat_t stat(const char* filename);
 
 int dup(int oldfd);
 void dup2(int oldfd, int newfd);
@@ -121,8 +135,8 @@ int open(const Str_t& filename, int flags, bool clo_exec=true,
          mode_t mode=DEFAULT_CREAT_FLAGS);
 
 
-int openat(int dirfd, const char *filename, int flags, bool clo_exec=true,
-           mode_t mode=DEFAULT_CREAT_FLAGS);
+// int openat(int dirfd, const char *filename, int flags, bool clo_exec=true,
+//            mode_t mode=DEFAULT_CREAT_FLAGS);
 template <class Str_t>
 int openat(int dirfd, const Str_t& filename, int flags,bool clo_exec=true,
            mode_t mode=DEFAULT_CREAT_FLAGS );
@@ -139,11 +153,10 @@ Str_t readlink (const Str_t & filename);
 template <class Str_t>
 Str_t readlinkat (int dirfd, const Str_t & filename);
 
-void readlinkat (int dirfd, const std::string & filename, std::string & output);
+void readlinkat (int dirfd, const char* filename, std::string & output);
 
 template <class Str_t>
 void readlinkat (int dirfd, const Str_t & filename, Str_t & output);
-
 
 ssize_t read (int fd, void *buf, size_t nbytes, bool retryOnInterrupt=false);
 
@@ -158,6 +171,8 @@ size_t sendmsg (int fd, const struct msghdr *message,
             int flags=0);
 
 off_t sendfile(int out_fd, int in_fd, size_t count);
+template <class Str_t>
+off_t sendfile(const Str_t& out_path, const Str_t& in_path, size_t count);
 
 void setFdDescriptorFlags(int fd, int flags);
 
@@ -188,6 +203,8 @@ sighandler_t signal(int sig, sighandler_t handler);
 void symlink(const char *target, const char *linkpath);
 
 SocketPair_t socketpair (int domain, int type_, int protocol=0);
+
+void unlinkat(int dirfd, const char *pathname, int flags);
 
 void umount (const std::string& specialFile);
 void unsetenv(const char* name);
@@ -231,9 +248,10 @@ template <class Str_t>
 void os::readlinkat (int dirfd, const Str_t & filename, Str_t & output){
     output.resize(PATH_MAX);
     char* buf = strDataAccess(output);
-    ssize_t path_len = ::readlinkat(dirfd, filename.data(), buf, PATH_MAX);
+    const char* filename_cstr = strDataAccess(filename);
+    ssize_t path_len = ::readlinkat(dirfd, filename_cstr, buf, PATH_MAX);
     if (path_len == -1 ){
-        throw ExcReadLink("readlinkat failed for file " + std::string(filename.data()));
+        throw ExcReadLink("readlinkat failed for file " + std::string(filename_cstr));
     }
     output.resize(static_cast<typename Str_t::size_type>(path_len));
 }
@@ -272,14 +290,14 @@ Str_t os::readlink(const Str_t &filename)
 /// @throws ExcOs
 template <class Str_t>
 int os::open(const Str_t& filename, int flags, bool clo_exec, mode_t mode){
-    return os::open(filename.data(), flags, clo_exec, mode);
+    return os::open(strDataAccess(filename), flags, clo_exec, mode);
 }
 
 
 /// @throws ExcOs
 template <class Str_t>
-int os::openat(int dirfd, const Str_t& filename, int flags, bool clo_exec, mode_t mode){
-    return os::openat(dirfd, filename.data(), flags, clo_exec, mode);
+int os::openat(int dirfd, const Str_t& filename, int flags, bool clo_exec, mode_t mode){    
+    return __os::openat(dirfd, strDataAccess(filename), flags, clo_exec, mode);
 }
 
 /// @return the username of the *real* user
@@ -320,3 +338,25 @@ void os::setenv(const Str_t &name, const Str_t &value, bool overwrite)
          throw ExcOs("setenv failed");
     }
 }
+
+
+template <class Str_t>
+off_t os::sendfile(const Str_t& out_path, const Str_t& in_path, size_t count){
+    int out_fd=-1, in_fd=-1;
+    try {
+        int out_fd = os::open<Str_t>(out_path, os::OPEN_WRONLY);
+        int in_fd = os::open<Str_t>(in_path, os::OPEN_RDONLY);
+        auto ret = os::sendfile(out_fd, in_fd, count);
+        close(out_fd);
+        close(in_fd);
+        return ret;
+    } catch (const os::ExcOs&) {
+        if(out_fd != -1) close(out_fd);
+        if(in_fd != -1)  close(in_fd);
+        throw ;
+    }
+}
+
+
+
+
