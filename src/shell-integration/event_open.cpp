@@ -43,7 +43,9 @@ static std::string mkAbsPath(const char* path){
 
     // resize to actual length
     buf.resize(strlen(rawBuf));
-    buf += '/';
+    if(buf.size() != 1){
+        buf += '/';
+    }
     buf += path;
     return buf;
 }
@@ -69,9 +71,21 @@ int event_open::handleOpen(const char *pathname, int flags, mode_t mode, bool la
     if(g_shell.watchState != E_WatchState::WITHIN_CMD){
         return g_shell.orig_open(pathname, flags, mode);
     }
-
     const auto absPath = mkAbsPath(pathname);
-    if(absPath.size() < 2){
+
+    // pass the resolved abs. path relative to shournal's root directory fd,
+    // by omitting the initial '/'.
+    // Users may further pass malformed file-paths such as //foo, so find the first
+    // non-slash char.
+    const char* actualPath = nullptr;
+    for(size_t i=0; i < absPath.size(); i++){
+        if(absPath[i] != '/'){
+            actualPath = &absPath[i];
+            break;
+        }
+    }
+
+    if(actualPath == nullptr || absPath.c_str() + absPath.size() - actualPath < 1){
         // Get here on mkAbsPath-error or because user attempted to open "/" or ""
         // The shortest possible absolute FILEpath under linux is two chars long.
         // We may get here, if bash-user calls e.g.
@@ -79,8 +93,8 @@ int event_open::handleOpen(const char *pathname, int flags, mode_t mode, bool la
         logDebug << "no valid path" << absPath;
         return g_shell.orig_open(pathname, flags, mode);
     }
-    // pass the resolved abs. path relative to shournal's root directory fd,
-    // by omitting the initial '/'.
-    return openat(g_shell.shournalRootDirFd, absPath.c_str() + 1, flags, mode);
+
+    logDebug << "about to open" << actualPath - 1;
+    return openat(g_shell.shournalRootDirFd, actualPath, flags, mode);
 }
 

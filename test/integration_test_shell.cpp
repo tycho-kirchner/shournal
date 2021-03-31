@@ -64,25 +64,20 @@ class IntegrationTestShell : public QObject {
     Q_OBJECT
 
 private:
-    void writeReadSettingsToCfgFile(const QString& readIncludeDir){
-        auto & sets = Settings::instance();
-        qsimplecfg::Cfg cfg;
+    void writeReadSettingsToCfg(const QString& readIncludeDir,
+                                qsimplecfg::Cfg& cfg){
         auto sectRead = cfg[Settings::SECT_READ_NAME];
         sectRead->getValue(Settings::SECT_READ_KEY_ENABLE, true, true);
         sectRead->getValue(Settings::SECT_READ_KEY_INCLUDE_PATHS, readIncludeDir, true);
-        auto cfgPath = sets.cfgFilepath();
-        cfg.store(cfgPath);
     }
 
-    void writeScriptSettingToCfgFile(const QString& includePath, const QStringList& fileExtensions){
-        auto & sets = Settings::instance();
-        qsimplecfg::Cfg cfg;
+    void writeScriptSettingToCfg(const QString& includePath,
+                                 const QStringList& fileExtensions,
+                                 qsimplecfg::Cfg& cfg){
         auto sectRead = cfg[Settings::SECT_SCRIPTS_NAME];
         sectRead->getValue(Settings::SECT_SCRIPTS_ENABLE, true, true);
         sectRead->getValue(Settings::SECT_SCRIPTS_INCLUDE_PATHS, includePath, true);
         sectRead->getValues(Settings::SECT_SCRIPTS_INCLUDE_FILE_EXTENSIONS, fileExtensions, true, "\n");
-        auto cfgPath = sets.cfgFilepath();
-        cfg.store(cfgPath);
     }
 
 
@@ -158,7 +153,9 @@ private slots:
     void testWrite() {
         auto pTmpDir = testhelper::mkAutoDelTmpDir();
         auto tmpDirPath = pTmpDir->path().toStdString();
-
+        QVERIFY(tmpDirPath != "/"); // otherwise this test must be changed
+        auto tmpDirNoLeadingSlash(tmpDirPath);
+        tmpDirNoLeadingSlash.erase(tmpDirNoLeadingSlash.begin());
 
         std::string filepath = tmpDirPath + "/f1";
         std::vector<std::string> cmds {
@@ -172,10 +169,16 @@ private slots:
                     "(echo foo8 > " + filepath + ") & wait",
                     "/bin/echo foo9 > " + filepath + " & wait",
                     "sh -c 'echo foo10 > " + filepath + " & wait'",
+                    // malformed filepath with multiple slash //
+                    "echo foo11 > //" + filepath,
+                    // special case root dir
+                    "cd /; echo foo11 > //" + filepath,
                     // relative paths must also work:
                     "cd " + tmpDirPath + "; echo hi > f1",
                     "cd " + tmpDirPath + "; echo hi > ./f1",
                     "cd " + tmpDirPath + "; echo hi > ../" + splitAbsPath(tmpDirPath).second + "/f1",
+                    // special case root dir
+                    "cd /; echo hi > " + tmpDirNoLeadingSlash + "/f1",
         };
 
         const auto setupCmd = AutoTest::globals().integrationSetupCommand;
@@ -192,7 +195,11 @@ private slots:
 
         auto pTmpDir = testhelper::mkAutoDelTmpDir();
         // for read events only include our tempdir
-        writeReadSettingsToCfgFile(pTmpDir->path());
+        qsimplecfg::Cfg cfg;
+        writeReadSettingsToCfg(pTmpDir->path(), cfg);
+        auto & sets = Settings::instance();
+        auto cfgPath = sets.cfgFilepath();
+        cfg.store(cfgPath);
 
         const QString fname = "foo1";
         const QString fullPath = pTmpDir->path() + '/' + fname;
@@ -227,7 +234,12 @@ private slots:
 
         auto pTmpDir = testhelper::mkAutoDelTmpDir();
         // for read events only include our tempdir
-        writeScriptSettingToCfgFile(pTmpDir->path(), {"sh"});
+        qsimplecfg::Cfg cfg;
+        writeScriptSettingToCfg(pTmpDir->path(), {"sh"}, cfg);
+        writeReadSettingsToCfg(pTmpDir->path(), cfg);
+        auto & sets = Settings::instance();
+        auto cfgPath = sets.cfgFilepath();
+        cfg.store(cfgPath);
 
         const QString fname = "foo1.sh";
         const QString fullPath = pTmpDir->path() + '/' + fname;
