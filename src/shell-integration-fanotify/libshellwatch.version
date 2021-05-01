@@ -1,0 +1,4 @@
+{
+  global: open; open64; fork; execve; strcpy;
+  local: *;         # hide everything else
+};
