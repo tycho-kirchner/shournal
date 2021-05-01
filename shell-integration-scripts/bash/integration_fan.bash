@@ -1,4 +1,4 @@
-# bash-integration for shournal.
+# bash-integration for shournal - fanotify backend.
 # You must provide a valid path for shournals libshournal-shellwatch.so
 # before executing SHOURNAL_ENABLE, e.g.:
 # SHOURNAL_PATH_LIB_SHELL_INTEGRATION="/usr/local/lib64/shournal/libshournal-shellwatch.so"
@@ -15,6 +15,14 @@ SHOURNAL_PRINT_VERSIONS() {
 
 
 SHOURNAL_ENABLE() {
+    if [[ -z ${_shournal_version+x} ]]; then
+        local common_path="$(dirname -- "$BASH_SOURCE")/_common.sh"
+        if ! source "$common_path"; then
+            >&2 echo "shournal shell integration: failed to source common file $common_path"
+            return 1
+        fi
+    fi
+
     # To allow for SHOURNAL_ENABLE in bashrc, make sure to not enable again
     [[ -n ${_shournal_enable_just_called+x} ]] && return 0
 
@@ -44,13 +52,13 @@ SHOURNAL_ENABLE() {
         return 1
     fi
 
-    local path_to_shournal_run=$(command -v shournal-run)
+    local path_to_shournal_run=$(command -v shournal-run-fanotify)
     if [[ -z ${path_to_shournal_run} ]] ; then
-        _shournal_error "cannot enable shournal's bash integration - command <shournal-run> not found"
+        _shournal_error "cannot enable shournal's bash integration - command <shournal-run-fanotify> not found"
         return 1
     fi
     if [[ ! -u $path_to_shournal_run ]]; then
-        _shournal_debug "shournal-run does not have the setuid-bit set." # but this might be a wrapper, so no warning
+        _shournal_debug "shournal-run-fanotify does not have the setuid-bit set." # but this might be a wrapper, so no warning
     fi
 
     declare -a args_array
@@ -68,7 +76,9 @@ SHOURNAL_ENABLE() {
         # of commands like e.g. bash -i -c 'echo "wtf - is that interactive?"'
         _shournal_debug "${FUNCNAME[0]}: exec non-interactive $cmd_path ${args_array[@]}"
         _shournal_parent_launched_us_noninteractive=true exec \
-            shournal --verbosity "$_SHOURNAL_LIB_SHELL_VERBOSITY" --exec-filename "$cmd_path" --exec "${args_array[@]}"
+            shournal --verbosity "$_SHOURNAL_LIB_SHELL_VERBOSITY" \
+            --backend-filename "$path_to_shournal_run" \
+            --exec-filename "$cmd_path" --exec "${args_array[@]}"
         # only get here on error
         return 1
     fi
@@ -97,6 +107,7 @@ SHOURNAL_ENABLE() {
     _shournal_debug "${FUNCNAME[0]}: calling preloaded: $cmd_path ${args_array[@]:1}"
     # Relaunch bash with shournals .so preloaded using the original arguments.
     exec shournal --verbosity "$_SHOURNAL_LIB_SHELL_VERBOSITY"  \
+        --backend-filename "$path_to_shournal_run" \
         --msenter-orig-mountspace --exec-filename "$cmd_path" --exec "${args_array[@]}"
     # only get here on error
     return 1
@@ -148,10 +159,6 @@ SHOURNAL_SET_VERBOSITY(){
 
 
 ######################## PRIVATE ########################
-
-# Do *not* touch the next line. The version is updated automatically on build from cmake according
-# to the version set there
-_shournal_version=2.3
 
 # 0: debug, 1: info, 2: warning, 3: error
 [[ -z ${_shournal_bash_integration_log_level+x} ]] && _shournal_bash_integration_log_level=2
@@ -290,7 +297,7 @@ _shournal_verbose_history_check(){
 }
 
 
-# don' call it directly, but use one of debug, info, warning, error functions
+# don't call it directly, but use one of debug, info, warning, error functions
 # $1: logleve.
 # all other args: is printed to stderr
 _shournal_log_msg(){

@@ -195,15 +195,18 @@ void handlePrepareCmd(){
         auto autocloseSocket0 = finally([&sockets] { close(sockets[0]); });
         auto autocloseSocket1 = finally([&sockets] { close(sockets[1]); });
 
-
+        const char* BACKEND_FILENAME = app::SHOURNAL_RUN_FANOTIFY;
         subprocess::Args_t args = {
-            app::SHOURNAL_RUN,
+            BACKEND_FILENAME,
             "--socket-fd", std::to_string(sockets[0]),
             "--verbosity", logger::msgTypeToStr(g_shell.verbosityLevel),
             "--shell-session-uuid", g_shell.sessionInfo.uuid.toBase64().data()
         };
-
-
+        const char* tmpdir = getenv("TMPDIR");
+        if(tmpdir != nullptr){
+            args.push_back("--tmpdir");
+            args.push_back(tmpdir);
+        }
         g_shell.lastMountNamespacePid = -1;
         subprocess::Subprocess subproc;
         subproc.setInNewSid(true); // Survive parent shell exit
@@ -227,7 +230,7 @@ void handlePrepareCmd(){
 
         subproc.setForwardFdsOnExec(forwardFs);
         subproc.call(args);
-        logDebug << "launched" << app::SHOURNAL_RUN
+        logDebug << "launched" << BACKEND_FILENAME
                  << "(pid" << subproc.lastPid() << ")";
 
         os::close(sockets[0]);
@@ -243,7 +246,7 @@ void handlePrepareCmd(){
         if(messages.size() != 1 ){
             logCritical << qtr("Setup of external %1-process failed: "
                                "expected one message but received %2")
-                                .arg(app::SHOURNAL_RUN)
+                                .arg(BACKEND_FILENAME)
                                 .arg(messages.size());
             return;
         }
@@ -257,7 +260,7 @@ void handlePrepareCmd(){
 
             logCritical << qtr("Setup of external %1-process failed, "
                                "received message: %2 (%3)")
-                           .arg(app::SHOURNAL_RUN)
+                           .arg(BACKEND_FILENAME)
                            .arg(msg)
                            .arg(int(socketMsg.msgId));
             return;
@@ -466,8 +469,7 @@ void handleEnableRequest(){
     }
 
     static StaticInitializer initOnFirstCall( [](){
-        QIErr::setPreambleCallback([]() { return "shournal shell-integration: "; });
-        app::setupNameAndVersion();
+        app::setupNameAndVersion("shournal shell-integration");
         try {
             if(! shournal_common_init()){
                 QIErr()  << qtr("Fatal error: failed to initialize custom Qt conversion functions");

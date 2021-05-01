@@ -104,7 +104,8 @@ int event_process::handleExecve(const char *filename, char * const argv[], char 
     std::string fullCmd;
 
     QVarLengthArray<const char*, 8192> args;
-    args.push_back(app::SHOURNAL_RUN);
+
+    args.push_back(app::SHOURNAL_RUN_FANOTIFY);
     args.push_back("--msenter");
     std::string pid = std::to_string(g_shell.lastMountNamespacePid);
     args.push_back(pid.c_str());
@@ -165,7 +166,7 @@ int event_process::handleExecve(const char *filename, char * const argv[], char 
         logCritical << qtr("Failed to launch %1 with external program. "
                            "Please make sure %2 is in your PATH: %3. "
                            "Running it unobserved instead...")
-                       .arg(filename, app::SHOURNAL_RUN, e.what());
+                       .arg(filename, app::SHOURNAL_RUN_FANOTIFY, e.what());
     }
     return execveUnobserved(filename, argv, envp);
 }
