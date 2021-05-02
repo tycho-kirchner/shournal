@@ -68,7 +68,12 @@ void CommandQueryIterator::fillCommand()
 
 void CommandQueryIterator::fillWrittenFiles()
 {
-    m_tmpQuery->prepare("select id,path,name,mtime,size,hash from writtenFile where cmdId=?");
+    m_tmpQuery->prepare("select writtenFile.id,writtenFile_path.path,writtenFile.name,"
+                        "writtenFile.mtime,writtenFile.size,writtenFile.hash "
+                        "from writtenFile "
+                        "join pathtable as writtenFile_path "
+                        "on writtenFile.pathId=writtenFile_path.id "
+                        "where cmdId=?");
     m_tmpQuery->addBindValue(m_cmd.idInDb);
     m_tmpQuery->exec();
     while(m_tmpQuery->next()){

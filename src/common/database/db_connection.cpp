@@ -72,12 +72,18 @@ static void handleDifferentVersions(const QVersionNumber& dbVersion,
         sqlite_database_scheme_updates::v2_2(query);
     }
 
+    if(dbVersion < QVersionNumber{2, 4}){
+        logDebug << "updating db to 2.4...";
+        sqlite_database_scheme_updates::v2_4(query);
+    }
+
     query.prepare("replace into version (id, ver) values (1, ?)");
     query.addBindValue(app::version().toString());
     query.exec();
 
 }
 
+/// @param versionAction: if true, update version, if needed
 /// @throws QExcDatabase
 static void openAndPrepareSqliteDb()
 {
@@ -96,8 +102,8 @@ static void openAndPrepareSqliteDb()
     // quoting sqlite.org/foreignkeys.html
     // "It is not possible to enable or disable foreign key constraints in the
     //  middle of a multi-statement transaction (when SQLite is not in autocommit mode)"
-    // So, do it before...
-    query.exec("PRAGMA foreign_keys=ON");
+    // The scheme-updates require foreign_keys=OFF, so enable below
+    query.exec("PRAGMA foreign_keys=OFF");
 
     query.transaction();
 
@@ -124,6 +130,9 @@ static void openAndPrepareSqliteDb()
         handleDifferentVersions(dbVersion, query);
     }
 
+    query.commit();
+    // outside of transaction (see above):
+    query.exec("PRAGMA foreign_keys=ON");
 }
 
 

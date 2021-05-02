@@ -1,3 +1,6 @@
+
+#include <fcntl.h>
+#include <csignal>
 #include <QSqlDatabase>
 #include <QSqlRecord>
 #include <QSql>
@@ -18,53 +21,50 @@
 #include "storedfiles.h"
 #include "interrupt_handler.h"
 #include "os.h"
+#include "qoutstream.h"
 
 using namespace db_conversions;
 
 namespace  {
 
 void
-insertFileWriteEvents(const QueryPtr& query, const CommandInfo &cmd,
-                FileWriteEvents &writeEvents )
+insertFileWriteEvent(const QueryPtr& query, const CommandInfo &cmd,
+                FileEvent* e )
 {
-    query->prepare("insert into writtenFile (cmdId,path,name,mtime,size,hash) "
-                  "values (?,?,?,?,?,?)");
+    auto pathFnamePair =  splitAbsPath(QString(e->path()));
+    query->prepare("insert or ignore into pathtable (path)"
+                   "values (?)");
+    query->addBindValue(pathFnamePair.first);
+    query->exec();
+    query->prepare("insert into writtenFile (cmdId,pathId,name,mtime,size,hash) "
+                   "values (?,"
+                   "(select id from pathtable where path=?),"
+                   "?,?,?,?)");
 
-    FileWriteEvent* e;
-    while ((e = writeEvents.read()) != nullptr) {
-        query->addBindValue(cmd.idInDb);
-
-        auto pathFnamePair =  splitAbsPath(QString(e->fullPath));
-        query->addBindValue(pathFnamePair.first);
-        query->addBindValue(pathFnamePair.second);
-        query->addBindValue(fromMtime(e->mtime));
-
-        query->addBindValue(static_cast<qint64>(e->size));
-        HashValue hash;
-        if(! e->hashIsNull){
-            hash = e->hash;
-        }
-        query->addBindValue(fromHashValue(hash));
-        query->exec();
-    }
+    query->addBindValue(cmd.idInDb);
+    query->addBindValue(pathFnamePair.first);
+    query->addBindValue(pathFnamePair.second);
+    query->addBindValue(fromMtime(e->mtime()));
+    query->addBindValue(static_cast<qint64>(e->size()));
+    query->addBindValue(fromHashValue(e->hash()));
+    query->exec();
 }
 
 /// Move or copy the file captured along the read event e
 /// to the read files directory in shournal's database dir.
-void moveOrCopyToStoredFiles(const FileReadEvent& e, FileReadEvents& readEvents,
+void copyToStoredFiles(const FileEvent* e,
                              const QByteArray& storedFilesDir,
-                             const QByteArray& idInDatabase, bool onSameDev){
-    const auto fullDestPath = storedFilesDir + '/' + idInDatabase;
-    const auto fullSrcPath = readEvents.makeStoredFilepath(e);
+                             const QByteArray& idInDatabase){
+    const auto fullDestPath = pathJoinFilename(storedFilesDir, idInDatabase);
+    int out_fd = os::open(strDataAccess(fullDestPath), os::OPEN_WRONLY | os::OPEN_CREAT);
+    auto autoCloseOutFd = finally([&out_fd] { close(out_fd); });
+
     try {
-        if(onSameDev){
-            os::rename(fullSrcPath, fullDestPath);
-        } else {
-            os::sendfile(fullDestPath, fullSrcPath, e.size);
-        }
+        os::sendfile(out_fd, fileno_unlocked(e->file()),
+                     e->fileContentSize(),
+                     e->fileContentStart());
     } catch (const os::ExcOs& ex) {
-        logCritical << QString("Failed to move or copy %1 to %2: %3")
-                       .arg(fullSrcPath.constData())
+        logWarning << QString("Failed to send file to %1 - %2")
                        .arg(fullDestPath.constData())
                        .arg(ex.what());
         throw;
@@ -74,44 +74,48 @@ void moveOrCopyToStoredFiles(const FileReadEvent& e, FileReadEvents& readEvents,
 }
 
 void
-insertFileReadEvents(const QueryPtr& query, const CommandInfo &cmd,
-                     const QVariant& envId, const QVariant& hashMetaId,
-                     FileReadEvents &readEvents )
+insertFileReadEvent(const QueryPtr& query, const CommandInfo &cmd,
+                    const QVariant& envId, const QVariant& hashMetaId,
+                    FileEvent* e )
 {
     StoredFiles storedFiles;
     const QByteArray storedFilesDir = storedFiles.getReadFilesDir().toUtf8();
-    const auto devTmpFiles = os::stat(strDataAccess(readEvents.getTmpDirPath())).st_dev;
-    const auto devStoredFiles = os::stat(strDataAccess(storedFiles.getReadFilesDir().toUtf8())).st_dev;
-    const bool tmpAndStoredFilesOnSameDev = devTmpFiles == devStoredFiles;
 
-    FileReadEvent* e;
-     while ((e = readEvents.read()) != nullptr) {
-        const auto pathFnamePair =  splitAbsPath(QString(e->fullPath));
-        bool existed;
-        HashValue hash;
-        if(! e->hashIsNull){
-            hash = e->hash;
-        }
-        const auto readFileId = query->insertIfNotExist("readFile", {
-                                    {"envId", envId },
-                                    {"name", pathFnamePair.second},
-                                    {"path", pathFnamePair.first},
-                                    {"mtime",fromMtime(e->mtime)},
-                                    {"size", qint64(e->size)},
-                                    {"mode", e->mode},
-                                    {"hash", fromHashValue(hash)},
-                                    {"hashmetaId", hashMetaId},
-                                    {"isStoredToDisk", e->file_content_id != -1}
-                                }, &existed);
-        if(! existed && e->file_content_id != -1){
-            moveOrCopyToStoredFiles(*e, readEvents, storedFilesDir,
-                                    readFileId.toByteArray(), tmpAndStoredFilesOnSameDev);
-        }
-        query->prepare("insert into readFileCmd (cmdId, readFileId) values (?,?)");
-        query->addBindValue(cmd.idInDb);
-        query->addBindValue(readFileId);
+    const auto pathFnamePair = splitAbsPath(QString(e->path()));
+
+    query->prepare("select id from pathtable where path=?");
+    query->addBindValue(pathFnamePair.first);
+    query->exec();
+    qint64 pathId;
+    if(query->next(false)){
+        pathId = qVariantTo_throw<qint64>(query->value(0));
+    } else {
+        query->prepare("insert into pathtable (path)"
+                       "values (?)");
+        query->addBindValue(pathFnamePair.first);
         query->exec();
+        pathId = qVariantTo_throw<qint64>(query->lastInsertId());
     }
+    bool existed;
+    const auto readFileId = query->insertIfNotExist("readFile", {
+                                                        {"envId", envId },
+                                                        {"name", pathFnamePair.second},
+                                                        {"pathId", pathId},
+                                                        {"mtime",fromMtime(e->mtime())},
+                                                        {"size", qint64(e->size())},
+                                                        {"mode", qint64(e->mode())},
+                                                        {"hash", fromHashValue(e->hash())},
+                                                        {"hashmetaId", hashMetaId},
+                                                        {"isStoredToDisk", e->fileContentSize() > 0}
+                                                    }, &existed);
+    if(! existed && e->fileContentSize() > 0){
+        copyToStoredFiles(e, storedFilesDir, readFileId.toByteArray());
+    }
+    query->prepare("insert into readFileCmd (cmdId, readFileId) values (?,?)");
+    query->addBindValue(cmd.idInDb);
+    query->addBindValue(readFileId);
+    query->exec();
+
 }
 
 
@@ -153,6 +157,11 @@ deleteChildlessParents(const QueryPtr& query){
     logDebug << "delete from env...";
     query->exec("delete from env where not exists (select 1 from cmd where "
                "cmd.envId=env.id)");
+
+    query->exec("delete from pathtable where not exists "
+                "(select 1 from writtenFile where writtenFile.pathId=pathtable.id) "
+                "and not exists "
+                "(select 1 from readFile where readFile.pathId=pathtable.id)");
 }
 
 
@@ -160,7 +169,10 @@ FileReadInfos
 queryFileReadInfos(const SqlQuery& sqlQ, const QueryPtr& query_=nullptr, const QString& optionalJoins={}){
     const QueryPtr query = (query_ != nullptr) ? query_ : db_connection::mkQuery();
     FileReadInfos readInfos;
-    query->prepare("select readFile.id,path,name,mtime,size,mode,hash,isStoredToDisk from readFile "
+    query->prepare("select readFile.id,readFile_path.path,name,mtime,size,"
+                   "mode,hash,isStoredToDisk from readFile "
+                   "join pathtable as readFile_path "
+                   "on readFile.pathId=readFile_path.id "
                    + optionalJoins + " where " + sqlQ.query());
     query->addBindValues(sqlQ.values());
     query->exec();
@@ -269,10 +281,10 @@ void db_controller::updateCommand(const CommandInfo &cmd)
 
 /// Add file events belonging to param cmd which must belong to a valid
 /// database entry (idInDb must valid)
-void db_controller::addFileEvents(const CommandInfo &cmd, FileWriteEvents &writeEvents,
-                                  FileReadEvents &readEvents)
+void db_controller::addFileEvents(const CommandInfo &cmd, FileEvents &fileEvents)
 {
     assert(cmd.idInDb != db::INVALID_INT_ID);
+    assert(ftell(fileEvents.file()) == 0);
 
     auto query = db_connection::mkQuery();
     query->transaction();
@@ -284,10 +296,25 @@ void db_controller::addFileEvents(const CommandInfo &cmd, FileWriteEvents &write
     const QVariant envId = query->value(0);
     const QVariant hashMetaId = query->value(1);
 
-    insertFileWriteEvents(query, cmd, writeEvents);
-    insertFileReadEvents(query, cmd, envId, hashMetaId, readEvents);
+    FileEvent* e;
+    uint counter = 0;
+    InterruptProtect ip(SIGTERM);
+    while ((e = fileEvents.read()) != nullptr) {
+        if(FileEvents::isReadEvent(e->flags())){
+            insertFileReadEvent(query, cmd, envId, hashMetaId, e);
+        }
+        if(FileEvents::isWriteEvent(e->flags())){
+            insertFileWriteEvent(query, cmd, e);
+        }
+        // Be 'nice' to others and sleep a bit every now and then
+        if(++counter % 500 == 0 &&
+           ! ip.signalOccurred()){ // if we shall terminate don't sleep.
+            query->commit();
+            usleep(10 * 1000);
+            query->transaction();
+        }
+    }
 }
-
 
 
 /// Deletes the command and corresponding file events (read and write).
@@ -322,17 +349,23 @@ db_controller::queryForCmd(const SqlQuery &sqlQ, bool reverseResultIter){
                 new CommandQueryIterator(pQuery, reverseResultIter));
 
     const QString queryStr =
-            "select cmd.id, cmd.txt, "
-            "cmd.returnVal, cmd.startTime, cmd.endTime, cmd.workingDirectory,"
-            "session.id, session.comment,"
-            "hashmeta.chunkSize, hashmeta.maxCountOfReads,"
-            "env.username, env.hostname "
+            "select cmd.id,cmd.txt,"
+            "cmd.returnVal,cmd.startTime,cmd.endTime,cmd.workingDirectory,"
+            "session.id,session.comment,"
+            "hashmeta.chunkSize,hashmeta.maxCountOfReads,"
+            "env.username,env.hostname "
             "from cmd "             +
-            QString((sqlQ.containsTablename("writtenFile")) ?
-                        "join writtenFile on cmd.id=writtenFile.cmdId " : "") +
-            QString((sqlQ.containsTablename("readFile")) ?
+            QString((sqlQ.containsTablename("writtenFile") ||
+                     sqlQ.containsTablename("writtenFile_path")) ? // an alias
+                        "join writtenFile on cmd.id=writtenFile.cmdId "
+                        "join pathtable as writtenFile_path "
+                        "on writtenFile.pathId=writtenFile_path.id " : "") +
+            QString((sqlQ.containsTablename("readFile") ||
+                     sqlQ.containsTablename("readFile_path")) ?
                         "join readFileCmd on cmd.id=readFileCmd.cmdId "
-                        "join readFile on readFileCmd.readFileId=readFile.id " :
+                        "join readFile on readFileCmd.readFileId=readFile.id "
+                        "join pathtable as readFile_path "
+                        "on readFile.pathId=readFile_path.id " :
                         "") +
             "join env on cmd.envId=env.id "
             "left join hashmeta on hashmeta.id=cmd.hashmetaId " // left joins last, if possible!

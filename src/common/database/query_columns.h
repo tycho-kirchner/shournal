@@ -22,15 +22,16 @@ public:
     const QString env_username {"env.username"};
 
     const QString rFile_name {"readFile.name"};
-    const QString rFile_path {"readFile.path"};
+    const QString rFile_path {"readFile_path.path"}; // separate table, join alias
     const QString rFile_mtime {"readFile.mtime"};
     const QString rFile_size {"readFile.size"};
 
-    const QString wFile_name {"writtenFile.name"};
+    const QString wFile_id    {"writtenFile.id"};
+    const QString wFile_name  {"writtenFile.name"};
     const QString wfile_mtime {"writtenFile.mtime"};
     const QString wFile_size  {"writtenFile.size"};
     const QString wFile_hash  {"writtenFile.hash"};
-    const QString wFile_path  {"writtenFile.path"};
+    const QString wFile_path  {"writtenFile_path.path"}; // separate table, join alias
 
     const QString session_id {"session.id"};
     const QString session_comment {"session.comment"};

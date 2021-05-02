@@ -4,7 +4,7 @@
 #include <QVector>
 #include <memory>
 
-#include "fileeventtypes.h"
+#include "fileevents.h"
 #include "commandinfo.h"
 #include "sqlquery.h"
 #include "db_connection.h"
@@ -19,8 +19,7 @@ typedef QVector<HashMeta> HashMetas;
 qint64 addCommand(const CommandInfo &cmd);
 void updateCommand(const CommandInfo &cmd);
 
-void addFileEvents(const CommandInfo &cmd, FileWriteEvents &writeEvents,
-                   FileReadEvents &readEvents);
+void addFileEvents(const CommandInfo &cmd, FileEvents& fileEvents);
 
 int deleteCommand(const SqlQuery &query);
 
