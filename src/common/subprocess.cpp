@@ -78,12 +78,14 @@ std::vector<char*> toPointerVect(const subprocess::Args_t& args){
 } // namespace
 
 subprocess::Subprocess::Subprocess() :
-    m_lastPid(0),
+    m_lastPid(std::numeric_limits<pid_t>::max()),
     m_asRealUser(false),
     m_forwardAllFds(false),
     m_lastCallWasDetached(false),
     m_environ(nullptr),
-    m_inNewSid(false)
+    m_inNewSid(false),
+    m_waitForSetup(true),
+    m_lastCallWaitedForSetup(false)
 {}
 
 void subprocess::Subprocess::call(char *const argv[],
@@ -92,10 +94,7 @@ void subprocess::Subprocess::call(char *const argv[],
     this->call(argv[0], argv, forwardStdin, forwardStdout, forwardStderr);
 }
 
-/// Call provided program after fork. Waits, until process is startet or failed
-/// to do so! Note that per default all file descriptors
-/// except stdin, stdout and stderr are closed.
-/// @throw ExcOs
+
 void subprocess::Subprocess::call(const Args_t &args, bool forwardStdin,
                                   bool forwardStdout, bool forwardStderr)
 {
@@ -103,11 +102,70 @@ void subprocess::Subprocess::call(const Args_t &args, bool forwardStdin,
     this->call(toPointerVect(args).data(), forwardStdin, forwardStdout, forwardStderr);
 }
 
-void subprocess::Subprocess::call(const char *filename, char * const argv[], bool forwardStdin, bool forwardStdout, bool forwardStderr)
+/// Call provided program after fork. Note that per default all file descriptors
+/// except stdin, stdout and stderr are closed.
+/// @throw ExcOs
+void subprocess::Subprocess::call(const char *filename,
+                                  char * const argv[], bool forwardStdin,
+                                  bool forwardStdout, bool forwardStderr)
 {
-    m_lastCallWasDetached = false;
+    doCall(filename, argv, forwardStdin, forwardStdout, forwardStderr,
+           false);
+}
 
-    auto startPipe = os::pipe(O_CLOEXEC | O_DIRECT);
+/// Call provided program after double-fork (daemonize).
+/// Waits, until grandchild-process. Note that per default all file descriptors
+/// except stdout and stderr are closed.
+/// @throw ExcOs
+void subprocess::Subprocess::callDetached(const char *filename, char * const argv[],
+                                          bool forwardStdin, bool forwardStdout,
+                                          bool forwardStderr)
+{
+   doCall(filename, argv, forwardStdin, forwardStdout, forwardStderr,
+          true);
+}
+
+
+void subprocess::Subprocess::callDetached(char * const argv[], bool forwardStdin,
+                                          bool forwardStdout, bool forwardStderr)
+{
+   callDetached(argv[0], argv, forwardStdin, forwardStdout, forwardStderr);
+}
+
+
+void subprocess::Subprocess::callDetached(const Args_t &args, bool forwardStdin,
+                                          bool forwardStdout, bool forwardStderr)
+{
+    this->callDetached(toPointerVect(args).data(), forwardStdin, forwardStdout, forwardStderr);
+}
+
+
+void subprocess::Subprocess::
+doCall(const char *filename, char * const argv[],
+       bool forwardStdin, bool forwardStdout,
+       bool forwardStderr, bool detached)
+{
+    m_lastCallWasDetached = detached;
+    m_lastCallWaitedForSetup = m_waitForSetup;
+    if(m_waitForSetup){
+        doCallWaitForSetup(filename, argv, forwardStdin, forwardStdout, forwardStderr,
+                   detached);
+    } else {
+        os::Pipes_t dummyPipe {-1, -1};
+        doFork(filename, argv, forwardStdin, forwardStdout, forwardStderr,
+               detached, dummyPipe);
+    }
+}
+
+/// Create a pipe and wait until the child-process has closed it's
+/// write-end, either by calling execve or on error.
+/// In case of a detached call, the pid of the grandchild-process
+/// is also send via the pipe and made available via m_lastPid.
+void subprocess::Subprocess::
+doCallWaitForSetup(const char *filename, char * const argv[],
+           bool forwardStdin, bool forwardStdout,
+           bool forwardStderr, bool detached){
+    auto startPipe = os::pipe( O_CLOEXEC  | O_DIRECT );
     auto closeStartRead = finally([&startPipe] {
         closeVerbose(startPipe[0]);
     });
@@ -115,60 +173,24 @@ void subprocess::Subprocess::call(const char *filename, char * const argv[], boo
         closeVerbose(startPipe[1]);
     });
 
-    m_lastPid  = os::fork();
-    if (m_lastPid == 0) {
-        if(m_inNewSid) os::setsid();
-        // child
-        handleChild(filename, argv, startPipe, false, forwardStdin, forwardStdout, forwardStderr);
-        // never get here
-    }
+    doFork(filename, argv, forwardStdin, forwardStdout, forwardStderr,
+           detached, startPipe);
 
-    // parent:
-    os::close(startPipe[1]);
-    closeStartWrite.setEnabled(false);
-
-    LaunchMsg msg;
-    if(!readMsg(startPipe[0], &msg)){
-        // no error
-        return;
-    }
-    assert(msg.msgType == LaunchMsgType::EXCEPTION);
-    throwFailedToLaunchEx(argv, msg);
-}
-
-void subprocess::Subprocess::callDetached(const char *filename, char * const argv[], bool forwardStdin, bool forwardStdout, bool forwardStderr)
-{
-    m_lastCallWasDetached = true;
-
-    auto startPipe = os::pipe( O_CLOEXEC  | O_DIRECT );
-    auto closeStartRead = finally([&startPipe] {
-        closeVerbose(startPipe[0]);
-    });
-    auto closeStartWrite = finally([&startPipe] {       
-        closeVerbose(startPipe[1]);
-    });
-    pid_t pid1 = os::fork();
-    if(pid1 == 0){
-        if(m_inNewSid) os::setsid();
-        // child: fork again and exit
-        try {
-            pid_t pid2 = os::fork();
-            if(pid2 == 0){
-                handleChild(filename, argv, startPipe, true,
-                            forwardStdin, forwardStdout, forwardStderr);
-            }
-        } catch (const os::ExcOs& ex){
-            // should never happen
-            std::cerr << __func__ << ": " << ex.what() << "\n";
-            exit(1);
-        }
-        exit(0);
-    }
-
-    // parent
     closeVerbose(startPipe[1]);
     closeStartWrite.setEnabled(false);
     LaunchMsg msg;
+
+    if(! detached){
+        if(!readMsg(startPipe[0], &msg)){
+            // no error
+            return;
+        }
+        assert(msg.msgType == LaunchMsgType::EXCEPTION);
+        throwFailedToLaunchEx(argv, msg);
+    }
+
+    // if detached we need the grandchild-pid
+
     if(!readMsg(startPipe[0], &msg)){
         // first message *must* be pid
        throwFailedToLaunchEx(argv, msg, "Missing pid reply from grandchild");
@@ -197,22 +219,37 @@ void subprocess::Subprocess::callDetached(const char *filename, char * const arg
 }
 
 
-void subprocess::Subprocess::callDetached(char * const argv[], bool forwardStdin,
-                                          bool forwardStdout, bool forwardStderr)
-{
-   callDetached(argv[0], argv, forwardStdin, forwardStdout, forwardStderr);
-}
+void subprocess::Subprocess::
+doFork(const char *filename, char * const argv[],
+           bool forwardStdin, bool forwardStdout,
+           bool forwardStderr, bool detached,
+           os::Pipes_t &startPipe){
 
+    m_lastPid = os::fork();
+    if(m_lastPid == 0){
+        if(m_inNewSid)
+            os::setsid();
 
-/// Call provided program after double-fork (daemonize).
-/// Waits, until grandchild-process startet or failed
-/// to do so! Note that per default all file descriptors
-/// except stdout and stderr are closed.
-/// @throw ExcOs
-void subprocess::Subprocess::callDetached(const Args_t &args, bool forwardStdin,
-                                          bool forwardStdout, bool forwardStderr)
-{
-    this->callDetached(toPointerVect(args).data(), forwardStdin, forwardStdout, forwardStderr);
+        if(detached){
+            // child: fork again and exit
+            try {
+                pid_t pid2 = os::fork();
+                if(pid2 == 0){
+                    handleChild(filename, argv, startPipe,
+                                forwardStdin, forwardStdout, forwardStderr);
+                }
+            } catch (const os::ExcOs& ex){
+                // should never happen
+                std::cerr << __func__ << ": " << ex.what() << "\n";
+                exit(1);
+            }
+            exit(0);
+        } else {
+            handleChild(filename, argv, startPipe,
+                        forwardStdin, forwardStdout, forwardStderr);
+        }
+    }
+
 }
 
 
@@ -257,6 +294,12 @@ void subprocess::Subprocess::setInNewSid(bool val)
     m_inNewSid = val;
 }
 
+/// Wait for child-process-setup on call or callDetached.
+void subprocess::Subprocess::setWaitForSetup(bool waitForSetup)
+{
+    m_waitForSetup = waitForSetup;
+}
+
 void subprocess::Subprocess::closeAllButForwardFds(os::Pipes_t &startPipe)
 {
     // startpipe fds have O_CLOEXEC set, if exec fails, the respond is sent via
@@ -275,16 +318,18 @@ void subprocess::Subprocess::closeAllButForwardFds(os::Pipes_t &startPipe)
 }
 
 void subprocess::Subprocess::handleChild(const char *filename, char *const argv[],
-                                         os::Pipes_t &startPipe,
-                                         bool writePidToStartPipe, bool forwardStdin,
+                                         os::Pipes_t &startPipe, bool forwardStdin,
                                          bool forwardStdout, bool forwardStderr)
-{
+{    
     try {
+        if(m_callbackAsChild)
+            m_callbackAsChild();
+
         if(m_asRealUser){
             os::setgid(os::getgid());
             os::setuid(os::getuid());
         }
-        if(writePidToStartPipe){
+        if(startPipe[0] != -1 && m_lastCallWasDetached){
             LaunchMsg msg{};
             msg.msgType = LaunchMsgType::PID;
             msg.pid = getpid();
@@ -298,12 +343,16 @@ void subprocess::Subprocess::handleChild(const char *filename, char *const argv[
         }
         os::exec(filename, argv, m_environ);
     } catch (const os::ExcOs& ex) {
+        if(startPipe[0] != -1){
+            std::cerr << __func__ << ": " << ex.what() << "\n";
+            exit(1);
+        }
         LaunchMsg msg{};
         msg.msgType = LaunchMsgType::EXCEPTION;
         msg.errorNumber = ex.errorNumber();
         try {
             os::write(startPipe[1], &msg, sizeof (LaunchMsg));
-        } catch (const os::ExcOs & ex) {
+        } catch (const os::ExcOs& ex) {
             // should never happen
             std::cerr << __func__ << ": " << ex.what() << "\n";
         }
@@ -317,10 +366,20 @@ void subprocess::Subprocess::setEnviron(char **env)
     m_environ = env;
 }
 
+void subprocess::Subprocess::setCallbackAsChild
+(const std::function<void ()> &callbackAsChild)
+{
+    m_callbackAsChild = callbackAsChild;
+}
 
-/// In case of callDetached the grandchild-PID is returned (intermediate
-/// is lost).
+
+/// In case of callDetached the grandchild-PID is returned (
+/// but only if we waited for setup, else the pid is invalid!).
 pid_t subprocess::Subprocess::lastPid() const
 {
+    if(m_lastCallWasDetached && ! m_lastCallWaitedForSetup){
+        throw QExcProgramming("m_lastCallWasDetached && ! m_lastCallWaitedForSetup");
+    }
+
     return m_lastPid;
 }

@@ -49,15 +49,36 @@ public:
     void setForwardFdsOnExec(const std::unordered_set<int>& forwardFds);
     void setForwardAllFds(bool val);
     void setInNewSid(bool val);
+    void setWaitForSetup(bool waitForSetup);
 
     pid_t lastPid() const;
     void setEnviron(char **env);
 
+    void setCallbackAsChild(const std::function<void ()> &callbackAsChild);
+
+
 private:
     void closeAllButForwardFds(os::Pipes_t &startPipe);
     [[noreturn]]
-    void handleChild(const char *filename, char * const argv[], os::Pipes_t & startPipe, bool writePidToStartPipe,
+    void handleChild(const char *filename, char * const argv[], os::Pipes_t & startPipe,
                      bool forwardStdin, bool forwardStdout, bool forwardStderr);
+    void doCall(const char *filename, char * const argv[],
+                    bool forwardStdin,
+                    bool forwardStdout,
+                    bool forwardStderr,
+                    bool detached);
+    void doCallWaitForSetup(const char *filename, char * const argv[],
+                    bool forwardStdin,
+                    bool forwardStdout,
+                    bool forwardStderr,
+                    bool detached);
+    void doFork(const char *filename, char * const argv[],
+                    bool forwardStdin,
+                    bool forwardStdout,
+                    bool forwardStderr,
+                    bool detached,
+                    os::Pipes_t &startPipe);
+
 
     pid_t m_lastPid;
     bool m_asRealUser;
@@ -66,6 +87,9 @@ private:
     bool m_lastCallWasDetached;
     char** m_environ;
     bool m_inNewSid;
+    bool m_waitForSetup;
+    bool m_lastCallWaitedForSetup;
+    std::function< void()> m_callbackAsChild;
 };
 
 
