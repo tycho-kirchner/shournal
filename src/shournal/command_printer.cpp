@@ -20,10 +20,17 @@
 
 using translation::TrSnippets;
 
+static QString buildRestorePath(){
+    return
+      pathJoinFilename(
+        QStandardPaths::writableLocation(QStandardPaths::TempLocation),
+        TrSnippets::instance().shournalRestore + "-" + os::getUserName<QString>()
+        );
+}
+
+
 CommandPrinter::CommandPrinter() :
-    m_restoreDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation) +
-                 QDir::separator() +
-                 TrSnippets::instance().shournalRestore + "-" + os::getUserName<QString>())
+    m_restoreDir(buildRestorePath())
 {}
 
 
@@ -49,8 +56,9 @@ void CommandPrinter::restoreReadFile_safe(const FileReadInfo &readInfo, const QS
 void CommandPrinter::restoreReadFile_safe(const FileReadInfo &readInfo, const QString &cmdIdStr,
                                   const QFile &openReadFile)
 {  
-    QDir fullDirPath(m_restoreDir.absoluteFilePath(qtr("command-id-") + cmdIdStr) + QDir::separator() +
-                  readInfo.path);
+    QDir fullDirPath(
+           pathJoinFilename(m_restoreDir.absoluteFilePath(qtr("command-id-") + cmdIdStr)
+                            ,readInfo.path));
 
     const QString failMsg(qtr("Failed to restore read file with id %1:").arg(readInfo.idInDb));
     try {

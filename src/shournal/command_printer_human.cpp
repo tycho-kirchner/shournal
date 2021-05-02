@@ -125,6 +125,10 @@ CommandPrinterHuman::printReadFileEventEvtlRestore(QFormattedStream& s,
                                                    const FileReadInfo& readInfo,
                                                    const QString &cmdIdStr){
     s.setLineStart(m_indentlvl2);
+    s << pathJoinFilename(f.path, f.name)
+      << "(" + m_userStrConv.bytesToHuman(f.size) + ")"
+      << qtr("Hash:") << ((f.hash.isNull()) ? "-" : QString::number(f.hash.value()))
+      << "id" << QString::number(f.idInDb) <<  + "\n";
     s << readInfo.path  + QDir::separator() + readInfo.name
       << "(" + m_userStrConv.bytesToHuman(readInfo.size) + ")" << "id" << QString::number(readInfo.idInDb) <<  + "\n";
     if(! readInfo.isStoredToDisk){
@@ -199,6 +203,7 @@ void CommandPrinterHuman::printWriteInfos(QFormattedStream &s, const FileWriteIn
             }
             break;
         }
+        s << pathJoinFilename(f.path, f.name)
         s << f.path  + QDir::separator() + f.name
           << "(" + m_userStrConv.bytesToHuman(f.size) + ")"
           << qtr("Hash:") << ((f.hash.isNull()) ? "-" : QString::number(f.hash.value()))

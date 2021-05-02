@@ -7,7 +7,7 @@
 void FileWriteInfo::write(QJsonObject &json) const
 {
     json["id"] = idInDb;
-    json["path"] = path + QDir::separator() + name;
+    json["path"] = pathJoinFilename(path, name);
     json["size"] = size;
     json["mtime"] = QJsonValue::fromVariant(mtime);
     json["hash"] = QJsonValue::fromVariant(QVariant::fromValue(hash));
@@ -31,7 +31,7 @@ FileWriteInfo::operator==(const FileWriteInfo &rhs) const
 void FileReadInfo::write(QJsonObject &json) const
 {
     json["id"] = idInDb;
-    json["path"] = path + QDir::separator() + name;
+    json["path"] = pathJoinFilename(path, name);
     json["size"] = size;
     json["mtime"] = QJsonValue::fromVariant(mtime);
     // Note: in case of a non-null hash, this results in a quoted string.

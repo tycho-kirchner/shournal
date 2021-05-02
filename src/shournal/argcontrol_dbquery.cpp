@@ -315,7 +315,7 @@ void argcontol_dbquery::parse(int argc, char *argv[])
             QIErr() << qtr("Restore directory %1 does not exist.").arg(restoreDir.absolutePath());
             cpp_exit(1);
         }
-        restoreDir.setPath(restoreDir.absolutePath() + QDir::separator() + trSnips.shournalRestore);
+        restoreDir.setPath(pathJoinFilename(restoreDir.absolutePath(), trSnips.shournalRestore));
         cmdPrinter->setRestoreDir(restoreDir);
     }  
 

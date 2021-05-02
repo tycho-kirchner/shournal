@@ -39,7 +39,8 @@ QString StoredFiles::mkPathStringToStoredReadFile(const FileReadInfo &info)
 
 QString StoredFiles::mkPathStringToStoredReadFile(qint64 idInDb)
 {
-    return StoredFiles::getReadFilesDir() + QDir::separator() + QString::number(idInDb);
+    return
+      pathJoinFilename(StoredFiles::getReadFilesDir(), QString::number(idInDb));
 }
 
 bool StoredFiles::deleteReadFile(const QString &fname)

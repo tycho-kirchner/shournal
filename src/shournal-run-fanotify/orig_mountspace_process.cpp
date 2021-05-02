@@ -30,9 +30,9 @@ namespace  {
 const char* LOCK = "_LOCK";
 
 QString userPidPath(){
-    return QStandardPaths::writableLocation(QStandardPaths::TempLocation) +
-            "/" + app::SHOURNAL + "-orig-mountnamespace-"
-            + os::getUserName<QString>() ;
+    return pathJoinFilename(QStandardPaths::writableLocation(QStandardPaths::TempLocation),
+            QString(app::SHOURNAL) + "-orig-mountnamespace-"
+            + os::getUserName<QString>()) ;
 
 }
 
