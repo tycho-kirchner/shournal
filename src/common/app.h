@@ -7,7 +7,6 @@ namespace app {
 const extern char* CURRENT_NAME;
 const extern char* SHOURNAL;
 const extern char* SHOURNAL_RUN;
-const extern char* SHOURNALK_DKMS;
 const extern char* SHOURNAL_RUN_FANOTIFY;
 const extern char* MSENTER_ONLY_GROUP;
 const extern char* ENV_VAR_SOCKET_NB;

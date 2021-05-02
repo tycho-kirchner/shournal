@@ -61,7 +61,7 @@ ShournalkControl::ShournalkControl()
         throw ExcShournalk(qtr("Version mismatch - %1 version is %2, but "
                                "%3 version is %4")
                            .arg(app::SHOURNAL_RUN).arg(SHOURNAL_VERSION)
-                           .arg(app::SHOURNALK_DKMS).arg(kversion.ver_str)
+                           .arg("kernel-module").arg(kversion.ver_str)
                            );
     }
 

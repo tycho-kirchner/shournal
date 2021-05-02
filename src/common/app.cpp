@@ -19,7 +19,6 @@ static_assert (false, "SHOURNAL_MSENTERGROUP not defined");
 const char* app::CURRENT_NAME = "UNDEFINED";
 const char* app::SHOURNAL = "shournal";
 const char* app::SHOURNAL_RUN = "shournal-run";
-const char* app::SHOURNALK_DKMS = "shournalk-dkms";
 const char* app::SHOURNAL_RUN_FANOTIFY = "shournal-run-fanotify";
 // groupnames should be smaller than 16 characters (portability).
 const char* app::MSENTER_ONLY_GROUP = SHOURNAL_MSENTERGROUP; // defined in cmake
