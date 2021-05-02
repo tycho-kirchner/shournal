@@ -7,19 +7,20 @@ include_directories(
     ../common/oscpp
     ../common/database
     ../common/qsqlthrow
+    ../../
     )
 
 
-add_executable(shournal-run
-    shournal-run.cpp # main
+add_executable(shournal-run-fanotify
+    shournal-run-fanotify.cpp # main
     fanotify_controller
-    filewatcher
-    mount_controller    
+    filewatcher_fan
+    mount_controller
     msenter
     orig_mountspace_process
     )
 
-target_link_libraries(shournal-run
+target_link_libraries(shournal-run-fanotify
     lib_shournal_common
     pthread
     uuid
@@ -28,7 +29,7 @@ target_link_libraries(shournal-run
 
 
 install(
-    TARGETS shournal-run
+    TARGETS shournal-run-fanotify
     RUNTIME DESTINATION bin
     PERMISSIONS SETUID
                 OWNER_READ OWNER_WRITE OWNER_EXECUTE
