@@ -147,8 +147,6 @@ add_library(lib_shournal_common_shared
     ${lib_shournal_common_files}
     )
 
-set_property(TARGET lib_shournal_common_shared PROPERTY POSITION_INDEPENDENT_CODE ON)
-hide_static_lib_symbols(lib_shournal_common_shared)
 
 target_link_libraries(lib_shournal_common PUBLIC
     Qt5::Sql
