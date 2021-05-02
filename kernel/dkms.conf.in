@@ -1,0 +1,7 @@
+PACKAGE_NAME="shournalk"
+PACKAGE_VERSION="${shournal_version}"
+CLEAN="make clean"
+MAKE[0]="make all KVER=$kernelver shournal_version=$PACKAGE_VERSION"
+BUILT_MODULE_NAME[0]="shournalk"
+DEST_MODULE_LOCATION[0]="/updates/dkms"
+AUTOINSTALL="yes"
