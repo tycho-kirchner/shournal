@@ -1,0 +1,19 @@
+# No shebang, we are appended as needed!
+
+set -e
+
+DKMS_NAME=shournalk
+DKMS_VERSION="${shournal_version}"
+
+case "$1" in
+    remove|upgrade|deconfigure)
+      if [  "$(dkms status -m $DKMS_NAME -v $DKMS_VERSION)" ]; then
+         dkms remove -m $DKMS_NAME -v $DKMS_VERSION --all
+      fi
+    ;;
+esac
+
+
+
+
+exit 0

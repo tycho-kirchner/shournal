@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+getent group ${MSENTER_GROUPNAME} || groupadd ${MSENTER_GROUPNAME}
+getent group ${GROUPNAME_SHOURNALK} || groupadd ${GROUPNAME_SHOURNALK}
+
+# do not call exit, this file might be appended to..

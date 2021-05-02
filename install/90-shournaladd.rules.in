@@ -1,0 +1,1 @@
+ACTION=="add", KERNEL=="shournalk_ctrl", RUN="/bin/sh -c 'test -f /etc/shournal.d/kgroup && read -r ___kgrp < /etc/shournal.d/kgroup || ___kgrp=${GROUPNAME_SHOURNALK}; chgrp $___kgrp /sys%p/mark'"

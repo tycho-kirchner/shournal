@@ -1,0 +1,40 @@
+# No shebang, we are appended as needed!
+
+# Copyright (C) 2002-2005 Flavio Stanchina
+# Copyright (C) 2005-2006 Aric Cyr
+# Copyright (C) 2007 Mario Limonciello
+# Copyright (C) 2009 Alberto Milone
+
+# Copyright (C) 2021 Tycho Kirchner: modified to fit shournal's needs
+
+
+DKMS_NAME=shournalk # name of the kernel module
+DKMS_PACKAGE_NAME=shournal # we bundle the dkms package inside shournal for easy installation.
+DKMS_VERSION="${shournal_version}"
+
+postinst_found=0
+
+case "$1" in
+	configure)
+		for DKMS_POSTINST in /usr/lib/dkms/common.postinst /usr/share/$DKMS_PACKAGE_NAME/postinst; do
+			if [ -f $DKMS_POSTINST ]; then
+				$DKMS_POSTINST $DKMS_NAME $DKMS_VERSION /usr/share/$DKMS_PACKAGE_NAME "" $2
+				postinst_found=1
+				break
+			fi
+		done
+		if [ "$postinst_found" -eq 1 ]; then
+			# Don't modprobe -r shournalk - we don't want to disturb running processes.
+			modprobe shournalk || :
+		else
+			echo "ERROR: DKMS version is too old and $DKMS_PACKAGE_NAME was not"
+			echo "built with legacy DKMS support."
+			echo "You must either rebuild $DKMS_PACKAGE_NAME with legacy postinst"
+			echo "support or upgrade DKMS to a more current version."
+			exit 1
+		fi
+	;;
+esac
+
+exit 0
+

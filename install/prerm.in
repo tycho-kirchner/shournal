@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+
+# This file is intentionally left blank for consistency with
+# postinst-dkms
+
+# do not call exit, this file might be appended to..
