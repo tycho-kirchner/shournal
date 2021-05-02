@@ -2,7 +2,7 @@
 
 #include <QString>
 
-#include "../exccommon.h"
+#include "exccommon.h"
 
 namespace qsimplecfg {
 

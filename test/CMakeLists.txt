@@ -36,8 +36,6 @@ add_test(NAME tests COMMAND runTests)
 target_link_libraries(runTests
     Qt5::Test
     lib_shournal_common
-    lib_qformattedstream
-    lib_qsimplecfg
     )
 
 

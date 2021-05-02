@@ -16,9 +16,7 @@
 
 using RawValues_t = QOptArg::RawValues_t;
 
-namespace  {
-
-
+namespace {
 
 /// Consume the next arguments according to the found trigger (if any).
 /// Store the found values in arg

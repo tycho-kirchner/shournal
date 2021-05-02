@@ -4,7 +4,7 @@
 #include <QString>
 #include <QHash>
 
-#include "../util.h"
+#include "util.h"
 
 /// Allow the consumption of multiple commandline arguments, in case
 /// a trigger word is given. Example:

@@ -3,7 +3,7 @@
 #include <QVector>
 
 #include "qoptarg.h"
-#include "database/compareoperator.h"
+#include "compareoperator.h"
 
 
 class QOptSqlArg : public QOptArg

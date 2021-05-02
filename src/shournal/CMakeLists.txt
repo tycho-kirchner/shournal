@@ -1,15 +1,5 @@
 
 
-include_directories(
-    ../common
-    ../common/qoptargparse
-    ../common/database
-    ../common/qsimplecfg
-    ../common/oscpp
-    ../common/database
-    ../common/qsqlthrow
-    )
-
 add_executable(${PROJECT_NAME} ../../html-export/dist/htmlexportres.qrc
     shournal.cpp # main
     argcontrol_dbdelete
