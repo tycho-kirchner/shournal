@@ -11,16 +11,13 @@
 #include "autotest.h"
 #include "helper_for_test.h"
 
-// #include "fdcontrol.h"
 #include "util.h"
 #include "os.h"
 #include "osutil.h"
-
 #include "settings.h"
-
+#include "stdiocpp.h"
 
 #include "fileeventhandler.h"
-#include "fileeventtypes.h"
 
 
 /// Write the content of buf to fd, let
@@ -38,15 +35,16 @@ void writeCompareBuf(const std::string & buf,
     lseek(fd, 0, SEEK_SET);
 
     uint64_t correctHash = XXH64(hasStr.c_str(), hasStr.size(), 0 );
-    fEventHandler.writeEvents().fseekToBegin();
-    FileWriteEvent* e = fEventHandler.writeEvents().read();
+
+    stdiocpp::fseek(fEventHandler.fileEvents().file(), 0 , SEEK_SET);
+    FileEvent* e = fEventHandler.fileEvents().read();
     QVERIFY(e != nullptr);
 
     auto path = osutil::findPathOfFd<std::string>(fd);
     //QIErr() << "std::string(e.fullPath), path" << QString(e.fullPath) << QString::fromStdString(path);
-    QCOMPARE(std::string(e->fullPath), path);
-    QVERIFY(! e->hashIsNull);
-    QCOMPARE(correctHash, e->hash);
+    QCOMPARE(std::string(e->path()), path);
+    QVERIFY(! e->hash().isNull());
+    QCOMPARE(correctHash, e->hash().value());
 }
 
 class FileEventHandlerTest : public QObject {

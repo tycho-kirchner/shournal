@@ -102,12 +102,14 @@ private slots:
         QVERIFY(! tree.isSubPath("/"));
         QVERIFY(! tree.isSubPath("/home"));
 
-        tree.insert("/home/user");
+        tree.insert("/home/user1");
+        tree.insert("/home/user2");
         QVERIFY(! tree.isSubPath("/home"));
-        QVERIFY(! tree.isSubPath("/home/user", false));
-        QVERIFY( tree.isSubPath("/home/user", true));
-        QVERIFY( tree.isSubPath("/home/user/foo", false));
-        QVERIFY( tree.isSubPath("/home/user/foo", true));
+        QVERIFY(! tree.isSubPath("/home/user1", false));
+        QVERIFY( tree.isSubPath("/home/user1", true));
+        QVERIFY( tree.isSubPath("/home/user1/foo", false));
+        QVERIFY( tree.isSubPath("/home/user1/foo", true));
+        QVERIFY(! tree.isSubPath("/home/nouser/foo", true));
 
         // special case root
         PathTree tree2;

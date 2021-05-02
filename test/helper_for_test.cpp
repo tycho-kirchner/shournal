@@ -80,6 +80,22 @@ void testhelper::writeStringToFile(const QString &filepath, const QString &str)
     stream << str;
 }
 
+/// Write repeated string pattern of len to the file at path
+void testhelper::writeStuffToFile(const QString &fpath, int len){
+    const QByteArray stuff("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+    QFileThrow f(fpath);
+    f.open(QFile::WriteOnly | QFile::Text);
+    for(int i=0; i < len / stuff.size(); i++){
+        f.write(stuff);
+    }
+    int rest = len % stuff.size();
+    if(rest){
+        auto stuffrest = QByteArray::fromRawData(stuff, rest);
+        f.write(stuffrest);
+    }
+
+}
+
 QString testhelper::readStringFromFile(const QString &fpath)
 {
     QFileThrow f(fpath);
@@ -87,7 +103,31 @@ QString testhelper::readStringFromFile(const QString &fpath)
 
     QTextStream stream(&f);
     return stream.readAll();
-
 }
 
 
+bool testhelper::copyRecursively(const QString &srcFilePath,
+                                 const QString &tgtFilePath)
+{
+    QFileInfo srcFileInfo(srcFilePath);
+    if (srcFileInfo.isDir()) {
+        QDir targetDir(tgtFilePath);
+        targetDir.cdUp();
+        if (!targetDir.mkdir(QFileInfo(tgtFilePath).fileName()))
+            return false;
+        QDir sourceDir(srcFilePath);
+        QStringList fileNames = sourceDir.entryList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
+        foreach (const QString &fileName, fileNames) {
+            const QString newSrcFilePath
+                    = srcFilePath + QLatin1Char('/') + fileName;
+            const QString newTgtFilePath
+                    = tgtFilePath + QLatin1Char('/') + fileName;
+            if (!copyRecursively(newSrcFilePath, newTgtFilePath))
+                return false;
+        }
+    } else {
+        if (!QFile::copy(srcFilePath, tgtFilePath))
+            return false;
+    }
+    return true;
+}

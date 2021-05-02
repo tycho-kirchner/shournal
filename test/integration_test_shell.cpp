@@ -157,6 +157,19 @@ private slots:
         auto tmpDirNoLeadingSlash(tmpDirPath);
         tmpDirNoLeadingSlash.erase(tmpDirNoLeadingSlash.begin());
 
+        auto r510 = pTmpDir->path() + "/510";
+        testhelper::writeStuffToFile(r510, 510);
+
+        auto r4096 = pTmpDir->path() + "/4096";
+        testhelper::writeStuffToFile(r4096, 4096);
+
+        auto r21567 = pTmpDir->path() + "/21567";
+        testhelper::writeStuffToFile(r21567, 21567);
+
+        auto r101978 = pTmpDir->path() + "/101978";
+        testhelper::writeStuffToFile(r101978, 101978);
+
+
         std::string filepath = tmpDirPath + "/f1";
         std::vector<std::string> cmds {
                     "echo '%' > " + filepath, // percent unveiled a printf format bug in shournal 0.7
@@ -179,6 +192,11 @@ private slots:
                     "cd " + tmpDirPath + "; echo hi > ../" + splitAbsPath(tmpDirPath).second + "/f1",
                     // special case root dir
                     "cd /; echo hi > " + tmpDirNoLeadingSlash + "/f1",
+                    // test also if partial hashing works for bigger files
+                    "cat " + r510.toStdString() + " > " + filepath,
+                    "cat " + r4096.toStdString() + " > " + filepath,
+                    "cat " + r21567.toStdString() + " > " + filepath,
+                    "cat " + r101978.toStdString() + " > " + filepath,
         };
 
         const auto setupCmd = AutoTest::globals().integrationSetupCommand;

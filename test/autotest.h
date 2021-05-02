@@ -112,7 +112,7 @@ inline int run(int argc, char *argv[])
 
     if(argIntegrationTest.wasParsed()){
         os::setenv<QByteArray>("_SHOURNAL_IN_INTEGRATION_TEST_MODE", "true");
-        app::setupNameAndVersion();
+        app::setupNameAndVersion("shournal-integration-test");
         if(! app::inIntegrationTestMode()){
             QIErr() << "Failed to enable integration test mode.";
             exit(1);

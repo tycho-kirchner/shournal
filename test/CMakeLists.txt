@@ -1,17 +1,20 @@
 
 
 include_directories(
+    ../kernel
     ../src/common
     ../src/common/qsimplecfg
     ../src/common/oscpp
+    ../src/common/util
     ../src/common/qsqlthrow
     )
 
 enable_testing()
 
 
-
 find_package(Qt5Test REQUIRED)
+
+add_definitions( -DSHOURNALTEST_SQLITE_v_2_2="${CMAKE_CURRENT_SOURCE_DIR}/sqlite_sample_db_v2_2")
 
 add_executable(runTests
     main
@@ -28,7 +31,6 @@ add_executable(runTests
     test_util
     integration_test_shell
     helper_for_test
-
 )
 
 add_test(NAME tests COMMAND runTests)

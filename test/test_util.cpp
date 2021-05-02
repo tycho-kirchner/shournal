@@ -41,6 +41,11 @@ private slots:
 
     }
 
+    void testPathJoinFilename(){
+        QVERIFY(pathJoinFilename(QString("/"), QString("foo")) == "/foo");
+        QVERIFY(pathJoinFilename(QString("/home/foo"), QString("bar")) == "/home/foo/bar");
+    }
+
 
 };
 
