@@ -1,11 +1,15 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "stdiocpp.h"
 #include "util.h"
 #include "translation.h"
 #include "os.h"
+
 
 stdiocpp::QExcStdio::QExcStdio
 (QString text, const FILE *file, bool collectErrno, bool collectStacktrace) :
@@ -24,6 +28,38 @@ stdiocpp::QExcStdio::QExcStdio
 
 }
 
+/// Create an unnamed temp-file respecting
+/// env-variable TMPDIR (other than the canonical
+/// tmpfile(3)).
+FILE *stdiocpp::tmpfile(int o_flags __attribute__ ((unused)))
+{
+    QByteArray p(QDir::tempPath().toUtf8());
+    // tmpfs and possibly other filesystems do not suppot O_TMPFILE, for
+    // the sake of simplicity just use mkostemp.
+#if false
+//#ifdef O_TMPFILE
+    int fd = os::open(p, O_RDWR | O_TMPFILE | O_EXCL | o_flags, true, S_IRUSR | S_IWUSR);
+#else
+    p = pathJoinFilename(p, QByteArray("tmp.XXXXXX"));
+    int fd = ::mkostemp(p.data(), O_CLOEXEC);
+    if (fd < 0) {
+        throw QExcStdio(QString("mkstemp %1 failed: ")
+                        .arg(p.constData()), nullptr, true);
+    }
+    if(remove(p) < 0){
+        fprintf(stderr, "%s: failed to delete the just created file %s - %s\n",
+                __func__, p.constData(), strerror(errno));
+    }
+#endif
+    try {
+        return stdiocpp::fdopen(fd, "w+");
+    } catch (const QExcStdio&) {
+        close(fd);
+        throw ;
+    }
+
+}
+
 FILE *stdiocpp::fopen(const char *pathname, const char *mode)
 {
     FILE* f = ::fopen(pathname, mode);
@@ -33,6 +69,16 @@ FILE *stdiocpp::fopen(const char *pathname, const char *mode)
     }
     return f;
 }
+
+FILE *stdiocpp::fdopen(int fd, const char *mode){
+    FILE* f = ::fdopen(fd, mode);
+    if(f == nullptr ){
+        throw QExcStdio(QString("Cannot open fd with mode %2: ")
+                        .arg(mode), nullptr, true);
+    }
+    return f;
+}
+
 
 void stdiocpp::fclose(FILE *stream)
 {
@@ -78,10 +124,19 @@ int stdiocpp::fseek(FILE *stream, long offset, int whence)
 {
     int new_offset = ::fseek(stream, offset, whence);
     if(new_offset == -1){
-        throw QExcStdio("fseek failed: ", nullptr, true);
+        throw QExcStdio("fseek failed: ", stream, true);
     }
     return new_offset;
 }
+
+long int stdiocpp::ftell(FILE *stream){
+    long int offset = ::ftell(stream);
+    if(offset == -1){
+        throw QExcStdio("ftell failed: ", stream, true);
+    }
+    return offset;
+}
+
 
 
 /// Warning: not threadsafe.

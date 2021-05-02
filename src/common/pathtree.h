@@ -106,6 +106,8 @@ public:
     void printDbg();
 
 
+    const std::unordered_set<StrLight>& allPaths() const;
+
 private:
     static const char sep = '/';
 

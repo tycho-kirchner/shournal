@@ -49,20 +49,20 @@ void onterminate() {
 }
 
 [[noreturn]]
-void execShournalRun(QOptArg::RawValues_t &cargs, bool withinOrigMountspace,
+void execShournalRun(const QByteArray& backendFilename,
+                     QOptArg::RawValues_t &cargs, bool withinOrigMountspace,
                      QOptArg &argVerbosity, QOptArg &argExecFilename);
 
 
 int shournal_main(int argc, char *argv[])
 {
-    QIErr::setPreambleCallback([]() { return QString(app::SHOURNAL) + ": "; });
-    app::setupNameAndVersion();
+    app::setupNameAndVersion(app::SHOURNAL);
 
     if(! translation::init()){
         QIErr() << "Failed to initialize translation";
     }
 
-    logger::setup(app::SHOURNAL);
+    logger::setup(app::CURRENT_NAME);
 
     std::set_terminate(onterminate);
     if(! shournal_common_init()){
@@ -83,8 +83,14 @@ int shournal_main(int argc, char *argv[])
     QOptArg argVersion("v", "version", qtr("Display version"), false);
     parser.addArg(&argVersion);
 
-    QOptArg argExec("e", "exec", qtr("Execute and observe the passed program "
-                                     "and its arguments (this argument has to be last)."), false);
+    QOptArg argExec("e", "exec",
+                    qtr("Execute and observe the passed program "
+                        "and its arguments (this argument has to be last). "
+                        "All further parameters starting with a minus "
+                        "are considered options for the shournal-run* backend until "
+                        "the first command (not starting with a minus) occurs, e.g.\n"
+                        "shournal -e --print-summary echo foobar\n"
+                        "-> --print-summary is an argument for shournal-run."), false);
     argExec.setFinalizeFlag(true);
     parser.addArg(&argExec);
 
@@ -96,7 +102,17 @@ int shournal_main(int argc, char *argv[])
                                                      "argument is provided, that filename "
                                                      "is used instead of argv[0]"));
     parser.addArg(&argExecFilename);
-    argExecFilename.addRequiredArg(&argExec);    
+    argExecFilename.addRequiredArg(&argExec);
+
+
+    QOptArg argBackend("", "backend-filename",
+                       qtr("When executing a command (option %1) use "
+                           "the given filename as observation backend-command")
+                           .arg(argExec.name()));
+    parser.addArg(&argBackend);
+    argBackend.addRequiredArg(&argExec);
+
+
 
     QOptArg argMsenterOrig("", "msenter-orig-mountspace",
                            qtr("Must be passed along with '%1'. Execute the "
@@ -161,7 +177,18 @@ int shournal_main(int argc, char *argv[])
         }
 
         if(argExec.wasParsed()){
-            execShournalRun(parser.rest(), argMsenterOrig.wasParsed(), argVerbosity,
+            auto backendFilename = argBackend.getValue<QString>();
+            if(backendFilename.isEmpty()){
+                backendFilename = Settings::instance().chooseShournalRunBackend();
+                if(backendFilename.isEmpty()){
+                    QIErr() << qtr("No backend-filename given and no valid "
+                                   "backend found - exiting...");
+                    cpp_exit(1);
+                }
+            }
+            execShournalRun(backendFilename.toLocal8Bit(),
+                            parser.rest(), argMsenterOrig.wasParsed(),
+                            argVerbosity,
                             argExecFilename);
         }
 
@@ -235,14 +262,15 @@ int shournal_main(int argc, char *argv[])
 
 
 
-void execShournalRun(QOptArg::RawValues_t& cargs , bool withinOrigMountspace,
+void execShournalRun(const QByteArray& backendFilename,
+                     QOptArg::RawValues_t& cargs , bool withinOrigMountspace,
                      QOptArg& argVerbosity, QOptArg& argExecFilename){
     // setuid-programs change some parts of the environment for security reasons.
     // Therefor, pass the environment via argv and apply it later (after setuid
     // to original user)
 
     QVarLengthArray<const char*, 8192> args;
-    args.push_back(app::SHOURNAL_RUN);
+    args.push_back(backendFilename);
     if(withinOrigMountspace){
         args.push_back("--msenter-orig-mountspace");
     }
@@ -252,6 +280,11 @@ void execShournalRun(QOptArg::RawValues_t& cargs , bool withinOrigMountspace,
         args.push_back("--verbosity");
         verbosityStr = argVerbosity.getValue<QByteArray>();
         args.push_back(verbosityStr.constData());
+    }
+    const char* tmpdir = getenv("TMPDIR");
+    if(tmpdir != nullptr){
+        args.push_back("--tmpdir");
+        args.push_back(tmpdir);
     }
 
     args.push_back("--env");
@@ -271,8 +304,15 @@ void execShournalRun(QOptArg::RawValues_t& cargs , bool withinOrigMountspace,
         args.push_back(argExecFilename.vals().argv[0]);
     }
 
-    args.push_back("--exec");
+    // As long as arguments start with a minus those
+    // are passed as options to the shournal-run backend, e.g.
+    // shournal-run -e --no-db --print-summary echo ok
+    bool exec_pushed = false;
     for(int i=0; i < cargs.len; i++){
+        if(! exec_pushed && cargs.argv[i][0] != '-'){
+            args.push_back("--exec");
+            exec_pushed = true;
+        }
         args.push_back(cargs.argv[i]);
     }
 

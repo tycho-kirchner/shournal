@@ -122,16 +122,14 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
 
 void
 CommandPrinterHuman::printReadFileEventEvtlRestore(QFormattedStream& s,
-                                                   const FileReadInfo& readInfo,
+                                                   const FileReadInfo& f,
                                                    const QString &cmdIdStr){
     s.setLineStart(m_indentlvl2);
     s << pathJoinFilename(f.path, f.name)
       << "(" + m_userStrConv.bytesToHuman(f.size) + ")"
       << qtr("Hash:") << ((f.hash.isNull()) ? "-" : QString::number(f.hash.value()))
       << "id" << QString::number(f.idInDb) <<  + "\n";
-    s << readInfo.path  + QDir::separator() + readInfo.name
-      << "(" + m_userStrConv.bytesToHuman(readInfo.size) + ")" << "id" << QString::number(readInfo.idInDb) <<  + "\n";
-    if(! readInfo.isStoredToDisk){
+    if(! f.isStoredToDisk){
         // since shournal 2.1 it is possible to log only meta-information about
         // read files without storing them in the read files dir.
         return;
@@ -141,27 +139,27 @@ CommandPrinterHuman::printReadFileEventEvtlRestore(QFormattedStream& s,
     }
 
     bool printFileContentSuccess {false};
-    QFileThrow f(m_storedFiles.mkPathStringToStoredReadFile(readInfo));
+    QFileThrow file(m_storedFiles.mkPathStringToStoredReadFile(f));
     try {
-        f.open(QFile::OpenModeFlag::ReadOnly);
-        auto mtype = m_mimedb.mimeTypeForData(&f);
+        file.open(QFile::OpenModeFlag::ReadOnly);
+        auto mtype = m_mimedb.mimeTypeForData(&file);
         s.setLineStart(m_indentlvl3);
         if(! mtype.inherits("text/plain")){
             s << qtr("Not printing content (mimetype %1)").arg(mtype.name()) << "\n";
             return;
         }
-        printReadFile(s, f);
+        printReadFile(s, file);
         printFileContentSuccess = true;
 
         if(m_restoreReadFiles){
-            restoreReadFile_safe(readInfo, cmdIdStr, f);
+            restoreReadFile_safe(f, cmdIdStr, file);
         }
     } catch (const QExcIo& e) {
         if(printFileContentSuccess){
             logWarning << e.what();
         } else {
             logWarning << qtr("Error while printing read file '%1' with id %2: %3")
-                          .arg(readInfo.name).arg(readInfo.idInDb).arg(e.descrip());
+                          .arg(f.name).arg(f.idInDb).arg(e.descrip());
         }
         return;
     }
@@ -204,7 +202,6 @@ void CommandPrinterHuman::printWriteInfos(QFormattedStream &s, const FileWriteIn
             break;
         }
         s << pathJoinFilename(f.path, f.name)
-        s << f.path  + QDir::separator() + f.name
           << "(" + m_userStrConv.bytesToHuman(f.size) + ")"
           << qtr("Hash:") << ((f.hash.isNull()) ? "-" : QString::number(f.hash.value()))
           << "\n";

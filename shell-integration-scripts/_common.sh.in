@@ -1,0 +1,4 @@
+
+# variables auto-filled by cmake
+_shournal_version="${shournal_version}"
+export SHOURNAL_PATH_LIB_SHELL_INTEGRATION="${full_path_libshournal}"

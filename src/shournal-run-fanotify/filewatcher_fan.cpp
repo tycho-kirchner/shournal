@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <sys/prctl.h>
 #include <sys/capability.h>
+#include <syscall.h>
 #include <linux/securebits.h>
 
 #include <QHostInfo>
@@ -14,7 +15,7 @@
 #include <thread>
 #include <future>
 
-#include "filewatcher.h"
+#include "filewatcher_fan.h"
 #include "fanotify_controller.h"
 #include "mount_controller.h"
 #include "os.h"
@@ -39,10 +40,13 @@
 #include "cpp_exit.h"
 #include "qfilethrow.h"
 #include "storedfiles.h"
+#include "sys_ioprio.h"
 #include "qoutstream.h"
 #include "conversions.h"
 #include "socket_message.h"
+#include "shournal_run_common.h"
 #include "stdiocpp.h"
+#include "kernel/shournalk_user.h"
 
 using socket_message::E_SocketMsg;
 using SocketMessages = fdcommunication::SocketCommunication::Messages;
@@ -52,6 +56,7 @@ using osutil::closeVerbose;
 const int PRIO_FANOTIFY_POLL = 2;
 const int PRIO_DATABASE_FLUSH = 10;
 
+
 static void unshareOrDie(){
     try {
         os::unshare( CLONE_NEWNS);
@@ -60,7 +65,7 @@ static void unshareOrDie(){
         if(os::geteuid() != 0){
             logCritical << qtr("Note that the effective userid is not 0 (root), so most probably %1 "
                                "does not have the setuid-bit set. As root execute:\n"
-                               "chown root %1 && chmod u+s %1").arg(app::SHOURNAL_RUN);
+                               "chown root %1 && chmod u+s %1").arg(app::CURRENT_NAME);
         }
         cpp_exit(1);
     }
@@ -135,6 +140,30 @@ void FileWatcher::setupShellLogger()
     m_shellLogger.setup();
 }
 
+std::shared_ptr<FileEventHandler> FileWatcher::createFileEventHandler()
+{
+    // fevent-handler sets up a temp dir in constructor - use user privileges.
+    // ld.so clears TMPDIR from the envirnoment of suid-binaries for security reasons,
+    // so set it temporarily:
+    assert(os::geteuid() == os::getuid());
+    static const char* TMPDIR = "TMPDIR";
+
+    const char* oldTmp = getenv(TMPDIR);
+    auto resetTmpDir = finally([&oldTmp] {
+        if(oldTmp == nullptr)
+            unsetenv(TMPDIR);
+        else
+            os::setenv(TMPDIR, oldTmp);
+
+    }, false);
+
+    if(! m_tmpDir.isEmpty()){
+        os::setenv(TMPDIR, m_tmpDir.constData());
+        resetTmpDir.setEnabled(true);
+    }
+    return std::make_shared<FileEventHandler>();
+}
+
 
 /// Unshare the mount-namespace and mark the interesting mounts with fanotify according
 /// to the paths specified in settings.
@@ -150,7 +179,7 @@ void FileWatcher::run()
     m_msenterGid = findMsenterGidOrDie();
     orig_mountspace_process::setupIfNotExist();
 
-    unshareOrDie();    
+    unshareOrDie();
     auto fanotifyCtrl = FanotifyController_ptr(new FanotifyController);
 
     // We process events (filedescriptor-receive- and fanotify-events) with the
@@ -158,17 +187,17 @@ void FileWatcher::run()
     // only the owner has read permission, usually fail for
     // root in case of NFS-storages. See also man 5 exports, look for 'root squashing'.
     os::seteuid(m_realUid);
-    // fevent-handler sets up a temp dir in constructor - use user privileged
-    m_fEventHandler = std::make_shared<FileEventHandler>();
+
+    m_fEventHandler = createFileEventHandler();
     fanotifyCtrl->setFileEventHandler(m_fEventHandler);
     fanotifyCtrl->setupPaths();
 
-    // We are indeed a non-interactive SCHED_BATCH-job
-    struct sched_param sched{};
-    sched.sched_priority = 0;
-    if(sched_setscheduler(getpid(), SCHED_BATCH | SCHED_RESET_ON_FORK, &sched) == -1){
-        logInfo << __FILE__ << "sched_setscheduler failed" << translation::strerror_l(errno) ;
-    }
+    // maybe_todo: change scheduler?
+    // struct sched_param sched{};
+    // sched.sched_priority = 0;
+    // if(sched_setscheduler(getpid(), SCHED_BATCH | SCHED_RESET_ON_FORK, &sched) == -1){
+    //     logInfo << __FILE__ << "sched_setscheduler failed" << translation::strerror_l(errno) ;
+    // }
 
     CommandInfo cmdInfo =  CommandInfo::fromLocalEnv();
     cmdInfo.sessionInfo.uuid = m_shellSessionUUID;
@@ -195,7 +224,7 @@ void FileWatcher::run()
                                                                  : m_commandFilename;
         proc.call(cmdFilename, m_commandArgv);
         // *Must* be called after fork (resurce limits, etc.)
-        std::future<E_SocketMsg> thread = std::async(&FileWatcher::pollUntilStopped, this,
+        std::future<E_SocketMsg> thread = std::async(&FileWatcher::fan_pollUntilStopped, this,
                                                      std::ref(cmdInfo),
                                                      std::ref(fanotifyCtrl));
         try {
@@ -226,7 +255,7 @@ void FileWatcher::run()
         m_sockCom.sendMsg({int(E_SocketMsg::SETUP_DONE),
                            qBytesFromVar(msenterChildRet.pid), rootDirFd});
 
-        pollResult = pollUntilStopped(cmdInfo, fanotifyCtrl);
+        pollResult = fan_pollUntilStopped(cmdInfo, fanotifyCtrl);
         ret = 0;
     } else {
         pollResult = E_SocketMsg::ENUM_END;
@@ -236,6 +265,7 @@ void FileWatcher::run()
     cmdInfo.endTime = QDateTime::currentDateTime();
     logDebug << "polling finished - about to cleanup and exit";
 
+    auto fanOveflowCount = fanotifyCtrl->getOverflowCount();
     fanotifyCtrl.reset();
 
     switch (pollResult) {
@@ -263,6 +293,26 @@ void FileWatcher::run()
     }
     if(! missingFields.isEmpty()){
         logDebug << "The following fields are empty: " << missingFields.join(", ");
+    }
+
+    if(m_printSummary){
+        auto & fevents = m_fEventHandler->fileEvents();
+        QString overflowEvents = (fanOveflowCount)
+                ? ">= " + QString::number(fanOveflowCount)
+                : "0";
+        QErr() << qtr("=== %1 summary ===\n"
+                      "number of write-events: %2\n"
+                      "number of read-events: %3\n"
+                      "number of lost events: %4\n"
+                      "number of stored read files: %5\n"
+                      "size of tmp-file: %6\n")
+                  .arg(app::CURRENT_NAME)
+                  .arg(fevents.wEventCount())
+                  .arg(fevents.rEventCount())
+                  .arg(overflowEvents)
+                  .arg(fevents.rStoredFilesCount())
+                  .arg(Conversions().bytesToHuman(
+                           os::fstat(fileno(fevents.file())).st_size));
     }
 
     if(m_storeToDatabase){
@@ -301,6 +351,17 @@ void FileWatcher::setStoreToDatabase(bool storeToDatabase)
 {
     m_storeToDatabase = storeToDatabase;
 }
+
+void FileWatcher::setPrintSummary(bool printSummary)
+{
+    m_printSummary = printSummary;
+}
+
+void FileWatcher::setTmpDir(const QByteArray &tmpDir)
+{
+    m_tmpDir = tmpDir;
+}
+
 
 void FileWatcher::setCommandFilename(char *commandFilename)
 {
@@ -347,6 +408,8 @@ E_SocketMsg FileWatcher::processSocketEvent( CommandInfo& cmdInfo ){
 
         case E_SocketMsg::CLEAR_EVENTS:
             m_fEventHandler->clearEvents();
+            // maybe_todo: also clear fanotify overflow events
+            // (which occurred very unlikely in this case)
             cmdInfo.startTime = QDateTime::currentDateTime();
             break;
         default: {
@@ -370,23 +433,17 @@ void FileWatcher::flushToDisk(CommandInfo& cmdInfo){
     try {
         cmdInfo.idInDb = db_controller::addCommand(cmdInfo);
         StoredFiles::mkpath();
-        m_fEventHandler->writeEvents().fseekToBegin();
-        m_fEventHandler->readEvents().fseekToBegin();
-
-        db_controller::addFileEvents(cmdInfo, m_fEventHandler->writeEvents(),
-                                     m_fEventHandler->readEvents() );
+        stdiocpp::fseek(m_fEventHandler->fileEvents().file(), 0, SEEK_SET);
+        db_controller::addFileEvents(cmdInfo, m_fEventHandler->fileEvents());
     } catch (std::exception& e) {
         // May happen, e.g. if we run out of disk space...
-        // We discard events anyway, so this error will not happen too soon again...
         logCritical << qtr("Failed to store (some) file-events to disk: %1").arg(e.what());
     }
 }
 
-
-
 /// @return: EMPTY, if stopped regulary
 ///          ENUM_END in case of an error
-E_SocketMsg FileWatcher::pollUntilStopped(CommandInfo& cmdInfo,
+E_SocketMsg FileWatcher::fan_pollUntilStopped(CommandInfo& cmdInfo,
                              FanotifyController_ptr& fanotifyCtrl){
 
     // To allow for more fanotify-events read at a time, increase
@@ -416,6 +473,11 @@ E_SocketMsg FileWatcher::pollUntilStopped(CommandInfo& cmdInfo,
     auto resetPriority = finally([] {
         os::setpriority(PRIO_PROCESS, 0, 0);
     });
+
+    if(syscall(SYS_ioprio_set, IOPRIO_WHO_PROCESS, 0,
+               IOPRIO_PRIO_VALUE(IOPRIO_CLASS_IDLE, 6))){
+        logWarning << "Failed to set io-priority:" << strerror(errno);
+    }
 
     int poll_num;
     const nfds_t nfds = 2;

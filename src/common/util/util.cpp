@@ -1,5 +1,4 @@
 
-
 #include <uuid/uuid.h>
 #include <QFileInfo>
 #include <QDir>
@@ -99,7 +98,7 @@ QString absPath(const QString &path)
     }
     QFileInfo inf(path);
     QString abs = inf.absoluteFilePath();
-    if(abs.endsWith(QDir::separator())){
+    if(abs.endsWith("/")){
         abs = abs.left(abs.length() - 1);
     }
     return abs;

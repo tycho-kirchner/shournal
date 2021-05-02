@@ -7,6 +7,8 @@
 
 #define GET_VARIABLE_NAME(Variable) (#Variable)
 
+#include <assert.h>
+
 #include <QtGlobal>
 #include <QObject>
 #include <QVariant>
@@ -59,6 +61,7 @@ Q_DECLARE_METATYPE(StrLight)
 
 bool shournal_common_init();
 
+#if QT_VERSION < QT_VERSION_CHECK (5, 14, 0)
 namespace std {
 
 /// Make QString hashable in stl-containers
@@ -68,6 +71,7 @@ template<> struct hash<QString> {
     }
 };
 }
+#endif
 
 StrLight toStrLight(const QString& str);
 
@@ -285,13 +289,26 @@ QPair<T, T> splitAbsPath(const T& path){
         return pair;
     }
     if(lastSlash == 0){
-        pair.first = '/';
+        pair.first = "/";
         pair.second = (path.mid(1));
         return pair;
     }
     pair.first = path.left(lastSlash);
     pair.second = path.mid(lastSlash + 1);
     return pair;
+}
+
+
+template<typename T>
+T pathJoinFilename(const T& path, const T& filename){
+    assert(path.size() != 0);
+    assert(filename.size() != 0);
+
+    // special case root
+    if(path == "/"){
+        return path + filename;
+    }
+    return path + "/" + filename;
 }
 
 /// @overload

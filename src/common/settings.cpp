@@ -24,11 +24,12 @@
 using Section_Ptr = qsimplecfg::Cfg::Section_Ptr;
 using qsimplecfg::ExcCfg;
 using StringSet = Settings::StringSet;
-
+using std::numeric_limits;
 
 const char* Settings::SECT_READ_NAME {"File read-events"};
 const char* Settings::SECT_READ_KEY_ENABLE {"enable"};
 const char* Settings::SECT_READ_KEY_INCLUDE_PATHS {"include_paths"};
+
 
 const char* Settings::SECT_SCRIPTS_NAME {"File read-events storage settings"};
 const char* Settings::SECT_SCRIPTS_ENABLE {"enable"};
@@ -55,13 +56,18 @@ const QStringList &Settings::defaultIgnoreCmds()
     return vals;
 }
 
+QString Settings::cfgAppDir()
+{
+    // don't make path static -> mutliple test cases...
+    return
+       pathJoinFilename(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation),
+                        QCoreApplication::applicationName());
+}
 
 QString Settings::cfgFilepath()
 {
-    // don't make p static -> mutliple test cases...
-    QString p(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)
-              + '/' + QCoreApplication::applicationName() + '/' + "config.ini");
-    return p;
+    // don't make path static -> mutliple test cases...
+    return cfgAppDir() + "/config.ini";
 }
 
 // was in use until shournal 2.1, then migrated
@@ -313,6 +319,24 @@ void Settings::loadSectWrite()
                 sectWriteEvents, "exclude_paths", true, {});
     cleanExcludePaths(m_wSettings.includePaths, hiddenPaths, m_wSettings.excludePaths,
                          sectWriteEvents->sectionName());
+
+    bool insertMaxEventCount;
+    uint32_t maxEventCount;
+    if(m_parsedCfgVersion < QVersionNumber{2,4}){
+        // Backwards compatibility: old versions did not impose
+        // an event limit
+        insertMaxEventCount = true;
+        maxEventCount = 0;
+    } else {
+        insertMaxEventCount = false;
+        maxEventCount = 5000;
+    }
+    m_wSettings.maxEventCount = sectWriteEvents->getValue<uint32_t>(
+                "max_event_count", maxEventCount, insertMaxEventCount);
+    m_wSettings.maxEventCount = (m_wSettings.maxEventCount == 0) ?
+                                    numeric_limits<uint64_t>::max() :
+                                    m_wSettings.maxEventCount;
+
     // maybe_todo: also record write events (not only closewrite)
     // - make it configurable -> test it...
     m_wSettings.onlyClosedWrite = true;
@@ -340,6 +364,23 @@ void Settings::loadSectRead()
                 sectReadEvents, "exclude_paths", true, {});
     cleanExcludePaths(m_rSettings.includePaths, hiddenPaths, m_rSettings.excludePaths,
                          sectReadEvents->sectionName());
+
+    bool insertMaxEventCount;
+    uint32_t maxEventCount;
+    if(m_parsedCfgVersion < QVersionNumber{2,4}){
+        // Backwards compatibility: older versions did not impose
+        // an event limit
+        insertMaxEventCount = true;
+        maxEventCount = 0;
+    } else {
+        insertMaxEventCount = false;
+        maxEventCount = 5000;
+    }
+    m_rSettings.maxEventCount = sectReadEvents->getValue<uint32_t>(
+                "max_event_count", maxEventCount, insertMaxEventCount);
+    m_rSettings.maxEventCount = (m_rSettings.maxEventCount == 0) ?
+                                    numeric_limits<uint64_t>::max() :
+                                    m_rSettings.maxEventCount;
 }
 
 void Settings::loadSectScriptFiles()
@@ -351,9 +392,8 @@ void Settings::loadSectScriptFiles()
                     "by the observed command, shall be stored within "
                     "%1's database.\n"
                     "The maximal filesize may have units such as KiB, MiB, etc.. "
-                    "Don't specify huge values here, because, at least for a short "
-                    "time, the file is stored in RAM.\n"
-                    "You can specify file-extensions or mime-types to match desired "
+                    "You can specify file-extensions or mime-types "
+                    "(only with the fanotify-backend) to match desired "
                     "file-types, e.g. sh (without leading dot!) or application/x-shellscript. "
                     "The following rules apply: if both are unset, "
                     "accept all file-types (not recommended), if one of the "
@@ -406,7 +446,8 @@ void Settings::loadSectIgnoreCmd()
     const QString sect_ignore_cmds_commands = "commands";
 
     sectIgnoreCmd->setComments(qtr(
-                      "Only applies to the shell-integration.\n"
+                      "Only applies to the shell-integration and the\n"
+                      "fanotify backend!\n"
                       "Exclude specific commands from observation. "
                       "The (optional) path to the commands must not contain whitepaces "
                       "(create a symlink and import that PATH, if necessary). "
@@ -441,6 +482,7 @@ void Settings::loadSectMount()
     const QString sect_mount_ignore = "exclude_paths";
 
     sectMount->setComments(qtr(
+                           "Only applies to the fanotify backend!"
                            "Ignore sub-mount-paths from observation. "
                            "This is typically only needed, if "
                            "you don't have permissions on some "
@@ -484,15 +526,17 @@ void Settings::loadSectHash()
     m_hashSettings.hashEnable = sectHash->getValue<bool>(sect_hash_enable, true, true);
     // Exclude negative values by using uint
     m_hashSettings.hashMeta.chunkSize = static_cast<HashMeta::size_type>(
-                sectHash->getValue<uint>(sect_hash_chunksize, 4096, true));
+                sectHash->getValue<uint>(sect_hash_chunksize, 256, true));
     m_hashSettings.hashMeta.maxCountOfReads = static_cast<HashMeta::size_type>(
-                sectHash->getValue<uint>(sect_hash_maxCountReads, 20, true));
+                sectHash->getValue<uint>(sect_hash_maxCountReads, 3, true));
     if(m_hashSettings.hashEnable){
+        // TODO: also limit maxCountOfReads -> see kernel module
+
         if(m_hashSettings.hashMeta.chunkSize < 8 ||
                 m_hashSettings.hashMeta.chunkSize > 1024 * 40 ||
                 m_hashSettings.hashMeta.maxCountOfReads < 1){
             throw ExcCfg(qtr("Invalid hashsettings. Must be:"
-                             " 8 >= %1 <= 40KiB  and %2 < 1")
+                             " 8 >= %1 <= 40KiB  and %2 > 1")
                          .arg(sect_hash_chunksize, sect_hash_maxCountReads));
         }
     }
@@ -625,10 +669,12 @@ void Settings::load()
 
     bool cfgFileExisted = parseCfgIfExists(cfgPath);
     bool cfgVersionNeedsUpdate = false;
+    m_parsedCfgVersion = app::version() ;
     if(cfgFileExisted){
         // do we need a version update?
         auto readVerRet = readVersion(cfgVersionFile);
         if(readVerRet.ver != app::version()){
+            m_parsedCfgVersion = readVerRet.ver;
             cfgVersionNeedsUpdate = true;
             handleUnequalVersions(readVerRet);
         }
@@ -656,7 +702,48 @@ void Settings::load()
     m_settingsLoaded = true;
 }
 
+/// Select which backend to choose based on local/global
+/// config files and availability (search $PATH).
+/// @return app::SHOURNAL_RUN, app::SHOURNAL_RUN_FANOTIFY or an
+/// empty string if not found.
+QString Settings::chooseShournalRunBackend()
+{
+    auto appname = QCoreApplication::applicationName();
+    const QString localPath(cfgAppDir() + "/backend");
+    const QString globalPath = "/etc/shournal.d/backend";
+    QString selectedPath;
 
+    if(QFile::exists(localPath)){
+        selectedPath = localPath;
+    } else if(QFile::exists(globalPath)){
+        selectedPath = globalPath;
+    }
+
+    if(! selectedPath.isEmpty()){
+        // load backend from file
+        QFileThrow backendCfgFile(selectedPath);
+        backendCfgFile.open(QFile::OpenModeFlag::ReadOnly);
+        QTextStream s(&backendCfgFile);
+        auto backendStr =  s.readLine();
+        if(backendStr == "ko") {
+            return app::SHOURNAL_RUN;
+        }
+        if(backendStr == "fanotify") {
+            return app::SHOURNAL_RUN_FANOTIFY;
+        }
+        logWarning << qtr("Invalid backend %1 at file %2 - "
+                          "supported options: [fanotify, ko]. "
+                          "Using defaults...").arg(backendStr, selectedPath);
+    }
+
+   if( ! QStandardPaths::findExecutable(app::SHOURNAL_RUN).isEmpty())
+       return app::SHOURNAL_RUN;
+
+   if( ! QStandardPaths::findExecutable(app::SHOURNAL_RUN_FANOTIFY).isEmpty())
+       return app::SHOURNAL_RUN_FANOTIFY;
+
+   return {};
+}
 
 
 const Settings::StrLightSet &Settings::getMountIgnorePaths()

@@ -31,6 +31,8 @@ public:
 
 
     void setStoreToDatabase(bool storeToDatabase);
+    void setPrintSummary(bool printSummary);
+    void setTmpDir(const QByteArray &tmpDir);
 
 private:
     struct MsenterChildReturnValue {
@@ -46,6 +48,7 @@ private:
     int m_sockFd;
     logger::LogRotate m_shellLogger;
     std::shared_ptr<FileEventHandler> m_fEventHandler;
+    QByteArray m_tmpDir;
     gid_t m_msenterGid;
     fdcommunication::SocketCommunication m_sockCom;
     QByteArray m_shellSessionUUID;
@@ -54,11 +57,13 @@ private:
     char **m_commandArgv;
     char ** m_commandEnvp;
     uid_t m_realUid;
+    bool m_printSummary{};
     fdcommunication::SocketCommunication::Messages m_sockMessages;
     bool m_storeToDatabase;
 
+    std::shared_ptr<FileEventHandler> createFileEventHandler();
     MsenterChildReturnValue setupMsenterTargetChildProcess();
-    socket_message::E_SocketMsg pollUntilStopped(CommandInfo& cmdInfo,
+    socket_message::E_SocketMsg fan_pollUntilStopped(CommandInfo& cmdInfo,
                                  FanotifyController_ptr& fanotifyCtrl);
     socket_message::E_SocketMsg processSocketEvent( CommandInfo& cmdInfo );
     void flushToDisk(CommandInfo& cmdInfo);

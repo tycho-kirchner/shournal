@@ -14,8 +14,9 @@ public:
                        bool collectStacktrace=true);
 };
 
-
+FILE* tmpfile(int o_flags=0);
 FILE *fopen(const char *pathname, const char *mode);
+FILE *fdopen(int fd, const char *mode);
 void fclose(FILE *stream);
 int fgetc_unlocked(FILE *stream);
 
@@ -25,6 +26,8 @@ void fflush(FILE *stream);
 size_t fread_unlocked(void *ptr, size_t size, size_t n,
                              FILE *stream);
 int fseek(FILE *stream, long offset, int whence);
+
+long int ftell(FILE *stream);
 void ftruncate_unlocked(FILE* stream);
 
 } // namespace stdiocpp

@@ -8,25 +8,27 @@
 #include <climits>
 #include <QtDebug>
 
-#include "fileeventhandler.h"
-#include "settings.h"
-#include "osutil.h"
+#include "app.h"
 #include "excos.h"
-#include "os.h"
+#include "fileeventhandler.h"
 #include "logger.h"
+#include "osutil.h"
 #include "os.h"
 #include "qfddummydevice.h"
 #include "qoutstream.h"
-#include "app.h"
+#include "settings.h"
+#include "stdiocpp.h"
 #include "strlight_util.h"
 
-
+static QString buildFilecacheDir(){
+    return
+       pathJoinFilename(QDir::tempPath(),
+          QString(app::SHOURNAL_RUN) + "-cache-" + QString::number(os::getpid()));
+}
 
 /// meant to be called as real user within the original mount namespace
 FileEventHandler::FileEventHandler() :
-    m_filecacheDir(QDir::tempPath() + '/' + app::SHOURNAL_RUN + "-cache-" + QString::number(os::getpid())),
-    m_writeEvents(m_filecacheDir.path().toUtf8()),
-    m_readEvents(m_filecacheDir.path().toUtf8()),
+    m_filecacheDir(buildFilecacheDir()),
     m_uid(os::getuid()),
     m_ourProcFdDirDescriptor(os::open("/proc/self/fd", O_DIRECTORY)),
     m_pathbuf(PATH_MAX + 1, '\0'),
@@ -36,15 +38,21 @@ FileEventHandler::FileEventHandler() :
     r_scriptCfg(Settings::instance().readEventScriptSettings()),
     r_hashCfg(Settings::instance().hashSettings())
 {
+    FILE* f = stdiocpp::fopen(
+                pathJoinFilename(m_filecacheDir.path().toUtf8(),
+                                 QByteArray("file-events")), "w+");
+    m_fileEvents.setFile(f);
+
     this->fillAllowedGroups();
     if(r_hashCfg.hashEnable){
         // This is typically larger than maxCountOfReads*chunkSize
         // but does not have to be.
-        m_hashControl.getXXHash().reserveBufSize(1024*512);
+        m_hashControl.getXXHash().resizeBuf(1024*512);
     }
 }
 
 FileEventHandler::~FileEventHandler(){
+    fclose(m_fileEvents.file());
     try {
         os::close(m_ourProcFdDirDescriptor);
     } catch (const os::ExcOs& e) {
@@ -155,20 +163,13 @@ QString FileEventHandler::getTmpDirPath() const
 
 void FileEventHandler::clearEvents()
 {
-    m_writeEvents.clear();
-    m_readEvents.clear();
+    m_fileEvents.clear();
 }
 
-FileWriteEvents &FileEventHandler::writeEvents()
+FileEvents &FileEventHandler::fileEvents()
 {
-    return m_writeEvents;
+    return m_fileEvents;
 }
-
-FileReadEvents &FileEventHandler::readEvents()
-{
-    return m_readEvents;
-}
-
 
 /// @param enableReadActions: if false, do not read from fd, regardless of settings
 /// @throws ExcOs, CXXHashError
@@ -208,12 +209,19 @@ void FileEventHandler::handleCloseWrite(int fd)
         return;
     }
 
+    if(m_fileEvents.wEventCount() >= r_wCfg.maxEventCount){
+        logDebug << "closedwrite-event dropped:"
+                 << m_pathbuf;
+        m_fileEvents.incrementDropCount(O_WRONLY);
+        return;
+    }
+
     HashValue hash;
     if(r_hashCfg.hashEnable){
         hash =  m_hashControl.genPartlyHash(fd, st.st_size,
                                                        r_hashCfg.hashMeta);
     }
-    m_writeEvents.write(m_pathbuf, st, hash);
+    m_fileEvents.write(O_WRONLY, m_pathbuf, st, hash);
 
     logDebug << "closedwrite-event recorded: "
              << m_pathbuf;
@@ -268,7 +276,7 @@ FileEventHandler::scriptReadSettingsSayLogIt(bool userHasWritePerm,
     }
     // repeat check here: fanotify-read-events are only unregistered, if
     // general read events are disabled...
-    if(m_readEvents.getStoredFilesCounter() >= r_scriptCfg.maxCountOfFiles){
+    if(m_fileEvents.rStoredFilesCount() >= r_scriptCfg.maxCountOfFiles){
         logDebug << "possible script-event ignored: already collected enough files:"
                  << fpath;
         return false;
@@ -344,6 +352,12 @@ void FileEventHandler::handleCloseRead(int fd)
     if(! logGeneralReadEvent && ! logScriptEvent){
         return;
     }
+    if(m_fileEvents.rEventCount() >= r_rCfg.maxEventCount){
+        logDebug << "closedread-event dropped:"
+                 << m_pathbuf;
+        m_fileEvents.incrementDropCount(O_RDONLY);
+        return;
+    }
 
     HashValue hash;
     if(r_hashCfg.hashEnable){
@@ -351,11 +365,15 @@ void FileEventHandler::handleCloseRead(int fd)
         hash =  m_hashControl.genPartlyHash(fd, st.st_size,
                                                        r_hashCfg.hashMeta);
     }
+    int storeFd;
     if(logScriptEvent){
         assert(os::ltell(fd) == 0);
+        storeFd = fd;
+    } else {
+        storeFd = -1;
     }
 
-    m_readEvents.write(m_pathbuf, st, hash, fd, logScriptEvent);
+    m_fileEvents.write(O_RDONLY, m_pathbuf, st, hash, storeFd);
 
     logDebug << "closedread-event recorded (collect script:" << logScriptEvent << ")"
              << m_pathbuf;

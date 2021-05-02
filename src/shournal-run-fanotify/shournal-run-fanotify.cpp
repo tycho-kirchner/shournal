@@ -11,7 +11,7 @@
 #include "excoptargparse.h"
 #include "os.h"
 #include "excos.h"
-#include "filewatcher.h"
+#include "filewatcher_fan.h"
 #include "msenter.h"
 #include "logger.h"
 #include "fdcommunication.h"
@@ -80,11 +80,9 @@ int shournal_run_main(int argc, char *argv[])
     for(int s : os::catchableTermSignals()){
         os::signal(s, [](int){});
     }
-    QIErr::setPreambleCallback([]() { return QString(app::SHOURNAL_RUN) + ": "; });
-
-    // Using app::NAME for several common paths (database, config) used
-    // by QStandardPaths but app::NAME_RUN for others (log-filename)
-    app::setupNameAndVersion();
+    // Using app::SHOURNAL for several common paths (database, config) used
+    // by QStandardPaths but app::CURRENT_NAME for others (log-filename)
+    app::setupNameAndVersion(app::SHOURNAL_RUN_FANOTIFY);
 
     if(! translation::init()){
         logWarning << "Failed to initialize translation";
@@ -92,12 +90,12 @@ int shournal_run_main(int argc, char *argv[])
     if(os::geteuid() != 0){
         QIErr() << qtr("%1 seems to lack the suid-bit (SETUID) for root. You can correct "
                        "that by\n"
-                       "chown root %1 && chmod u+s %1").arg(app::SHOURNAL_RUN);
+                       "chown root %1 && chmod u+s %1").arg(app::CURRENT_NAME);
         // but continue to allow for e.g. msenter-orig to exec the process anyway...
     }
 
 
-    logger::setup(app::SHOURNAL_RUN);
+    logger::setup(app::CURRENT_NAME);
 
     std::set_terminate(onterminate);
 
@@ -110,7 +108,8 @@ int shournal_run_main(int argc, char *argv[])
     --argc;
     ++argv;
     QOptArgParse parser;
-    parser.setHelpIntroduction(qtr("Observation backend for <%1>. Not meant to be called by users directly, "
+    parser.setHelpIntroduction(qtr("Observation backend for <%1>. "
+                                   "Not meant to be called by users directly, "
                                    "you would rather call %1 without trailing '-run'."
                                       ).arg(app::SHOURNAL) + "\n");
     QOptArg argVersion("v", "version", qtr("Display version"), false);
@@ -147,10 +146,20 @@ int shournal_run_main(int argc, char *argv[])
                                         "must be the string 'SHOURNAL_DUMMY_NULL=1'"));
     parser.addArg(&argEnv);
 
+    QOptArg argTmpDir("", "tmpdir",
+                      qtr("Use the given TMPDIR (for non security-relevant stuff). "
+                          "As a setuid binary some variables are cleared from "
+                          "the environment (see also man 8 ld.so)"));
+    // We expect to be called by the binary 'shournal' or the
+    // shell integration, which both pass $TMPDIR using --tmpdir, so no need
+    // to make it public.
+    argTmpDir.setInternalOnly(true);
+    parser.addArg(&argTmpDir);
+
     QOptArg argMsenter("", "msenter", qtr("<pid>. Must be passed along with '%1'. Execute the "
                                           "given command in an existing mountspace which was "
                                           "previously created via %2 %1")
-                            .arg(argExec.name(), app::SHOURNAL_RUN));
+                            .arg(argExec.name(), app::CURRENT_NAME));
     argMsenter.addRequiredArg(&argExec);
     parser.addArg(&argMsenter);
 
@@ -158,7 +167,7 @@ int shournal_run_main(int argc, char *argv[])
                            qtr("Must be passed along with '%1'. Execute the "
                                "given command in the 'original' mount-namespace "
                                "created the first time %2 observed a process.")
-                            .arg(argExec.name(), app::SHOURNAL_RUN), false);
+                            .arg(argExec.name(), app::CURRENT_NAME), false);
     argMsenterOrig.addRequiredArg(&argExec);
     parser.addArg(&argMsenterOrig);
 
@@ -178,6 +187,11 @@ int shournal_run_main(int argc, char *argv[])
     QOptArg argNoDb("", "no-db", qtr("For debug purposes: do not write to"
                                      "database after event processing"), false);
     parser.addArg(&argNoDb);
+
+    QOptArg argPrintSummary("", "print-summary",
+                         qtr("Print a short summary after "
+                             "event processing finished."), false);
+    parser.addArg(&argPrintSummary);
 
     try {
         parser.parse(argc, argv);
@@ -222,7 +236,7 @@ int shournal_run_main(int argc, char *argv[])
         }
 
         if(argVersion.wasParsed()){
-            QOut() << app::SHOURNAL_RUN << qtr(" version ") << app::version().toString() << "\n";
+            QOut() << app::CURRENT_NAME << qtr(" version ") << app::version().toString() << "\n";
             cpp_exit(0);
         }
 
@@ -232,7 +246,7 @@ int shournal_run_main(int argc, char *argv[])
             // we forgot to make shournal suid...
             bool weAreAnotheUser = os::geteuid() != os::getuid();
             if(weAreAnotheUser) os::seteuid(os::getuid());
-            logger::enableLogToFile(app::SHOURNAL_RUN);
+            logger::enableLogToFile(app::CURRENT_NAME);
             if(weAreAnotheUser) os::seteuid(0);
             orig_mountspace_process::msenterOrig(cmdFilename, cmdArgv, cmdEnv);
             // never get here
@@ -250,17 +264,19 @@ int shournal_run_main(int argc, char *argv[])
             // if not necessary!)
             fwatcher.setCommandFilename(argExecFilename.vals().argv[0]);
         }
-        if(argNoDb.wasParsed()){
-            fwatcher.setStoreToDatabase(false);
+        if(argTmpDir.wasParsed()){
+            fwatcher.setTmpDir(argTmpDir.getValue<QByteArray>());
         }
 
+        fwatcher.setStoreToDatabase(! argNoDb.wasParsed());
+        fwatcher.setPrintSummary(argPrintSummary.wasParsed());
 
         // load settings as real user (this is a setuid-program)
         // also enable logging already, *before* possibly unsharing the
         // mount-namespace.
         os::seteuid(os::getuid());
         try {
-            logger::enableLogToFile(app::SHOURNAL_RUN);
+            logger::enableLogToFile(app::CURRENT_NAME);
             Settings::instance().load();
             StoredFiles::mkpath();
         } catch(const qsimplecfg::ExcCfg & ex){
@@ -296,8 +312,6 @@ int shournal_run_main(int argc, char *argv[])
             fwatcher.setArgv(externCmd.argv, externCmd.len);
             callFilewatcherSafe(fwatcher);
         }
-
-
 
         if(parser.rest().len != 0){
             QIErr() << qtr("Invalid parameters passed: %1.\n"

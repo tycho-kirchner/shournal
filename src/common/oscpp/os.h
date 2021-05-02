@@ -40,6 +40,10 @@ static const int DEFAULT_CREAT_FLAGS = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 extern const int OPEN_WRONLY;
 extern const int OPEN_RDONLY;
 extern const int OPEN_RDWR;
+extern const int OPEN_NONBLOCK;
+extern const int OPEN_EXCL;
+extern const int OPEN_CREAT;
+
 
 class ExcKernelVersionParse : public std::exception
 {
@@ -119,6 +123,7 @@ std::vector<std::string> ls(const std::string & dirname_,
 off_t lseek (int fd, off_t offset, int whence);
 off_t ltell(int fd);
 
+void mkfifo(const char *pathname, mode_t mode);
 void mkpath(std::string s, mode_t mode=0755);
 void mount (const std::string & source, const std::string &target,
           const char *fstype, unsigned long int rwflag,
@@ -167,14 +172,17 @@ size_t recvmsg (int fd, struct msghdr *message, int flags=0);
 template <class Str_t>
 void rename(const Str_t & old, const Str_t & new_);
 
+void rmdir(const char *path);
+
 size_t sendmsg (int fd, const struct msghdr *message,
             int flags=0);
 
-off_t sendfile(int out_fd, int in_fd, size_t count);
+off_t sendfile(int out_fd, int in_fd, size_t count, off_t offset=0);
 template <class Str_t>
 off_t sendfile(const Str_t& out_path, const Str_t& in_path, size_t count);
 
 void setFdDescriptorFlags(int fd, int flags);
+void setFdStatusFlags(int fd, int flags);
 
 void setgid (gid_t gid);
 void setgroups (const Groups & groups);
@@ -344,8 +352,8 @@ template <class Str_t>
 off_t os::sendfile(const Str_t& out_path, const Str_t& in_path, size_t count){
     int out_fd=-1, in_fd=-1;
     try {
-        int out_fd = os::open<Str_t>(out_path, os::OPEN_WRONLY);
-        int in_fd = os::open<Str_t>(in_path, os::OPEN_RDONLY);
+        out_fd = os::open<Str_t>(out_path, os::OPEN_WRONLY);
+        in_fd = os::open<Str_t>(in_path, os::OPEN_RDONLY);
         auto ret = os::sendfile(out_fd, in_fd, count);
         close(out_fd);
         close(in_fd);

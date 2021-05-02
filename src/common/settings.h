@@ -37,6 +37,7 @@ public:
         std::shared_ptr<PathTree> excludePaths;
         bool onlyClosedWrite {true};
         bool excludeHidden {true};
+        uint64_t maxEventCount{std::numeric_limits<uint64_t>::max()};
 
         Q_DISABLE_COPY(WriteFileSettings)
         DISABLE_MOVE(WriteFileSettings)
@@ -54,6 +55,7 @@ public:
         std::shared_ptr<PathTree> excludePaths;
         bool onlyWritable {true};
         bool excludeHidden {true};
+        uint64_t maxEventCount{std::numeric_limits<uint64_t>::max()};
 
         Q_DISABLE_COPY(ReadFileSettings)
         DISABLE_MOVE(ReadFileSettings)
@@ -90,12 +92,14 @@ public:
 
 public:
     void load();
+    QString chooseShournalRunBackend();
 
     const HashSettings& hashSettings() const;
     const WriteFileSettings& writeFileSettings() const;
     const ReadFileSettings& readFileSettings() const;
     const ScriptFileSettings& readEventScriptSettings() const;
 
+    QString cfgAppDir();
     QString cfgFilepath();
 
     const QStringList& defaultIgnoreCmds();
@@ -159,6 +163,7 @@ private:
     StringSet m_ignoreCmdsRegardlessOfArgs;
     const QString m_userHome { QDir::homePath() };
     const QString m_workingDir { QDir::currentPath() };
+    QVersionNumber m_parsedCfgVersion;
 
 private:
     // unit testing...

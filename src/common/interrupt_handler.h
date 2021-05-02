@@ -10,12 +10,15 @@
 class InterruptProtect
 {
 public:    
-    InterruptProtect();
+    InterruptProtect(int signum=SIGINT);
+    bool signalOccurred();
+
     ~InterruptProtect();
 
 public:
     Q_DISABLE_COPY(InterruptProtect)
 private:
     struct sigaction m_oldAct{};
+    int m_signum;
 };
 

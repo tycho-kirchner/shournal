@@ -94,10 +94,10 @@ void addPathsAndSubMountPaths(const std::shared_ptr<PathTree>& parentPaths,
                               const std::shared_ptr<PathTree>& allMountpaths,
                               StringSet& result){
     for(const auto& p : *parentPaths){
-        // TODO: avoid needless conversion
+        // maybe_todo: avoid needless conversion
         result.insert(p.c_str());
         for(auto mountIt = allMountpaths->subpathIter(p); mountIt != allMountpaths->end(); ++mountIt){
-            // TODO: avoid needless conversion
+            // maybe_todo: avoid needless conversion
             result.insert((*mountIt).constData());
         }
     }
@@ -112,7 +112,6 @@ void addPathsAndSubMountPaths(const std::shared_ptr<PathTree>& parentPaths,
 /// Initialize fanotify's filedescriptor (requires root)
 /// @throws ExcOs
 FanotifyController::FanotifyController() :
-    m_overflowOccurred(false),
     m_fanFd(-1),
     m_markLimitReached(false),
     m_ReadEventsUnregistered(false),
@@ -140,12 +139,6 @@ FanotifyController::~FanotifyController(){
 }
 
 
-
-
-bool FanotifyController::overflowOccurred() const
-{
-    return m_overflowOccurred;
-}
 
 int FanotifyController::fanFd() const
 {
@@ -304,7 +297,7 @@ bool FanotifyController::handleEvents()
             // integer).
             if (metadata->fd < 0) {
                 logWarning << "fanotify: queue overflow";
-                m_overflowOccurred = true;
+                m_overflowCount++;
             } else {
                 handleSingleEvent(*metadata);
                 ::close(metadata->fd);
@@ -324,7 +317,7 @@ void FanotifyController::handleSingleEvent(const struct fanotify_event_metadata&
     bool closed_nowrite = metadata.mask & FAN_CLOSE_NOWRITE;
     if(metadata.mask & FAN_Q_OVERFLOW){
         logWarning << "fanotify: queue overflow";
-        m_overflowOccurred = true;
+        m_overflowCount++;
     }
 
  #ifndef NDEBUG
@@ -436,7 +429,7 @@ void FanotifyController::handleCloseNoWrite_safe(const fanotify_event_metadata &
     }
     if(! r_rCfg.enable && // never unregister, if general read files are logged
          r_scriptCfg.enable &&
-            m_feventHandler->readEvents().getStoredFilesCounter() >=
+            m_feventHandler->fileEvents().rStoredFilesCount() >=
             r_scriptCfg.maxCountOfFiles) {
         unregisterAllReadPaths();
         m_ReadEventsUnregistered = true;
@@ -489,6 +482,11 @@ void FanotifyController::ignoreOwnPath(const QByteArray& p){
         logCritical << "fanotify_mark: failed to ignore our own path: "
                     << translation::strerror_l(errno);
     }
+}
+
+uint FanotifyController::getOverflowCount() const
+{
+    return m_overflowCount;
 }
 
 

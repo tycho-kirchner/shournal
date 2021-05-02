@@ -23,7 +23,8 @@ void dummySighandler(int){
 #endif
 
 
-InterruptProtect::InterruptProtect()
+InterruptProtect::InterruptProtect(int signum) :
+    m_signum(signum)
 {
     if(g_withinInterProtect){
         throw QExcProgramming(QString(__func__) + ": only one instance allowed per thread");
@@ -36,7 +37,12 @@ InterruptProtect::InterruptProtect()
     sigemptyset (&act.sa_mask);
     act.sa_flags = SA_RESTART;
 
-    os::sigaction(SIGINT, &act, &m_oldAct);
+    os::sigaction(m_signum, &act, &m_oldAct);
+}
+
+bool InterruptProtect::signalOccurred()
+{
+    return g_signalOccurred;
 }
 
 
@@ -44,14 +50,14 @@ InterruptProtect::~InterruptProtect()
 {    
     // restore previous handler
     try {
-        os::sigaction(SIGINT, &m_oldAct, nullptr);
+        os::sigaction(m_signum, &m_oldAct, nullptr);
     } catch (const os::ExcOs& e) {
         logCritical << e.what();
     }
     g_withinInterProtect = false;
 
     if(g_signalOccurred){
-        kill(getpid(), SIGINT);
+        kill(getpid(), m_signum);
     }
 
 

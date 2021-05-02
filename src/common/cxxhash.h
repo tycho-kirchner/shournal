@@ -8,6 +8,8 @@
 
 #include "xxhash.h"
 #include "strlight.h"
+#include "xxhash_common.h"
+
 
 /// A cpp interface around the needed c-functions of XXHASH and
 /// some other methods (digestFile).
@@ -27,18 +29,14 @@ public:
         int m_errorcode;
     };
 
-    struct DigestResult {
-        XXH64_hash_t hash;
-        off64_t countOfbytes;   // number of read bytes
-    };
 
     CXXHash();
     ~CXXHash();
 
-    void reserveBufSize(size_t n);
+    void resizeBuf(size_t n);
 
-    DigestResult digestWholeFile(int fd, int chunksize);
-    DigestResult digestFile(int fd, int chunksize, off64_t seekstep,
+    struct partial_xxhash_result digestWholeFile(int fd, int chunksize);
+    struct partial_xxhash_result digestFile(int fd, int chunksize, off64_t seekstep,
                             int maxCountOfReads=std::numeric_limits<int>::max());
 
 public:

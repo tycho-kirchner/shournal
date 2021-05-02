@@ -10,7 +10,7 @@
 
 #include "hashcontrol.h"
 #include "nullable_value.h"
-#include "fileeventtypes.h"
+#include "fileevents.h"
 #include "settings.h"
 #include "os.h"
 #include "strlight.h"
@@ -30,8 +30,8 @@ public:
     void handleCloseWrite(int fd);
     void handleCloseRead(int fd);
 
-    FileWriteEvents &writeEvents();
-    FileReadEvents &readEvents();
+    FileEvents& fileEvents();
+
     void clearEvents();
 
     QString getTmpDirPath() const;
@@ -39,6 +39,7 @@ public:
 public:
     Q_DISABLE_COPY(FileEventHandler)
     DISABLE_MOVE(FileEventHandler)
+
 
 private:
     void fillAllowedGroups();
@@ -61,8 +62,7 @@ private:
     bool pathIsHidden(const StrLight &fullPath);
 
     QTemporaryDir m_filecacheDir;
-    FileWriteEvents m_writeEvents;
-    FileReadEvents m_readEvents;
+    FileEvents m_fileEvents;
     HashControl m_hashControl;
     std::unordered_set<gid_t> m_groups;
     uid_t m_uid; // cached real uid

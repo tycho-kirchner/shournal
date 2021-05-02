@@ -18,15 +18,15 @@ public:
 
     bool handleEvents();
 
-    bool overflowOccurred() const;
-
     int fanFd() const;
 
     int getFanotifyMaxEventCount() const;
+    uint getOverflowCount() const;
 
 public:
     Q_DISABLE_COPY(FanotifyController)
     DISABLE_MOVE(FanotifyController)
+
 
 private:
 
@@ -38,7 +38,7 @@ private:
 
     std::shared_ptr<FileEventHandler> m_feventHandler;
 
-    bool m_overflowOccurred;
+    uint m_overflowCount{0};
     int m_fanFd;
     bool m_markLimitReached;
     bool m_ReadEventsUnregistered;

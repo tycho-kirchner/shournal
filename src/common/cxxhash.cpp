@@ -12,6 +12,7 @@ CXXHash::CXXHash() :
     m_pXXState(XXH64_createState())
 {
     assert(m_pXXState != nullptr);
+    m_buf.resize(sysconf(_SC_PAGESIZE));
 }
 
 CXXHash::~CXXHash()
@@ -19,7 +20,7 @@ CXXHash::~CXXHash()
     XXH64_freeState(m_pXXState);
 }
 
-void CXXHash::reserveBufSize(size_t n)
+void CXXHash::resizeBuf(size_t n)
 {
     assert(n > 0);
     m_buf.resize(n);
@@ -43,12 +44,32 @@ void CXXHash::update(const void *buffer, size_t len)
     }
 }
 
-CXXHash::DigestResult CXXHash::digestWholeFile(int fd, int chunksize)
+struct partial_xxhash_result CXXHash::digestWholeFile(int fd, int chunksize)
 {
     return this->digestFile(fd, chunksize, 0, std::numeric_limits<int>::max());
 }
 
+partial_xxhash_result CXXHash::digestFile(int fd, int chunksize,
+                                off64_t seekstep, int maxCountOfReads)
+{
+    struct partial_xxhash part_hash;
+    part_hash.xxh_state = m_pXXState;
+    part_hash.chunksize = chunksize;
+    part_hash.seekstep = seekstep;
+    part_hash.max_count_of_reads = maxCountOfReads;
+    part_hash.buf = m_buf.data();
+    part_hash.bufsize = m_buf.size();
 
+    struct partial_xxhash_result res;
+    auto ret = partial_xxh_digest_file(fd, &part_hash, &res);
+    if(ret != 0){
+        throw ExcCXXHash("digest failed: ", int(ret));
+    }
+    return res;
+}
+
+
+/*
 /// XXHASH-digest a whole file or parts of it at regular intervals.
 /// @param fd the fildescriptor of the file. Note that in general you would want
 ///           to make sure, that the offset is at 0. Note that the offset
@@ -125,6 +146,7 @@ CXXHash::DigestResult CXXHash::digestFile(int fd, int chunksize,
     res.hash = XXH64(m_buf.data(), bufRaw - m_buf.data(), 0 );
     return res;
 }
+*/
 
 
 CXXHash::ExcCXXHash::ExcCXXHash(const std::string &msg, int errorcode) :

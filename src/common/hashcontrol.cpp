@@ -9,13 +9,13 @@ HashValue HashControl::genPartlyHash(int fd, qint64 filesize, const HashMeta &ha
                                      bool resetOffset)
 {
     const off64_t seektstep = filesize / hashMeta.maxCountOfReads;
-    CXXHash::DigestResult hashRes = m_hash.digestFile(
+    auto hashRes = m_hash.digestFile(
                         fd,
                         hashMeta.chunkSize,
                         seektstep ,
                         hashMeta.maxCountOfReads);
     HashValue hashVal;
-    if(hashRes.countOfbytes > 0){
+    if(hashRes.count_of_bytes > 0){
         if(resetOffset){
             os::lseek(fd, 0, SEEK_SET);
         }

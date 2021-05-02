@@ -276,6 +276,11 @@ void PathTree::commonConstructor()
     m_rootNodeIsContained = false;
 }
 
+const std::unordered_set<StrLight> &PathTree::allPaths() const
+{
+    return m_allPaths;
+}
+
 
 void PathTree::printDbg()
 {
@@ -371,7 +376,6 @@ bool PathTree::isSubPath(const StrLight &path, bool allowEquals) const {
         }
         return path != '/';
     }
-
     m_rawbuftmp.setRawData(path.constData(), path.size());
     for(size_t s : m_orderedPathlenghts){
         if(s < path.size()){

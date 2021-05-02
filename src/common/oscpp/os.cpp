@@ -14,6 +14,7 @@
 #include <sys/sendfile.h>
 
 #include <cstdio>
+#include <cassert>
 
 #include <algorithm>
 #include <sstream>
@@ -29,6 +30,10 @@
 const int os::OPEN_WRONLY = O_WRONLY;
 const int os::OPEN_RDONLY = O_RDONLY;
 const int os::OPEN_RDWR = O_RDWR;
+const int os::OPEN_NONBLOCK = O_NONBLOCK;
+const int os::OPEN_CREAT = O_CREAT;
+const int os::OPEN_EXCL = O_EXCL;
+
 
 
 static bool& retryOnInterrupt(){
@@ -282,6 +287,12 @@ gid_t os::getsgid()
     return sgid;
 }
 
+void os::mkfifo(const char *pathname, mode_t mode){
+    if(::mkfifo(pathname, mode) == -1){
+        throw os::ExcOs(std::string("mkfifo ") + pathname + " failed");
+    }
+}
+
 /// aquivalent of 'mkdir -p' to create necessary
 /// parts of a path recursively
 void os::mkpath(std::string s, mode_t mode)
@@ -380,7 +391,7 @@ os::KernelVersion os::getKernelVersion()
          throw ExcOs("uname");
     }
     KernelVersion version;
-    int verIdx=0;
+    os::KernelVersion::size_type verIdx=0;
     std::string release = uname_.release;
     std::string currentNumber;
     for(const char c : release){
@@ -606,8 +617,17 @@ void os::setFdDescriptorFlags(int fd, int flags)
                     + " (flags " + std::to_string(flags) + ")"
                     );
     }
-
 }
+
+void os::setFdStatusFlags(int fd, int flags){
+    if(::fcntl(fd, F_SETFL, flags) == -1){
+        throw ExcOs(std::string(__func__) + " failed for fd "+
+                    std::to_string(fd)
+                    + " (flags " + std::to_string(flags) + ")"
+                    );
+    }
+}
+
 
 
 int os::dup(int oldfd){
@@ -763,6 +783,12 @@ void os::readlinkat(int dirfd, const char *filename, std::string &output){
     folly::resizeWithoutInitialization(output, static_cast<typename std::string::size_type>(path_len));
 }
 
+void os::rmdir(const char *path){
+    if (::rmdir(path) == -1 ){
+        throw ExcReadLink("rmdir failed for " + std::string(path));
+    }
+}
+
 /// @return the number of bytes send
 /// @throws ExcOs
 size_t os::sendmsg(int fd, const msghdr *message, int flags)
@@ -782,23 +808,23 @@ size_t os::sendmsg(int fd, const msghdr *message, int flags)
 
 }
 
-/// offset of in_fd is *not* modified, startoffset is always 0
+/// offset of in_fd is *not* modified
 /// @return number of sent bytes
-off_t os::sendfile(int out_fd, int in_fd, size_t count)
+off_t os::sendfile(int out_fd, int in_fd, size_t count, off_t offset)
 {
-    off_t offset=0;
-    auto sizeToSend = count;
+    ssize_t sizeToSend = count;
     while (true) {
         auto sent = ::sendfile(out_fd, in_fd, &offset, sizeToSend);
         if(sent == -1){
             throw ExcOs(std::string(__func__) + " failed");
         }
-        if(offset == static_cast<off_t>(count) || sent == 0){
+        sizeToSend -= static_cast<size_t>(sent);
+        assert(sizeToSend >= 0);
+        if(sizeToSend <= 0 || sent == 0){
             break;
         }
-        sizeToSend -= static_cast<size_t>(sent);
     }
-    return offset;
+    return count - sizeToSend;
 }
 
 /// returns the number of bytes received
