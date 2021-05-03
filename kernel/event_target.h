@@ -22,6 +22,7 @@ struct cred;
 struct file;
 struct kbuffered_file;
 struct pid_namespace;
+struct user_namespace;
 struct shournalk_mark_struct;
 struct dentry;
 
@@ -50,6 +51,7 @@ struct event_target {
 
     unsigned stored_files_count;
     struct pid_namespace *pid_ns; /* we only follow forks in same pid ns */
+    struct user_namespace* user_ns; /* of caller */
     struct mem_cgroup* memcg;     /* of caller */
     struct mm_struct* mm;         /* of caller */
 

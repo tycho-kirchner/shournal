@@ -13,6 +13,8 @@
 #include "event_target.h"
 #include "event_queue.h"
 #include "kutil.h"
+#include "tracepoint_helper.h"
+
 
 struct task_entry {
      struct task_struct* tsk;
@@ -306,7 +308,8 @@ void event_handler_fput(unsigned long ip __attribute__ ((unused)),
     struct event_target* event_target;
     struct file* file;
 
-    file = (struct file*)(SYSCALL_GET_FIRST_ARG(current, regs));
+    file = (struct file*)(SYSCALL_GET_FIRST_ARG(current,
+                                                tracepoint_helper_get_ftrace_regs(regs)));
 
     // Ideally we would ftrace fsnotify_close which is, however, inlined
     // (thus cannot be traced).

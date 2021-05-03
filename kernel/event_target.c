@@ -11,6 +11,7 @@
 #include <linux/cred.h>
 #include <linux/pipe_fs_i.h>
 #include <linux/circ_buf.h>
+#include <linux/user_namespace.h>
 
 #include "event_target.h"
 #include "kutil.h"
@@ -212,6 +213,7 @@ __event_target_create(struct file* target_file, struct file* pipe_w,
          goto error_out;
 
     t->pid_ns = pid_ns;
+    t->user_ns = current_user_ns();
     t->memcg = memcg;
     t->mm = mm;
     t->file = target_file_buffered;
@@ -245,6 +247,8 @@ __event_target_create(struct file* target_file, struct file* pipe_w,
     get_pid_ns(pid_ns);
     get_cred(current_cred());
     get_task_struct(current);
+    get_user_ns(t->user_ns);
+
 
     return t;
 
@@ -272,6 +276,7 @@ static void __event_target_free(struct event_target* t){
     kpathtree_cleanup(&t->script_includes);
     kpathtree_cleanup(&t->script_excludes);
 
+    put_user_ns(t->user_ns);
     put_pid_ns(t->pid_ns);
     mem_cgroup_put(t->memcg);
     if(t->mm){ mmdrop(t->mm); mmput(t->mm); }

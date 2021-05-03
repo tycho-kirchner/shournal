@@ -10,6 +10,7 @@
 #include <linux/fadvise.h>
 #include <linux/kthread.h>
 #include <linux/mmu_context.h>
+#include <asm/uaccess.h>
 
 
 #include "event_consumer.h"
@@ -526,12 +527,11 @@ void event_consumer_thread_setup(struct event_target* event_target){
     struct event_consumer* consumer = &event_target->event_consumer;
 
     if(event_target->mm) {
-
-        kthread_use_mm(event_target->mm);
-        // As of 37c54f9bd48663f7657a9178fe08c47e4f5b537b
-        // not strictly necessary, but should not hurt.
+#ifdef USE_MM_SET_FS_OFF
         consumer->consume_tsk_oldfs = get_fs();
         set_fs(USER_DS);
+#endif
+        kthread_use_mm(event_target->mm);
     }
 
     // use_mm() -> We want this kthread's page-cache memory allocations to account to
@@ -582,8 +582,10 @@ void event_consumer_thread_cleanup(struct event_target* event_target){
                             "current != consumer->consume_task");
     revert_creds(consumer->consume_task_orig_cred);
     if(event_target->mm){
-        set_fs(consumer->consume_tsk_oldfs);
         kthread_unuse_mm(event_target->mm);
+#ifdef USE_MM_SET_FS_OFF
+        set_fs(consumer->consume_tsk_oldfs);
+#endif
     }
 }
 
@@ -620,7 +622,8 @@ void close_event_consume(struct event_target* event_target, struct close_event* 
         pr_devel("ignore event, inode is NULL.\n");
         goto out;
     }
-    may_read =  inode_permission(inode, MAY_READ) == 0;
+    may_read =  kutil_inode_permission(
+                   event_target->user_ns, inode, MAY_READ) == 0;
     if(unlikely(! may_read)){
         // maybe the file event came from a setuid-program? Otherwise, the file
         // might be writable, but not readable. We ignore this special
@@ -629,7 +632,8 @@ void close_event_consume(struct event_target* event_target, struct close_event* 
         goto out;
     }
     // __dbg_print_event(event_target, close_event, "test");
-    may_write = inode_permission(inode, MAY_WRITE) == 0;
+    may_write = kutil_inode_permission(
+                  event_target->user_ns, inode, MAY_WRITE) == 0;
 
     // Just as fanotify does, we consider O_RDWR only
     // as write-event.

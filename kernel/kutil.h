@@ -150,12 +150,12 @@ kutil_set_active_memcg(struct mem_cgroup *memcg)
 }
 #endif // CONFIG_MEMCG
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 1))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0))
+// see commit 37c54f9bd48663f7657a9178fe08c47e4f5b537b
+#define USE_MM_SET_FS_OFF
 // see commit f5678e7f2ac31c270334b936352f0ef2fe7dd2b3
 #define kthread_use_mm use_mm
 #define kthread_unuse_mm unuse_mm
-
-
 #endif
 
 
@@ -210,3 +210,17 @@ static inline int vfs_fadvise_wrapper(struct file *file, loff_t offset, loff_t l
     return 0;
 }
 #endif
+
+// see commit 47291baa8ddfdae10663624ff0a15ab165952708
+static inline int
+kutil_inode_permission(struct user_namespace *user_ns, struct inode * inode, int mask){
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+    return inode_permission(user_ns, inode, mask);
+#else
+    (void)(user_ns);
+    return inode_permission(inode, mask);
+#endif
+
+}
+
+

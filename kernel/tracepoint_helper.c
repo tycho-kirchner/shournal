@@ -37,7 +37,9 @@ __probe_process_exit(unsigned long ip __attribute__ ((unused)),
                      struct ftrace_ops *op __attribute__ ((unused)),
                      struct pt_regs *regs){
     struct task_struct *task;
-    task = (struct task_struct*)(SYSCALL_GET_FIRST_ARG(current, regs));
+    task = (struct task_struct*)(
+                SYSCALL_GET_FIRST_ARG(current,
+                                      tracepoint_helper_get_ftrace_regs(regs)));
     event_handler_process_exit(task);
 }
 
@@ -52,10 +54,20 @@ struct trace_entry {
     struct ftrace_ops __ftrace_ops;
 };
 
+
+// see commit a25d036d939a30623ff73ecad9c8b9116b02e823 :
+// ftrace: Reverse what the RECURSION flag means in the ftrace_ops
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0))
+#define SHOURNAL_FTRACE_RECURSION_SAFE FTRACE_OPS_FL_RECURSION_SAFE
+#else
+#define SHOURNAL_FTRACE_RECURSION_SAFE 0
+#endif
+
+
 // TODO: handle patch from October 2020
 // PATCH 9/9] ftrace: Reverse what the RECURSION flag means in the ftrace_ops
 #define __DEFAULT_FTRACE_FLAGS \
-            FTRACE_OPS_FL_SAVE_REGS | FTRACE_OPS_FL_RECURSION_SAFE  // FTRACE_OPS_FL_RCU
+            FTRACE_OPS_FL_SAVE_REGS | SHOURNAL_FTRACE_RECURSION_SAFE
 
 
 static struct trace_entry interests[] = {
