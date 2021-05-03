@@ -3,13 +3,14 @@
 
 ## TL;DR
 After setup, put `SHOURNAL_ENABLE` into your shell's rc (e.g. .bashrc)
-and log all configured meta-data (file events, etc.), *without further ado*.
+and log all configured data and meta-data (file events, etc.),
+*without further ado*.
 
 * [Bash integration](./bash)
 
 ## Motivation
 
-For a general introduction about the meta-data *shournal* stores
+For a general introduction about the data and meta-data *shournal* stores
 please visit the general [README](/../../).
 
 Having to type *shournal* before every single command one wants
@@ -48,8 +49,8 @@ For dbg, shournal must have been compiled with debugging symbols. A verbosity hi
 
 ## Requirements
 The shell must be
-[supported by shournal](#supported-shells)
-and linked dynamically against (g)libc
+[supported by shournal](#supported-shells). If the *fanotify* backend
+is used, the shell must further be linked dynamically against (g)libc
 (default case, can be tested e.g. with<br>
 `file $(which bash) | grep "dynamically linked"` )
 
@@ -60,7 +61,7 @@ to restart your shell. A more elegant way than logout-login might be to `exec` y
 
 
 ## FAQ
-* **How to obtain the value of variables?**.<br>
+* **How to obtain the value of variables?**. <br>
   If shell-variables are used within a command, shournal's reports might
   not seem to be very helpful. However, the shell-integration assigns
   each shell-session a unique identifier (uuid).
@@ -69,53 +70,37 @@ to restart your shell. A more elegant way than logout-login might be to `exec` y
   This of course only works, if SHOURNAL_ENABLE was called, *before*
   a variable was assigned. Example: <br>
   `shournal --query --shell-session-id 'L/932KZTEemRB/dOGB9LOA==' | grep var_name`
-* **What about new, nested shell-sessions**?<br>
+* **What about new, nested shell-sessions**? <br>
   By *new shell-sessions* it is meant to call e.g. `bash` within an already
   running bash-process. What happens next really depends on whether the
-  shell is itself "observed" by shournal or not (e.g. whether
+  shell is itself **observed** by shournal or not (e.g. whether
   `SHOURNAL_ENABLE` is within the .bashrc or not). On calling
-  `SHOURNAL_ENABLE` the original mount-namespace is joined so file-events
-  are no longer reported to the the shournal-observation-process
-  belonging to the initial bash-process. If a non-observed shell
+  `SHOURNAL_ENABLE` file-events are then considered to belong to the
+  new shell-session and are no longer reported to the original
+  observation-process of the caller. If a **non-observed** shell
   is a called, shournal's later report will not be very helpful: all
   file-modifications caused by that process will yield the plain
   shell-command (and not individual commands possibly entered
   within the new shell session).
 
 
-
-
-## Technology
-The shell-integration works by using the well known `LD_PRELOAD`-trick
-to inject code into a shell-process. In particular the library-calls
-for `open` and `exec` are masked. When `open` is called, a
-directory-file-descriptor of another mount-namespace is used to
-perform the open-call, so the event can be tracked by fanotify.
-When `exec` is called, instead of the original program,
-shournal-run is executed in the first place which enters a
-mount-namespace common to the whole *command sequence*.
-The so executed program is **not** using shournal's LD_PRELOAD'ed
-library any more, so the observation also works for
-statically linked executables. <br>
-The observed shell communicates with an external *shournal-run*-process
-via a socket. To not interfere with the file-descriptors, the shell creates,
-this socket is the highest allowed (free) descriptor (typically 1023).
-The observation of external processes continues until all instances
-of this descriptor, which is inherited to subprocesses, are closed.
-Note that there are corner-cases, where this does not work (see limitations
-below).
-
 ## Limitations
 * File-operations (redirections) which spread over **multiple** command-sequences
-  within the **interactive shell** are currently not tracked (reliably). <br>
+  within the **interactive shell** might lead to surprising (*kernel module backend*)
+  or incorrect (*fanotify backend*) results. <br>
   Example:
-  ```
-  $ exec 3> /tmp/foo  # open fd 3.
+  ~~~
+  $ exec 3> /tmp/foo  # open fd 3
   $ echo "test" >&3
-  $ exec 3>&- # close event not tracked
-  ```
-  This will probably be fixed in future versions.
-* Filesystem-events of asynchronously launched processes, which close the inherited
+  $ exec 3>&-  # close fd 3.
+  ~~~
+  In case of the *kernel module backend* as usual the close event is
+  tracked, however `shournal -q -wf /tmp/foo` prints only the command
+  `exec 3>&-`. By using the shell-session uuid it should be possible
+  to reconstruct those cases. <br>
+  In case of the *fanotify backend* the close-event is lost.
+* **Additional limitations of the fanotify-backend**: <br>
+  Filesystem-events of asynchronously launched processes, which close the inherited
   shournal-socket, might be lost, because an external shournal-run process
   waits until all instances of that socket are closed.
   Steps to reproduce: In an *observed* shell-session enter <br>

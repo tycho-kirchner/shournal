@@ -12,7 +12,7 @@ It is assumed that shournal is already installed, as described in the
 general [README](/../../) and that shournal's bash-integration functions
 were already made available by sourcing the SOURCE_ME.bash
 **at the end of ~/.bashrc** (below path may differ depending on
-  distribution and installation mode): <br>
+distribution and installation mode): <br>
 `source /usr/share/shournal/SOURCE_ME.bash` <br>
 **Note:** due to technical reasons the sourcing **must** be
 performed in the bashrc and not within a terminal session.
@@ -25,15 +25,15 @@ other than `ignorespace` or `ignoreboth`, for example:
 `HISTCONTROL="ignoredups"`
 
 Check, if *bash* is correctly observed:
-```
+~~~
 $ SHOURNAL_ENABLE
 $ echo foo > bar
 $ shournal --query --wfile bar
 # should output above command, etc.
-```
+~~~
 
 ## Notes
-* **Never** modify the PROMPT_COMMAND after enabling shournal
+* **Do not** modify the PROMPT_COMMAND, PS0 or PS1 after enabling shournal
   (unless you know what you are doing (; )
 * Background for shournal's bash-integration to forbid e.g. `ignorespace`
   is that otherwise potentially wrong commands could be stored within

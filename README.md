@@ -64,7 +64,7 @@ Use an ordinary web-browser for display.
 
 
 * Create a file and ask shournal, how it came to be:
-  ```
+  ~~~
   $ SHOURNAL_ENABLE # monitor all commands using the shell-integration
   $ echo hi > foo
   $ shournal --query --wfile foo
@@ -72,10 +72,10 @@ Use an ordinary web-browser for display.
     Written file(s):
        /home/user/foo (3 bytes) Hash: 15349503233279147316
 
-  ```
+  ~~~
 * shournal can be configured, to store *specific* read files, like shell-scripts,
   within it's database. An unmodified file occupies space only once.
-  ```
+  ~~~
   $ ./test.sh
   $ shournal -q --history 1
   Command id 2 returned 0 - 14.05.19 14:01 : ./test.sh
@@ -84,20 +84,20 @@ Use an ordinary web-browser for display.
            #!/usr/bin/env bash
            echo 'Hello world'
 
-  ```
+  ~~~
 * What commands were executed at the current working directory?
-  ```
+  ~~~
   shournal --query --command-working-dir "$PWD"
-  ```
+  ~~~
 * What commands were executed within a specific shell-session? The
   uuid can be taken from the command output of a previous query.
-  ```
+  ~~~
   shournal --query --shell-session-id $uuid
-  ```
+  ~~~
 * For the full list of query-options, please enter
-  ```
+  ~~~
   shournal --query --help
-  ```
+  ~~~
 
 
 ## Installation
@@ -105,12 +105,43 @@ Use an ordinary web-browser for display.
 ### Binary releases
 For Debian/Ubuntu-based distributions .deb-packages are available on the
 [release-page](https://github.com/tycho-kirchner/shournal/releases/latest).
+Three different editions are provided for different use-cases: most users will
+want to install *shournal* on a real host (or virtual machine) and
+*shournal-docker* [inside Docker](#running-inside-docker)
+(or another container platform).
+*shournal-fanotify* does not contain the kernel backend and
+is targeted at institutions where the usage of *out-of-tree kernel-modules*
+is discouraged. <br>
 Only LTS-releases are officially supported, the packages are known to work on
 Debian 9 (Stretch), Debian 10 (Buster), Ubuntu 18.04 (Bionic) and Ubuntu 20.04 (Focal).
 Install deb-packages as usual, e.g. <br>
-`sudo apt install ./shournal_2.2_amd64.deb`
+`sudo apt install ./shournal_2.2_amd64.deb` <br>
+An **update** of *shournal* should be performed after all users have
+logged out, because the shell integrations need to be resourced.
+Further in case of the *kernel module* backend unloading the old
+version stops all running observations.
 
 **After installation**:
+Depending on your distribution, additional steps might be necessary to
+enable the (recommended) uuidd-daemon. If systemd is in use, one
+may need to:
+
+    systemctl enable uuidd
+    systemctl start uuidd
+
+
+Add yourself or other users to the group *shournalk*: <br>
+`sudo adduser $USER shournalk` (relogin to take affect). <br>
+You may override this group:
+~~~
+mkdir -p /etc/shournal.d/
+echo GROUPNAME > /etc/shournal.d/kgroup
+~~~
+replacing GROUPNAME with the value of your choice. This rule takes
+into effect the next time shournal's kernel module is loaded ( so
+call e.g. `modprobe -r shournalk; modprobe shournalk` or reboot).
+
+
 To enable the shell-integration:
 
 * for *bash*: put the following to the end of your ~/.bashrc <br>
@@ -121,79 +152,8 @@ and run `SHOURNAL_ENABLE` afterwards.
 
 
 ### Compile and install from source
-
-  * Install gcc >= 5.0. Other compilers might work but are untested.
-  * Install cmake >= 3.6 and make
-  * for safe generation of uuids it is recommend to install uuidd (uuid-runtime)
-  * install qt-dev, uuid-dev, qt-sqlite-driver, Qt version >= 5.6.
-    *With a little effort, shournal could be modified to
-    support Qt version >= 5.3. Please open an issue, if that would
-    be helpful to you.*
-
-    *Packages lists*:
-
-    Debian/Ubuntu:
-    ```
-    apt-get install g++ cmake make qtbase5-dev libqt5sql5-sqlite uuid-dev libcap-dev uuid-runtime
-    ```
-
-    Opensuse:
-    ```
-    zypper install gcc-c++ cmake make libqt5-qtbase-devel libQt5Sql5-sqlite libuuid-devel libcap-devel uuidd
-    ```
-
-    CentOS (note: CentOS 7 as of July 2019 only ships with gcc 4.8
-    -> compile gcc >= 5.0 yourself. cmake3 and cmake are seperate packages
-    where cmake in version 2 is the default. Please ensure to compile with cmake3):
-    ```
-    yum install gcc-c++ cmake3 make qt5-qtbase-devel libuuid-devel libcap-devel uuidd
-    ```
-
-  * In the source-tree-directory, enter the following commands to compile and install:
-    ```
-    mkdir -p build
-    cd build
-    # if you later want to generate a deb-package, it is recommended
-    # to use /usr as prefix: -DCMAKE_INSTALL_PREFIX=/usr
-    cmake ..
-    make
-    # as root:
-    make install
-    # or if using a Debian-based distribution, generate a .deb-package:
-    cpack -G DEB
-
-    ```
-
-**After compile and install**: if you created a .deb-package, please see
-[Binary releases](###binary-releases). **Otherwise:**
-
-* Add a group to your system, which is primarily needed for the shell-integration:
-
-  ```groupadd shournalmsenter```
-
-  However, *do not add any users to that group*. It is part of a permission check, where root adopts that gid (within shournal).
-  If you don't like the default group name, you can specify your own: at build time pass the following to cmake:
-
-  ```-DMSENTER_GROUPNAME=$your_group_name```
-
-* Depending on your distribution, additional steps might be necessary to
-  enable the (recommended) uuidd-daemon. If systemd is in use, one may need to:
-  ```
-  systemctl enable uuidd
-  systemctl start uuidd
-  ```
-* To **uninstall**, after having installed with `make install`, you can
-  execute <br>
-  `xargs rm < install_manifest.txt`, but see
-  [here](https://stackoverflow.com/a/44649542/7015849) for the
-  limitations.
-
-To enable the shell-integration: perform the same procedure as described
-in [Binary releases](###binary-releases), however, the location of
-the `SOURCE_ME.$shell_name` scripts after `make install` is typically
-`/usr/local/share/shournal/`.
-
-
+Please refer to the instructions found within the
+[compile-README](./README-compile.md).
 
 
 
@@ -204,9 +164,9 @@ the `SOURCE_ME.$shell_name` scripts after `make install` is typically
   by content (size, hash) and mtime, not by its name.
   For the name, `--wname` can be used.
   More concrete:
-  ```
+  ~~~
   shournal --exec sh -c 'echo foo > bar; mv bar bar_old'
-  ```
+  ~~~
   Querying for bar_old by content (`--wfile`-option) yields exactly
   the given command, however, `--wname bar_old` does **not** work
   (`--wname bar` of course works). To use the bar_old *file name*
@@ -232,10 +192,10 @@ the `SOURCE_ME.$shell_name` scripts after `make install` is typically
   path within the config-file in section `[mounts]`. If you want to ignore all
   fanotify_mark permission errors, you can set the flag in section
   `[mounts]`:
-  ```
+  ~~~
   [mounts]
   ignore_no_permission = true
-  ```
+  ~~~
 
 ## Configuration
 shournal stores a self-documenting config-file typically at
@@ -243,18 +203,20 @@ shournal stores a self-documenting config-file typically at
 which is created on first run. It can be edited either directly with
 a plain text editor or via `--edit-cfg`.
 For completeness, the most important points are listed here as well.
-* In several sections, (include-/exclude-) paths can be edited.
-  Put each path into a separate line, all paths being enclosed
+* Write- and read events can be configured, so only events occurring at
+  specific (include-)paths are stored. Put each path into a separate
+  line, all paths being enclosed
   by triple quotes:
-  ```
+  ~~~
   include_paths = '''
     /home/me
     /media
   '''
-  ```
+  ~~~
   Each exclude_path should be a sub-path of an include path.
-* Write- and read events can be configured, so only events occurring at
-  specific paths are stored. Read files (e.g. scripts) can **further** be configured
+* Note that by default, there
+  is a limit on the number of logged events per command (max_event_count).
+  Read files (e.g. scripts) can **further** be configured
   to be stored within shournal's database.
   Files are only stored, if the configured max. file-size, file extension
   (e.g. sh) and mimetype (e.g. application/x-shellscript) matches.
@@ -270,6 +232,39 @@ For completeness, the most important points are listed here as well.
   Matching files coming first have precedence.
 
 
+## Running inside Docker
+To use *shournal* within Docker (or another container platform),
+depending on the backend the following steps are necessary: <br>
+**kernel module backend** <br>
+Install *shournal* on the host and *shournal-docker* inside the container.
+For *unprivileged* containers *sysfs* is mounted readonly. In this case
+create a bindmount from /sys/kernel/shournalk_root to
+/tmp/shournalk-sysfs, e.g. <br>
+`docker run ... -v /sys/kernel/shournalk_root:/tmp/shournalk-sysfs`.
+
+**fanotify backend** <br>
+Install *shournal-docker* (or *shournal-fanotify*) inside docker.
+For *unprivileged* containers the capabilities SYS_ADMIN, SYS_PTRACE and
+SYS_NICE are required, e.g. <br>
+`docker run ... --cap-add SYS_ADMIN --cap-add SYS_PTRACE --cap-add SYS_NICE`. <br>
+You may need to [configure the backend](#backend-configuration).
+
+
+## Backend configuration
+shournal provides two backends, a custom *kernel module* and *fanotify*.
+The *kernel module* is used by default, except the *shournal-fanotify*
+edition is installed, where only the *fanotify* backend is
+available. In general it is recommended to stick with the *kernel module*
+as it is faster and has less interference with the process environment -
+for example no new mount namespaces have to be created and no file
+descriptor inheritance is necessary to wait for the end of a process
+tree. See also:
+[shell-integration](./shell-integration-scripts#limitations). <br>
+If both backends are installed you may configure the default one globally
+by creating the file `/etc/shournal.d/backend` or for each user by creating
+`~/.config/shournal/backend` with content `ko` or `fanotify`.
+
+
 ## Disk-space - get rid of obsolete file-events
 Depending on the file-activity of the observed commands, shournal's
 database will sooner or later grow. When you feel that enough time
@@ -281,28 +276,31 @@ More options are available, see also
 
 
 ## Remote file-systems
-* File modifications on a remote server, mounted e.g. via NFS or sshfs, can be observed,
-  since we only monitor processes running on the local machine (fanotify can otherwise not monitor
-  events which *another* Kernel causes on the same NFS-storage).
-* For sshfs it is necessary, to add ```-o allow_root``` to the sshfs-options,
+* *shournal* is able to monitor file events of specific processes (PID's).
+  Therefore, remote filesystems such as NFS or sshfs can be observed as
+  long as *shournal* runs on the same (virtual) machine as the observed
+  process. Consequently file events *another kernel* performs are lost.
+* For sshfs in case of the *fanotify* backend it is necessary,
+  to add ```-o allow_root``` to the sshfs-options,
   otherwise permission errors during ```fanotify_mark``` are raised.
   See also: https://serverfault.com/a/188896
 
 
-## Technology
-The linux-kernel's *fanotify* (not to be confused with the more popular
-*inotify*) is able to observe file-events for whole
-mountpoints. By unsharing the mount-namespace it is possible to monitor only
-the file-events of a given process and its children (but see [Limitations](#limitations)).
-See also `man mount_namespaces` and fanotify.
-
-
 ## Security
-shournal-run is a so called "setuid"-program: whenever a regular user calls it, it runs
+### kernel-module backend
+In the kernel module it is ensured that each user is only allowed to
+monitor his/her own processes. Further, the kernel thread, which processes
+file events, runs with effective caller credentials and checks
+allowed accesses on a per-file basis. Memory allocations are cgroup-aware,
+even for reading (in case of hashing) and writing (in case of logging)
+files.
+
+### fanotify backend
+*shournal-run-fanotify* is a so called "setuid"-program: whenever a regular user calls it, it runs
 with root-permissions in the first place. As soon as possible, it runs effectively with user
 permissions though.
 It must be setuid for two reaons:
-* fanotify, the filesystem-changes api requires root for initializing, because it is in
+* fanotify requires root for initializing, because it is in
   principle able, to **forbid** a process to access a file. shournal does not make use
   of this feature so this is not a real security concern.
 * unsharing the *mount namespace* requires root, because setuid-programs *could* still refer
@@ -315,38 +313,38 @@ It must be setuid for two reaons:
   Shared mounts are the default in all recent distributions I know of.
   See also
   man 7 mount_namespaces and
-  "shared subtrees"
-  https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
+  [shared subtrees](https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt).
+
+
 
 
 
 ## Limitations
-The file observation only works, if the process does not unshare the mount-namespace itself,
-e.g. monitoring a program started via *flatpak* fails.
-
 Processes can communicate via IPC (inter-process-communication).
-If the observed process A instructs the **not** observed process B
-via IPC to modify a file, the filesystem-event is not registered by shournal.
+If the observed process *A* instructs the **not** observed process *B*
+via IPC to modify a file, the filesystem-event is not registered by
+*shournal*.
 
 For performance reasons, all files opened with write-permissions
 are reported as *written* by shournal, irrespective of whether
-the process actually wrote to it. By using file size and content (hash) you should
-be able to cover those cases.
+the process actually wrote to it. By using file size and content (hash)
+you should be able to cover those cases.
 
-The provided timestamp is determined shortly after a modified file was
+The provided timestamp is determined shortly after a file was
 closed. Note that it is possible that some other process has
 written to it in between. This however is only a
 problem, if that other process was itself **not** observed.
 
-To cache write-events efficiently during execution, they are put into a
-device-inode-hashtable. Note that the kernel might reuse them.
-If you copy a file to a non-observed directory, delete it at the original
-location and the inode is reused during execution
-of the observed process, the filesystem-event is lost.
-Note that copying it to a observed location is fine though,
-because copying a file is itself a file-modification-event.
+Whether memory mapped (see mmap(2) ) file-events are reported correctly
+depends on **when** the underlying file-descriptor is closed. It is thus
+application dependent and does not work in general.
 
+### Additional limitations of the fanotify backend
+The file observation only works, if the process does not unshare the
+mount-namespace itself, e.g. monitoring a program started
+via *flatpak* fails.
 For further limitations please visit the fanotify manpage.
+
 
 ## Known Issues
 * on NFS-storages: file events are lost, if the user does not have
@@ -374,12 +372,13 @@ and Konstantin&nbsp;Riege - without you this project
 couldn't have been accomplished.
 
 
-
 # License
 The whole project is licensed under the GPL, v3 or later
 (see LICENSE file for details) <br>
 **except**
-* the libraries within
+* The kernel module within `kernel/` which is licensed under
+  the GNU General Public License version 2 only.
+* The libraries within
   `extern/` → Please refer to the licenses within their
     respective directories.
 * The javascript-libraries in the auto-generated
@@ -387,4 +386,4 @@ The whole project is licensed under the GPL, v3 or later
   stored in `html-export/dist/main.licenses.txt`.
 
 
-Copyleft (C) 2019, Tycho Kirchner
+Copyleft (C) 2021, Tycho Kirchner
