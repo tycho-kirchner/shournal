@@ -65,9 +65,10 @@ endif()
 
 set(KBUILD_CMD $(MAKE)
     -C "${mod_buildir}"
-    modules M=${CMAKE_CURRENT_BINARY_DIR}
+    M=${CMAKE_CURRENT_BINARY_DIR}
     src=${CMAKE_CURRENT_SOURCE_DIR}
     EXTRA_CFLAGS=${k_extra_cflags}
+    modules
     shournal_cmake_build=true
     shournal_version=${shournal_version}
 )
@@ -83,7 +84,15 @@ add_custom_target(shournalk ALL
 set(dkms_dir "${CMAKE_BINARY_DIR}/dkms")
 
 # Copy required files to dkms dir
+# Better be safe and copy the files on cmake and make.
 file(COPY ${kernel_src} DESTINATION "${dkms_dir}" )
+add_custom_command(
+        TARGET shournalk POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+                ${kernel_src}
+                "${dkms_dir}")
+
+
 # copy-and-rename workaround (not really a 'configure_file')
 configure_file(Kbuild "${dkms_dir}/Makefile" COPYONLY)
 configure_file( "dkms.conf.in" "${dkms_dir}/dkms.conf")
