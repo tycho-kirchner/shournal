@@ -309,6 +309,9 @@ void event_handler_fput(unsigned long ip __attribute__ ((unused)),
     struct event_target* event_target;
     struct file* file;
 
+    if(unlikely(current->flags & PF_KTHREAD))
+        return;
+
     file = (struct file*)(SYSCALL_GET_FIRST_ARG(current,
                                                 tracepoint_helper_get_ftrace_regs(regs)));
 
@@ -348,6 +351,9 @@ out_put:
 
 void event_handler_process_exit(struct task_struct *task)
 {
+    if(unlikely(current->flags & PF_KTHREAD))
+        return;
+
     if (unlikely(!rcu_is_watching())){
         kutil_WARN_DBG(1, "called without rcu");
         return;
@@ -364,7 +370,8 @@ void event_handler_process_fork(struct task_struct *parent,
     struct event_target* target;
     long ret;
 
-    // fixme: is this ever called, if parent/child is kthread? Better check it.
+    if(unlikely(current->flags & PF_KTHREAD))
+        return;
 
     if (unlikely(!rcu_is_watching())){
         kutil_WARN_DBG(1, "called without rcu");
@@ -387,6 +394,7 @@ void event_handler_process_fork(struct task_struct *parent,
     }
 
     if(unlikely((ret = __insert_task_into_table_safe(child, target, false)))){
+        // fixme: set some flag in this event_target.
         pr_debug("failed to observe child process: %ld", ret);
         goto put_out;
     }
