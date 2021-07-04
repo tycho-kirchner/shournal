@@ -29,9 +29,8 @@ static DEFINE_SPINLOCK(task_table_lock);
 static struct workqueue_struct* del_taskentries_wq = NULL;
 
 static struct task_entry* __task_entry_alloc(void){
-    struct task_entry* e;
-    e = kmem_cache_alloc(__task_entry_cache, GFP_NOWAIT | SHOURNALK_GFP);
-    return e;
+    return kmem_cache_alloc(__task_entry_cache,
+                            GFP_NOWAIT | __GFP_ACCOUNT | __GFP_NOWARN);
 }
 
 /// Warning: May sleep!
