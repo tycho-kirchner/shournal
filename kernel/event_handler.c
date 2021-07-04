@@ -152,10 +152,12 @@ __remove_task_from_table_safe(struct task_struct *task){
     if((el = __find_task_entry(task, t_hash)) != NULL){
         spin_lock(&task_table_lock);
         hash_del_rcu(&el->node);
+        // Maybe it is safe to concurrently INIT_RCU_WORK outside the spinlock.
+        // But better safe than sorry.
+        INIT_RCU_WORK(&el->destroy_rwork, __task_entry_destroy_work);
         spin_unlock(&task_table_lock);
 
         // free later
-        INIT_RCU_WORK(&el->destroy_rwork, __task_entry_destroy_work);
         queue_rcu_work(del_taskentries_wq, &el->destroy_rwork);
         enqueued = true; // do not "enqueued = queue_rcu_work()", we do not care, if
                          // done now or later.
