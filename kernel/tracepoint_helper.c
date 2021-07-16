@@ -64,8 +64,6 @@ struct trace_entry {
 #endif
 
 
-// TODO: handle patch from October 2020
-// PATCH 9/9] ftrace: Reverse what the RECURSION flag means in the ftrace_ops
 #define __DEFAULT_FTRACE_FLAGS \
             FTRACE_OPS_FL_SAVE_REGS | SHOURNAL_FTRACE_RECURSION_SAFE
 
