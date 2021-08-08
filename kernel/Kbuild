@@ -6,8 +6,6 @@ CFLAGS_MODULE += "-DSHOURNAL_VERSION=\"${shournal_version}\""
 
 ifeq (${shournal_cmake_build}, true)
 	common_prefix := ../src/common/
-else
-    EXTRA_CFLAGS=-O3
 endif
 
 shournalk-y += shournalk_main.o event_handler.o shournalk_sysfs.o \
@@ -29,7 +27,7 @@ MDEST_DIR	?= $(KBASE)/kernel
 PWD  := $(shell pwd)
 
 all:
-	@$(MAKE) -C $(KBUILD_DIR) M=$(PWD) modules
+	@$(MAKE) -C $(KBUILD_DIR) M=$(PWD) EXTRA_CFLAGS="-O3" modules
 
 install:
 	install -D -m 755 shournalk.ko $(MDEST_DIR)
