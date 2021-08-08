@@ -1,5 +1,5 @@
 
-obj-m$(CONFIG_LTO_MENU) := shournalk.o
+obj-m := shournalk.o
 
 CFLAGS_MODULE += "-DSHOURNAL_VERSION=\"${shournal_version}\""
 
