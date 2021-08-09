@@ -8,27 +8,30 @@ execute_process(
 string(REGEX REPLACE "-[^-]+$" "" KERNEL_RELEASE_NO_ARCH ${KERNEL_RELEASE})
 
 # Find the headers
-if(EXISTS /usr/src/linux-headers-${KERNEL_RELEASE_NO_ARCH}-common/include)
-    # Most likely on Debian or similar
-    set(KERNELHEADERS_INCLUDE_DIRS
-            /usr/src/linux-headers-${KERNEL_RELEASE_NO_ARCH}-common/include
-            /usr/src/linux-headers-${KERNEL_RELEASE_NO_ARCH}-common/arch/x86/include )
-else()
+foreach(header_path
+        /usr/src/linux-headers-${KERNEL_RELEASE_NO_ARCH}-common # Debian
+        /usr/src/linux-${KERNEL_RELEASE_NO_ARCH}/include)       # Opensuse
+    if(EXISTS "${header_path}")
+        set(KERNELHEADERS_DIR "${header_path}")
+        break()
+    endif()
+endforeach()
+
+if(NOT (KERNELHEADERS_DIR))
     # Red Hat (?)
     find_path(KERNELHEADERS_DIR
         include/linux/user.h
         PATHS /usr/src/kernels/${KERNEL_RELEASE})
-    if (KERNELHEADERS_DIR)
-    set(KERNELHEADERS_INCLUDE_DIRS
-            ${KERNELHEADERS_DIR}/include
-            ${KERNELHEADERS_DIR}/arch/x86/include
-            CACHE PATH "Kernel headers include dirs")
-    endif()
 endif()
 
 
 message(STATUS "Kernel release: ${KERNEL_RELEASE}")
-message(STATUS "Kernel headers: ${KERNELHEADERS_INCLUDE_DIRS}")
 
-
-
+if (KERNELHEADERS_DIR)
+set(KERNELHEADERS_INCLUDE_DIRS
+        ${KERNELHEADERS_DIR}/include
+        ${KERNELHEADERS_DIR}/arch/x86/include)
+    message(STATUS "Kernel headers: ${KERNELHEADERS_INCLUDE_DIRS}")
+else()
+    message(WARNING "Unable to find kernel headers!")
+endif()
