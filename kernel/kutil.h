@@ -64,6 +64,11 @@ static inline void *kvzalloc(size_t size, gfp_t flags)
 #endif
 
 
+
+static inline int kutil_kthread_be_nice(void){
+    return cond_resched();
+}
+
 char* resolve_reg_filepath(struct files_struct *files,
                            struct file *file,
                            char * buf);

@@ -22,6 +22,8 @@
 #include "shournal_kio.h"
 #include "kutil.h"
 
+#define __CONSUMER_JIFFY_OFFSET 200
+
 
 /// "Consumes" the ringbuffer (writes tail)
 /// @return the number of consumed bytes (*not* events).
@@ -33,15 +35,24 @@ __consume_close_events(struct event_target* event_target){
     struct circ_buf* circ_buf = &event_target->event_consumer.circ_buf;
     const int cir_buf_size = event_target->event_consumer.circ_buf_size;
     struct close_event* e;
+    unsigned long next_sched_jiffy;
 
     head = smp_load_acquire(&circ_buf->head);
     tail = READ_ONCE(circ_buf->tail);
     bytes_total = CIRC_CNT(head, tail, cir_buf_size);
 
-    for(bytes=0; bytes < bytes_total; bytes+=sizeof(struct close_event)){
+    next_sched_jiffy =  jiffies + msecs_to_jiffies(__CONSUMER_JIFFY_OFFSET);
+    for(bytes=0; bytes < bytes_total; ){
         e = (struct close_event*)&circ_buf->buf[tail];
-        close_event_consume(event_target, e);
         tail = (tail + sizeof (struct close_event)) & (cir_buf_size - 1);
+        bytes += sizeof(struct close_event);
+
+        close_event_consume(event_target, e);
+        if(time_is_before_jiffies(next_sched_jiffy)){
+            smp_store_release(&circ_buf->tail, tail);
+            kutil_kthread_be_nice();
+            next_sched_jiffy =  jiffies + msecs_to_jiffies(__CONSUMER_JIFFY_OFFSET);
+        }
     }
     // maybe_todo: move into loop to avoid event-overflow?
     smp_store_release(&circ_buf->tail, tail);
@@ -87,6 +98,7 @@ int event_queue_consume_thread(void* data){
             if(target_file->__pos > target_file->__bufsize/4){
                 event_consumer_flush_target_file_safe(event_target);
                 // this might have taken a while, so..
+                kutil_kthread_be_nice();
                 continue;
             }
 
