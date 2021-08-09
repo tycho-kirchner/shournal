@@ -15,7 +15,7 @@
 #ifdef KVMALLOC_BACKPORT
 #include <linux/vmalloc.h>
 
-void *kvmalloc_node(size_t size, gfp_t flags, int node)
+void *_kvmalloc_node_backport(size_t size, gfp_t flags, int node)
 {
     gfp_t kmalloc_flags = flags;
     void *ret;
@@ -226,9 +226,9 @@ bool queue_rcu_work(struct workqueue_struct *wq, struct rcu_work *rwork)
 
 #endif // RCU_WORK_BACKPORT
 
-#ifdef MM_BACKPORT
+#ifdef GET_MEMCG_FROM_MM_BACKPORT
 
-struct mem_cgroup *get_mem_cgroup_from_mm(struct mm_struct *mm)
+struct mem_cgroup *_get_mem_cgroup_from_mm_backport(struct mm_struct *mm)
 {
     struct mem_cgroup *memcg = NULL;
 
@@ -246,7 +246,7 @@ struct mem_cgroup *get_mem_cgroup_from_mm(struct mm_struct *mm)
     return memcg;
 }
 
-#endif // MM_BACKPORT
+#endif // GET_MEMCG_FROM_MM_BACKPORT
 
 
 

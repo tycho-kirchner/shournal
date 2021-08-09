@@ -226,7 +226,7 @@ static bool __do_log_file_event(struct event_target* t,
         } else {
             long ret;
             // maybe_todo: only set to random, if ! store_whole_file?
-            ret = vfs_fadvise_wrapper(file, 0,0, POSIX_FADV_RANDOM);
+            ret = vfs_fadvise(file, 0,0, POSIX_FADV_RANDOM);
             if(ret){
                 pr_devel("vfs_fadvise failed with %ld\n", ret);
             }
