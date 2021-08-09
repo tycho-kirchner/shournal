@@ -14,6 +14,7 @@
 #include "db_globals.h"
 #include "qexcdatabase.h"
 #include "qsqlquerythrow.h"
+#include "insertifnotexist.h"
 #include "query_columns.h"
 #include "logger.h"
 #include "util.h"
@@ -24,21 +25,22 @@
 #include "qoutstream.h"
 
 using namespace db_conversions;
+using db_controller::InsertIfNotExist;
 
-namespace  {
 
-void
+static void
 insertFileWriteEvent(const QueryPtr& query, const CommandInfo &cmd,
                 FileEvent* e )
 {
     auto pathFnamePair =  splitAbsPath(QString(e->path()));
-    query->prepare("insert or ignore into pathtable (path)"
+    query->prepare(query->insertIgnorePreamble() + " into pathtable (path)"
                    "values (?)");
     query->addBindValue(pathFnamePair.first);
     query->exec();
-    query->prepare("insert into writtenFile (cmdId,pathId,name,mtime,size,hash) "
+    query->prepare(query->insertIgnorePreamble() +
+                   " into writtenFile (cmdId,pathId,name,mtime,size,hash) "
                    "values (?,"
-                   "(select id from pathtable where path=?),"
+                   "(select `id` from pathtable where path=?),"
                    "?,?,?,?)");
 
     query->addBindValue(cmd.idInDb);
@@ -52,7 +54,8 @@ insertFileWriteEvent(const QueryPtr& query, const CommandInfo &cmd,
 
 /// Move or copy the file captured along the read event e
 /// to the read files directory in shournal's database dir.
-void copyToStoredFiles(const FileEvent* e,
+static void
+copyToStoredFiles(const FileEvent* e,
                              const QByteArray& storedFilesDir,
                              const QByteArray& idInDatabase){
     const auto fullDestPath = pathJoinFilename(storedFilesDir, idInDatabase);
@@ -73,7 +76,7 @@ void copyToStoredFiles(const FileEvent* e,
 
 }
 
-void
+static void
 insertFileReadEvent(const QueryPtr& query, const CommandInfo &cmd,
                     const QVariant& envId, const QVariant& hashMetaId,
                     FileEvent* e )
@@ -82,36 +85,32 @@ insertFileReadEvent(const QueryPtr& query, const CommandInfo &cmd,
     const QByteArray storedFilesDir = storedFiles.getReadFilesDir().toUtf8();
 
     const auto pathFnamePair = splitAbsPath(QString(e->path()));
-
-    query->prepare("select id from pathtable where path=?");
+    query->prepare(query->insertIgnorePreamble() + " into pathtable (path)"
+                   "values (?)");
     query->addBindValue(pathFnamePair.first);
     query->exec();
-    qint64 pathId;
-    if(query->next(false)){
-        pathId = qVariantTo_throw<qint64>(query->value(0));
-    } else {
-        query->prepare("insert into pathtable (path)"
-                       "values (?)");
-        query->addBindValue(pathFnamePair.first);
-        query->exec();
-        pathId = qVariantTo_throw<qint64>(query->lastInsertId());
-    }
+
+    InsertIfNotExist insIfnExist(*query, "readFile");
+    insIfnExist.addSimple("envId", envId);
+    insIfnExist.addSimple("name", pathFnamePair.second);
+    insIfnExist.addEntry("pathId", {pathFnamePair.first},
+                         "(select id from pathtable where path=?)");
+
+    insIfnExist.addSimple("mtime",fromMtime(e->mtime()));
+    insIfnExist.addSimple("size", qint64(e->size()));
+    insIfnExist.addSimple("mode", qint64(e->mode()));
+    insIfnExist.addSimple("hash", fromHashValue(e->hash()));
+    insIfnExist.addSimple("hashmetaId", hashMetaId);
+    insIfnExist.addSimple("isStoredToDisk", e->fileContentSize() > 0);
+
     bool existed;
-    const auto readFileId = query->insertIfNotExist("readFile", {
-                                                        {"envId", envId },
-                                                        {"name", pathFnamePair.second},
-                                                        {"pathId", pathId},
-                                                        {"mtime",fromMtime(e->mtime())},
-                                                        {"size", qint64(e->size())},
-                                                        {"mode", qint64(e->mode())},
-                                                        {"hash", fromHashValue(e->hash())},
-                                                        {"hashmetaId", hashMetaId},
-                                                        {"isStoredToDisk", e->fileContentSize() > 0}
-                                                    }, &existed);
+    const auto readFileId = insIfnExist.exec(&existed);
+
     if(! existed && e->fileContentSize() > 0){
         copyToStoredFiles(e, storedFilesDir, readFileId.toByteArray());
     }
-    query->prepare("insert into readFileCmd (cmdId, readFileId) values (?,?)");
+    query->prepare(query->insertIgnorePreamble() +
+                   " into readFileCmd (cmdId, readFileId) values (?,?)");
     query->addBindValue(cmd.idInDb);
     query->addBindValue(readFileId);
     query->exec();
@@ -124,7 +123,7 @@ insertFileReadEvent(const QueryPtr& query, const CommandInfo &cmd,
 
 /// sql allows for cascade deleting orphans (children), here we kill
 /// parents, where all children died
-void
+static void
 deleteChildlessParents(const QueryPtr& query){
     logDebug << "delete from hashmeta...";
     query->exec("delete from hashmeta where not exists "
@@ -165,7 +164,7 @@ deleteChildlessParents(const QueryPtr& query){
 }
 
 
-FileReadInfos
+static FileReadInfos
 queryFileReadInfos(const SqlQuery& sqlQ, const QueryPtr& query_=nullptr, const QString& optionalJoins={}){
     const QueryPtr query = (query_ != nullptr) ? query_ : db_connection::mkQuery();
     FileReadInfos readInfos;
@@ -192,11 +191,6 @@ queryFileReadInfos(const SqlQuery& sqlQ, const QueryPtr& query_=nullptr, const Q
     }
     return readInfos;
 }
-
-
-} // namespace
-
-
 
 
 /////////////////////// public ////////////////////////////////

@@ -30,8 +30,6 @@ public:
 public:
     typedef QVector<QPair<const char*, QVariant> > ColnameValuePairs;
 
-    QVariant insertIfNotExist(const QString& tablename, const ColnameValuePairs& colValPairs,
-                              bool* existed=nullptr);
     const QString& insertIgnorePreamble() const;
 
 public:

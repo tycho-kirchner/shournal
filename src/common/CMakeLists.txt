@@ -45,6 +45,7 @@ set(database_files
     database/fileinfos
     database/sqlquery
     database/file_query_helper
+    database/insertifnotexist
     database/query_columns
     database/db_conversions
     database/sqlite_database_scheme_updates

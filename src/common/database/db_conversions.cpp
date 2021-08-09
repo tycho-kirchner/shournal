@@ -11,17 +11,15 @@ QVariant db_conversions::fromMtime(time_t mtime)
 /// sqlite cannot store uint64 as int - store as blob instead.
 QVariant db_conversions::fromHashValue(const HashValue &val)
 {
-    QByteArray hashBytes;
-    if(! val.isNull()){
-        hashBytes = qBytesFromVar(val.value());
-    }
+    QByteArray hashBytes(val.isNull() ? "" : qBytesFromVar(val.value()));
     return  { hashBytes };
 }
 
 HashValue db_conversions::toHashValue(const QVariant &var)
 {
-    if(var.isNull()){
+    QByteArray hashBytes = var.toByteArray();
+    if(hashBytes.isEmpty()){
         return {};
     }
-    return varFromQBytes<HashValue::value_type>(var.toByteArray());
+    return varFromQBytes<HashValue::value_type>(hashBytes);
 }

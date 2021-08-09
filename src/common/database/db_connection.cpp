@@ -56,7 +56,7 @@ static void handleDifferentVersions(const QVersionNumber& dbVersion,
                       .arg(dbVersion.toString()).arg(app::version().toString());
         return;
     }
-    // the version is smaller -> performa all necessary updates
+    // the version is smaller -> perform all necessary updates
 
     if(dbVersion < QVersionNumber{0, 9}){
         logDebug << "updating db to 0.9...";
@@ -75,6 +75,11 @@ static void handleDifferentVersions(const QVersionNumber& dbVersion,
     if(dbVersion < QVersionNumber{2, 4}){
         logDebug << "updating db to 2.4...";
         sqlite_database_scheme_updates::v2_4(query);
+    }
+
+    if(dbVersion < QVersionNumber{2, 5}){
+        logDebug << "updating db to 2.5...";
+        sqlite_database_scheme_updates::v2_5(query);
     }
 
     query.prepare("replace into version (id, ver) values (1, ?)");

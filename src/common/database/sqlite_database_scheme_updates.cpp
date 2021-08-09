@@ -171,3 +171,48 @@ void sqlite_database_scheme_updates::v2_4(QSqlQueryThrow& query){
     // new one:
     query.exec("create index `idx_readFile_pathId` ON `readFile` (`pathId`)");
 }
+
+
+void sqlite_database_scheme_updates::v2_5(QSqlQueryThrow &query)
+{
+    // Forbid sense- and useless duplicates in readFileCmd.
+    // Before the kernel-module backend these occurred rarely,
+    // because fanotify already merges many equal events.
+    // The kernel-module backend does not do so (at least not in
+    // v2.4), so this became apparent quite late.
+
+    // Delete existing duplicates
+    query.exec(
+    R"SOMERANDOMTEXT(
+    delete from readFileCmd
+    where `id` not in
+             (
+             select  min(`id`)
+             from    readFileCmd
+             group by cmdId, readFileId
+             )
+    )SOMERANDOMTEXT"
+    );
+
+    query.exec("create unique index if not exists "
+               " idx_unq_readFileCmd on readFileCmd (cmdId,readFileId)");
+
+    // Null-values in sql can be nasty, e.g. null != null.
+    // Replace null-hashes by empty strings.
+    query.exec("update writtenFile set `hash`='' where `hash` is null");
+    query.exec("update readFile    set `hash`='' where `hash` is null");
+
+    // Also delete and forbid duplicate written file-events.
+    query.exec(
+    R"SOMERANDOMTEXT(
+    delete from writtenFile where `id` not in
+    (
+     select  min(`id`) from writtenFile
+     group by `name`,pathId,cmdId,mtime,size,hash
+    )
+    )SOMERANDOMTEXT"
+    );
+
+    query.exec("create unique index if not exists "
+               " idx_unq_writtenFile on writtenFile (`name`,pathId,cmdId,mtime,size,hash)");
+}

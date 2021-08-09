@@ -305,6 +305,47 @@ private slots:
         // TODO: also check bytes of the file?!
     }
 
+    void tDuplicates(){
+        FILE* tmpFile = stdiocpp::tmpfile();
+        auto closeTmpFile = finally([&tmpFile] {
+            fclose(tmpFile);
+        });
+        FileEvents fileEvents;
+        fileEvents.setFile(tmpFile);
+
+
+        auto wInfo1 = generateFileWriteEvent();
+        push_back_writeEvent(fileEvents, wInfo1);
+        push_back_writeEvent(fileEvents, wInfo1);
+        push_back_writeEvent(fileEvents, wInfo1);
+
+        auto rInfo1 = generateFileReadEvent();
+        push_back_readEvent(fileEvents, rInfo1);
+        push_back_readEvent(fileEvents, rInfo1);
+        push_back_readEvent(fileEvents, rInfo1);
+
+
+        CommandInfo cmd1 = generateCmdInfo();
+        cmd1.idInDb = db_controller::addCommand(cmd1);
+        auto closeDb = finally([] {
+            db_connection::close();
+        });
+
+        db_addFileEventsWrapper(cmd1, fileEvents);
+
+
+        QueryColumns & queryCols = QueryColumns::instance();
+        SqlQuery q1;
+        q1.addWithAnd(queryCols.cmd_id, int(cmd1.idInDb) );
+
+        auto cmd1Back = queryForCmd(q1);
+        QVERIFY(cmd1Back->next());
+        cmd1.fileWriteInfos = { fileWriteEventToWriteInfo(wInfo1)};
+        cmd1.fileReadInfos = { fileReadEventToReadInfo(rInfo1)};
+
+        QCOMPARE(cmd1Back->value(), cmd1);
+    }
+
 
     void tDeleteCommand(){
         FILE* tmpFile = stdiocpp::tmpfile();
