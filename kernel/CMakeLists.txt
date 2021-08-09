@@ -35,10 +35,10 @@ target_compile_definitions(lib_shournalk_dummy PRIVATE
 )
 
 
-if(EXISTS "/lib/modules/${CMAKE_SYSTEM_VERSION}/build")
-    set(mod_buildir "/lib/modules/${CMAKE_SYSTEM_VERSION}/build")
+if(EXISTS "/lib/modules/${KERNEL_RELEASE}/build")
+    set(mod_buildir "/lib/modules/${KERNEL_RELEASE}/build")
 else()
-    set(mod_buildir "/lib/modules/${CMAKE_SYSTEM_VERSION}")
+    set(mod_buildir "/lib/modules/${KERNEL_RELEASE}")
 endif()
 
 # maybe_todo: link time optimization produces weird warnings
