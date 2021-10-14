@@ -479,9 +479,11 @@ _shournal_verbose_history_check(){
     # no history needed if running non-interactively
     [ -n "${ZSH_EXECUTION_STRING+x}" ] && return 0
 
-    # TODO: check ignore space, etc.:
-    # man zshoptions | grep HIST_IGNORE
-
+    # While in bash we retrieve the command-string
+    # from history, in zsh it is directly passed
+    # to our preexec_function, which seems to work
+    # regardless of history options like e.g.
+    # $ setopt HIST_IGNORE_SPACE
     return 0
 }
 
