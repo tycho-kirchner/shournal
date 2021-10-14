@@ -5,13 +5,6 @@
 SHOURNAL_ENABLE() {
     local tmpdir
 
-    if [ -z "${_shournal_version+x}" ]; then
-        local common_path="$(dirname -- "$_shournal_this_scriptname")/_common.sh"
-        if ! . "$common_path"; then
-            >&2 echo "shournal shell integration: failed to source common file $common_path"
-            return 1
-        fi
-    fi
     # 0: debug, 1: info, 2: warning, 3: error
     [ -z "${_shournal_shell_integration_log_level+x}" ] && _shournal_shell_integration_log_level=2
     [ -z "${_SHOURNAL_VERBOSITY+x}" ] && _SHOURNAL_VERBOSITY="warning"
@@ -342,6 +335,16 @@ _shournal_postexec(){
 }
 
 
+# BEGIN_SECTION auto-filled by cmake
+_shournal_version="@shournal_version@"
+
+# -z: Allow to be overwritten
+[ -z "${SHOURNAL_PATH_LIB_SHELL_INTEGRATION+x}" ] &&
+  export SHOURNAL_PATH_LIB_SHELL_INTEGRATION="@full_path_libshournal@" ||
+  :
+
+# END_SECTION auto-filled by cmake
+
 
 # Setup non-portable stuff for
 # each supported shell. The following variables _must_ be set:
@@ -356,10 +359,8 @@ _shournal_postexec(){
 # During the prompts _shournal_preexec and _shournal_postexec must be
 # called respectively.
 
-# TODO: remove _shournal_this_scriptname once ready.
 if [ -n "${BASH_VERSION+x}" ]; then
 _shournal_this_shell='bash'
-_shournal_this_scriptname="$BASH_SOURCE"
 
 # Until bash-version 5.0 ( commit d233b485e83c3a784b803fb894280773f16f2deb),
 # in eval.c:reader_loop the current_command_number was incremented before decode_prompt_string (ps0_prompt).
@@ -472,7 +473,6 @@ _shournal_prompt_bash(){
 
 elif [ -n "${ZSH_VERSION+x}" ]; then
 _shournal_this_shell='zsh'
-_shournal_this_scriptname="$0"
 
 [ -n "${ZSH_EXECUTION_STRING+x}" ] &&
     _shournal_shell_exec_string="$ZSH_EXECUTION_STRING"

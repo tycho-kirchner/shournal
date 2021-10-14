@@ -1,6 +1,6 @@
 
 configure_file( _common.sh.in _common.sh @ONLY)
-configure_file(integration_ko.sh integration_ko.sh COPYONLY)
+configure_file(integration_ko.sh.in integration_ko.sh @ONLY)
 
 
 add_custom_target(target_SOURCE_SHELLSCRIPTS ALL
