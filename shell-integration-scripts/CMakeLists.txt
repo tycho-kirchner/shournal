@@ -1,7 +1,7 @@
 
+configure_file( _common.sh.in _common.sh @ONLY)
 configure_file(integration_ko.sh integration_ko.sh COPYONLY)
 
-configure_file( _common.sh.in _common.sh )
 
 add_custom_target(target_SOURCE_SHELLSCRIPTS ALL
   COMMAND ${CMAKE_COMMAND} -E create_symlink _source_me_generic.sh SOURCE_ME.bash

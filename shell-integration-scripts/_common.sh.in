@@ -1,4 +1,10 @@
 
-# variables auto-filled by cmake
-_shournal_version="${shournal_version}"
-export SHOURNAL_PATH_LIB_SHELL_INTEGRATION="${full_path_libshournal}"
+# BEGIN_SECTION auto-filled by cmake
+_shournal_version="@shournal_version@"
+
+# -z: Allow to be overwritten
+[ -z "${SHOURNAL_PATH_LIB_SHELL_INTEGRATION+x}" ] &&
+  export SHOURNAL_PATH_LIB_SHELL_INTEGRATION="@full_path_libshournal@" ||
+  :
+
+# END_SECTION auto-filled by cmake
