@@ -125,6 +125,8 @@ inline int run(int argc, char *argv[])
         const auto shellArgs = argShell.getValue<QString>().split(" ", QString::SkipEmptyParts);
         if(shellArgs.first() == "bash"){
             globals().integrationSetupCommand = "export HISTFILE=/dev/null";
+        } else if(shellArgs.first() == "zsh"){
+            globals().integrationSetupCommand = "unset HISTFILE";
         } else {
             QIErr() << "currently only bash is supported.";
             exit(1);

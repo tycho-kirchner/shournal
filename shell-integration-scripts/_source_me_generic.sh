@@ -20,13 +20,12 @@ __shournal_select_backend(){
     local IFS=
     local scriptname
 
-    if [ -n "$BASH_VERSION" ]; then
+    if [ -n "${BASH_VERSION+x}" ]; then
        this_shell='bash'
        scriptname="$BASH_SOURCE"
-    # Once zsh-support is ready:
-    # elif [ -n "$ZSH_VERSION" ]; then
-    #    this_shell='zsh'
-    #    scriptname="$0"
+    elif [ -n "${ZSH_VERSION+x}" ]; then
+       this_shell='zsh'
+       scriptname="$0"
     else
         __shournal_eprint "called from unsupported shell [currently only bash is supported]"
         return 1
