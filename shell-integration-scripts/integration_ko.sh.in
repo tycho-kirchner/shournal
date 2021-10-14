@@ -233,13 +233,11 @@ _shournal_run_finalize(){
 # observing this pid.
 _shournal_detach_this_pid(){
     local fifopath
-    local reset_nomatch=false
     local ret=0
 
     if [ "$_shournal_this_shell" = 'zsh' ] && [[ -o nomatch ]]; then
         # supress nomatch error messages (and aborts)
-        # TODO: just setopt LOCAL_OPTIONS ??
-        reset_nomatch=true
+        setopt LOCAL_OPTIONS
         unsetopt nomatch
     fi
 
@@ -258,7 +256,6 @@ _shournal_detach_this_pid(){
             ret=1
         fi
     fi
-    $reset_nomatch && setopt nomatch
     return $ret
 }
 
