@@ -54,8 +54,6 @@ public:
     SessionInfo sessionInfo;
     int shournalRootDirFd {-1};
 
-    QDateTime lastCmdStartTime {};
-
 public:
     ~ShellGlobals() = default;
     Q_DISABLE_COPY(ShellGlobals)

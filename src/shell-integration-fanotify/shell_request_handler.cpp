@@ -36,10 +36,6 @@ using socket_message::socketMsgToStr;
 using fdcommunication::SocketCommunication;
 
 
-namespace  {
-
-
-
 /// ENABLE: shell observation enabled
 /// DISABLE: shell observation disabled
 /// PREPARE_CMD: prepare observing the next command-sequence
@@ -80,7 +76,7 @@ enum class ShellRequest {ENABLE, DISABLE,
 // }
 
 
-bool initializeAttachedShellIfNeeded(){
+static bool initializeAttachedShellIfNeeded(){
     auto& g_shell = ShellGlobals::instance();
     if(g_shell.pAttchedShell != nullptr){
         return true;
@@ -91,25 +87,29 @@ bool initializeAttachedShellIfNeeded(){
         logCritical << "shell name is not set in envrionment. Command not reported.";
         return false;
     }
-    switch (attachedShellName[0]) {
-    case 'b':
-        try {
+    try {
+        switch (attachedShellName[0]) {
+        case 'b': // bash
             g_shell.pAttchedShell = new AttachedBash();
-        } catch (const os::ExcOs& e) {
-            logCritical << "Failed to initialize attached shell:" << e.what();
+            break;
+        case 'z': // zsh - nothing special to do.
+            g_shell.pAttchedShell = new AttachedShell();
+            break;
+        default:
+            logCritical << "unknown shell name:" << attachedShellName;
             return false;
         }
-        break;
-    default:
-        logCritical << "unknown shell name:" << attachedShellName;
+    } catch (const os::ExcOs& e) {
+        logCritical << "Failed to initialize attached shell:" << e.what();
         return false;
     }
+
     return true;
 }
 
 
 
-bool loadSettings(){
+static bool loadSettings(){
     try {
         // maybe_todo: copy file to another path and load the same file later in shournal-run:
         Settings::instance().load();
@@ -122,7 +122,7 @@ bool loadSettings(){
 }
 
 
-void updateVerbosityFromEnv(){
+static void updateVerbosityFromEnv(){
     const char* desiredVerbosityStr = getenv("_SHOURNAL_LIB_SHELL_VERBOSITY");
     if(desiredVerbosityStr == nullptr){
         return;
@@ -142,7 +142,7 @@ void updateVerbosityFromEnv(){
 /// Shells usually start at low numbers for internal file descriptors (usually 10),
 /// we try to find the highest possible free fd
 /// If startFd != -1, start searching from that.
-int verbose_findHighestFreeFd(int startFd=-1){
+static int verbose_findHighestFreeFd(int startFd=-1){
     int fd = osutil::findHighestFreeFd(startFd, 30);
     if(fd == -1){
         logWarning << qtr("Could not find a free file descriptor number. "
@@ -150,6 +150,196 @@ int verbose_findHighestFreeFd(int startFd=-1){
                       .arg(osutil::getMaxCountOpenFiles());
     }
     return fd;
+}
+
+/// Read update request from environment and check if the request
+/// is valid (log error on exit).
+/// @return The valid request, or ENUM_END if no request was found or it
+/// was invalid.
+static ShellRequest readCheckShellUpdateRequest(){
+    const char* TRIGGER_NAME = "_LIBSHOURNAL_TRIGGER";
+
+    const char* shellStateStr = getenv(TRIGGER_NAME);
+    if(shellStateStr == nullptr){
+        // No update request
+        return ShellRequest::ENUM_END;
+    }
+
+    auto unsetTrigger = finally([&TRIGGER_NAME] {
+        try {
+            os::unsetenv(TRIGGER_NAME);
+        } catch (const os::ExcOs& e) {
+            logCritical << e.what();
+        }
+    });
+
+    uint shellRequestInt;
+    try {
+        qVariantTo_throw(shellStateStr, &shellRequestInt);
+    } catch (const ExcQVariantConvert& ex) {
+        logCritical << qtr("Cannot determine shell-request: ")
+                    << ex.descrip();
+        return ShellRequest::ENUM_END;
+    }
+
+    if(shellRequestInt >= static_cast<int>(ShellRequest::ENUM_END)){
+        logCritical << qtr("Invalid shell-request passed:")
+                    << shellRequestInt;
+        return ShellRequest::ENUM_END;
+    }
+    auto shellRequest = static_cast<ShellRequest>(shellRequestInt);
+
+    // Note: this logDebug is called BEFORE initialize logging.
+    // logDebug << "received shell request:" << int(shellRequest);
+    // QIErr() << "received shell request:" << int(shellRequest) << "(current state:"
+    //          << int(ShellGlobals::instance().watchState) << ")";
+    return shellRequest;
+}
+
+static void verboseCloseShournalSocket(){
+    auto& g_shell = ShellGlobals::instance();
+    if(g_shell.shournalSocket.sockFd() >= 0 &&
+            close(g_shell.shournalSocket.sockFd()) == -1){
+        logWarning << "close of shournal-socket failed:"
+                   << translation::strerror_l();
+
+    }
+    g_shell.shournalSocket.setSockFd(-1);
+}
+
+static void verboseCloseRootDirFd(){
+    auto& g_shell = ShellGlobals::instance();
+    if(g_shell.shournalRootDirFd >= 0 &&
+            close(g_shell.shournalRootDirFd) == -1){
+        logWarning << "close of shournal-root dir-fd failed:"
+                   << translation::strerror_l();
+
+    }
+    g_shell.shournalRootDirFd = -1;
+}
+
+
+static void handleDisableRequest(){
+    auto& g_shell = ShellGlobals::instance();
+    if(g_shell.watchState == E_WatchState::DISABLED){
+        logWarning << qtr("Received disable-request while shell observation "
+                          "was already disabled.");
+        return;
+    }
+    g_shell.watchState = E_WatchState::DISABLED;
+
+    verboseCloseShournalSocket();
+    verboseCloseRootDirFd();
+}
+
+
+static void handleCleanupCmd(){
+    auto& g_shell = ShellGlobals::instance();
+
+    if(g_shell.watchState != E_WatchState::WITHIN_CMD){
+        //   can for example happen, if
+        // - a user presses enter while the command-string is empty, or Ctrl+C
+        //   is pressed without a currently executing command,
+        // - being at the first prompt after SHOURNAL_ENABLE -> no command
+        //   was observed yet, nothing to clean up
+        logDebug << "ignoring cleanup-request: not within command.";
+        return;
+    }
+
+    auto finalActions = finally([&g_shell] {
+        g_shell.watchState = E_WatchState::INTERMEDIATE;
+        verboseCloseShournalSocket();
+        verboseCloseRootDirFd();
+    });
+
+    QByteArray lastCommand = getenv("_SHOURNAL_LAST_COMMAND");
+    if(lastCommand.isNull()){
+        logWarning << "Failed to retrieve last command string from environment";
+        lastCommand = "UNKNOWN";
+    }    
+    const char* lastReturnValueStr = getenv("_SHOURNAL_LAST_RETURN_VALUE");
+    qint32 returnVal = CommandInfo::INVALID_RETURN_VAL;
+    if(lastReturnValueStr == nullptr){
+        logWarning << qtr("Failed to retrieve last return-value from environment");
+    } else {
+        try {
+            qVariantTo_throw(lastReturnValueStr, &returnVal);
+        } catch (const ExcQVariantConvert& ex) {
+            logWarning << "Failed to convert last return value:"
+                       << ex.descrip();
+        }
+    }
+    SocketCommunication::Messages messages;
+    messages.push_back({int(E_SocketMsg::COMMAND), lastCommand});
+    messages.push_back({int(E_SocketMsg::RETURN_VALUE), qBytesFromVar(returnVal)});
+    g_shell.shournalSocket.sendMessages(messages);
+}
+
+
+static void handleEnableRequest(){
+    if(! initializeAttachedShellIfNeeded()){
+        return;
+    }
+
+    updateVerbosityFromEnv();
+    auto& g_shell = ShellGlobals::instance();
+    if(g_shell.watchState != E_WatchState::DISABLED){
+        logDebug << "received enable request while watchstate != DISABLED"
+                 << int(E_WatchState::DISABLED);
+    }
+
+    static StaticInitializer initOnFirstCall( [](){
+        app::setupNameAndVersion("shournal shell-integration");
+        try {
+            if(! shournal_common_init()){
+                QIErr()  << qtr("Fatal error: failed to initialize custom Qt conversion functions");
+            }
+            shell_logger::setup();
+            translation::init();
+        } catch (const std::exception& ex) {
+            logCritical << ex.what();
+        }
+
+        // This shell might have been launched within an already observed shell.
+        // Note that when the shell observation was launched, we already left
+        // the observerd mount namespace. Thus all that remains to do is closing
+        // respective fd (which hopefully does not belong to another program..
+        const char* socketNbStr = getenv(app::ENV_VAR_SOCKET_NB);
+        if(socketNbStr != nullptr){
+            auto laterUnsetIt = finally([] { unsetenv(app::ENV_VAR_SOCKET_NB); });
+
+            int fdNb;
+            try {
+                qVariantTo_throw(socketNbStr, &fdNb);
+            } catch (const ExcQVariantConvert& ex) {
+                logCritical << qtr("Bad environment variable %1: ").arg(app::ENV_VAR_SOCKET_NB)
+                            << ex.descrip();
+                return;
+            }
+            if(osutil::fdIsOpen(fdNb)){
+                logDebug << "initially closing shournal-socket" << fdNb;
+
+                try {
+                    os::close(fdNb);
+                } catch (const os::ExcOs& e){
+                    logCritical << "handleEnableRequest" << e.what();
+                }
+            } else {
+                logInfo << QString("The environment variable %1 is set, but the socket "
+                                    "%2 is not open").arg(app::ENV_VAR_SOCKET_NB).arg(fdNb);
+            }
+        }
+    });
+
+    g_shell.watchState = E_WatchState::INTERMEDIATE;
+    bool madeSafe;
+    g_shell.sessionInfo.uuid = make_uuid(&madeSafe);
+    if(! madeSafe){
+        logInfo << __func__ << qtr("session uuid not created 'safe'. Is the uuidd-daemon running?");
+    }
+    os::setenv(QByteArray("SHOURNAL_SESSION_ID"), g_shell.sessionInfo.uuid.toBase64());
+
+    g_shell.pAttchedShell->handleEnable();
 }
 
 
@@ -163,7 +353,7 @@ int verbose_findHighestFreeFd(int startFd=-1){
 /// Note that for processes, which close passed file-descriptors
 /// before exit, shournal might quit too early, in which case file modfication events
 /// are lost
-void handlePrepareCmd(){
+void shell_request_handler::handlePrepareCmd(){
     updateVerbosityFromEnv();
     auto& g_shell = ShellGlobals::instance();
     if(g_shell.watchState == E_WatchState::WITHIN_CMD){
@@ -309,221 +499,6 @@ void handlePrepareCmd(){
     g_shell.shournalRootDirFd = -1;
 
 }
-
-
-
-
-/// Read update request from environment and check if the request
-/// is valid (log error on exit).
-/// @return The valid request, or ENUM_END if no request was found or it
-/// was invalid.
-ShellRequest readCheckShellUpdateRequest(){
-    const char* TRIGGER_NAME = "_LIBSHOURNAL_TRIGGER";
-
-    const char* shellStateStr = getenv(TRIGGER_NAME);
-    if(shellStateStr == nullptr){
-        // No update request
-        return ShellRequest::ENUM_END;
-    }
-
-    auto unsetTrigger = finally([&TRIGGER_NAME] {
-        try {
-            os::unsetenv(TRIGGER_NAME);
-        } catch (const os::ExcOs& e) {
-            logCritical << e.what();
-        }
-    });
-
-    uint shellRequestInt;
-    try {
-        qVariantTo_throw(shellStateStr, &shellRequestInt);
-    } catch (const ExcQVariantConvert& ex) {
-        logCritical << qtr("Cannot determine shell-request: ")
-                    << ex.descrip();
-        return ShellRequest::ENUM_END;
-    }
-
-    if(shellRequestInt >= static_cast<int>(ShellRequest::ENUM_END)){
-        logCritical << qtr("Invalid shell-request passed:")
-                    << shellRequestInt;
-        return ShellRequest::ENUM_END;
-    }
-    auto shellRequest = static_cast<ShellRequest>(shellRequestInt);
-
-    // Note: this logDebug is called BEFORE initialize logging.
-    // logDebug << "received shell request:" << int(shellRequest);
-    // QIErr() << "received shell request:" << int(shellRequest) << "(current state:"
-    //          << int(ShellGlobals::instance().watchState) << ")";
-    return shellRequest;
-}
-
-void verboseCloseShournalSocket(){
-    auto& g_shell = ShellGlobals::instance();
-    if(g_shell.shournalSocket.sockFd() >= 0 &&
-            close(g_shell.shournalSocket.sockFd()) == -1){
-        logWarning << "close of shournal-socket failed:"
-                   << translation::strerror_l();
-
-    }
-    g_shell.shournalSocket.setSockFd(-1);
-}
-
-void verboseCloseRootDirFd(){
-    auto& g_shell = ShellGlobals::instance();
-    if(g_shell.shournalRootDirFd >= 0 &&
-            close(g_shell.shournalRootDirFd) == -1){
-        logWarning << "close of shournal-root dir-fd failed:"
-                   << translation::strerror_l();
-
-    }
-    g_shell.shournalRootDirFd = -1;
-}
-
-
-void handleDisableRequest(){
-    auto& g_shell = ShellGlobals::instance();
-    if(g_shell.watchState == E_WatchState::DISABLED){
-        logWarning << qtr("Received disable-request while shell observation "
-                          "was already disabled.");
-        return;
-    }
-    g_shell.watchState = E_WatchState::DISABLED;
-
-    verboseCloseShournalSocket();
-    verboseCloseRootDirFd();
-}
-
-
-void handleCleanupCmd(){
-    auto& g_shell = ShellGlobals::instance();
-
-    auto clearCmdStartTime = finally([&g_shell] { g_shell.lastCmdStartTime = {}; });
-
-    if(g_shell.lastCmdStartTime.isNull()){
-        logDebug << "last command was invalid";
-
-        // If, for example, a user presses enter while the command-string is empty, or Ctrl+C
-        // is pressed without a currently executing command,
-        // do not cleanup(setup) to avoid unnecessary overhead.
-        // Clear possible events mich might have had occurred meanwhile, e.g. because
-        // of autocompletion.
-        if(g_shell.watchState == E_WatchState::WITHIN_CMD){
-            g_shell.shournalSocket.sendMsg(int(E_SocketMsg::CLEAR_EVENTS));
-        }
-        return;
-    }
-
-    if(g_shell.watchState != E_WatchState::WITHIN_CMD){
-        //   can happen, if
-        // - being at the first prompt after SHOURNAL_ENABLE -> no command
-        //   was observed yet, nothing to clean up
-        // - an interrupt occurs: if a SIGINT occurred between the cleanup request and the installation
-        //   of our sigint-handler or after cleanup but before the setup of the next command, nothing needs
-        //   to be done.
-        return;
-    }
-
-    auto finalActions = finally([&g_shell] {
-        g_shell.watchState = E_WatchState::INTERMEDIATE;
-        verboseCloseShournalSocket();
-        verboseCloseRootDirFd();
-    });
-
-    QByteArray lastCommand = getenv("_SHOURNAL_LAST_COMMAND");
-    if(lastCommand.isNull()){
-        logWarning << "Failed to retrieve last command string from environment";
-        lastCommand = "UNKNOWN";
-    }    
-    const char* lastReturnValueStr = getenv("_SHOURNAL_LAST_RETURN_VALUE");
-    qint32 returnVal = CommandInfo::INVALID_RETURN_VAL;
-    if(lastReturnValueStr == nullptr){
-        logWarning << qtr("Failed to retrieve last return-value from environment");
-    } else {
-        try {
-            qVariantTo_throw(lastReturnValueStr, &returnVal);
-        } catch (const ExcQVariantConvert& ex) {
-            logWarning << "Failed to convert last return value:"
-                       << ex.descrip();
-        }
-    }
-    SocketCommunication::Messages messages;
-    messages.push_back({int(E_SocketMsg::COMMAND), lastCommand});
-    const QByteArray cmdStartDateTime = g_shell.lastCmdStartTime.toString(
-                Conversions::dateIsoFormatWithMilliseconds()).toUtf8();
-    messages.push_back({int(E_SocketMsg::CMD_START_DATETIME), cmdStartDateTime});
-    messages.push_back({int(E_SocketMsg::RETURN_VALUE), qBytesFromVar(returnVal)});
-    g_shell.shournalSocket.sendMessages(messages);
-}
-
-
-void handleEnableRequest(){
-    if(! initializeAttachedShellIfNeeded()){
-        return;
-    }
-
-    updateVerbosityFromEnv();
-    auto& g_shell = ShellGlobals::instance();
-    if(g_shell.watchState != E_WatchState::DISABLED){
-        logDebug << "received enable request while watchstate != DISABLED"
-                 << int(E_WatchState::DISABLED);
-    }
-
-    static StaticInitializer initOnFirstCall( [](){
-        app::setupNameAndVersion("shournal shell-integration");
-        try {
-            if(! shournal_common_init()){
-                QIErr()  << qtr("Fatal error: failed to initialize custom Qt conversion functions");
-            }
-            shell_logger::setup();
-            translation::init();
-        } catch (const std::exception& ex) {
-            logCritical << ex.what();
-        }
-
-        // This shell might have been launched within an already observed shell.
-        // Note that when the shell observation was launched, we already left
-        // the observerd mount namespace. Thus all that remains to do is closing
-        // respective fd (which hopefully does not belong to another program..
-        const char* socketNbStr = getenv(app::ENV_VAR_SOCKET_NB);
-        if(socketNbStr != nullptr){
-            auto laterUnsetIt = finally([] { unsetenv(app::ENV_VAR_SOCKET_NB); });
-
-            int fdNb;
-            try {
-                qVariantTo_throw(socketNbStr, &fdNb);
-            } catch (const ExcQVariantConvert& ex) {
-                logCritical << qtr("Bad environment variable %1: ").arg(app::ENV_VAR_SOCKET_NB)
-                            << ex.descrip();
-                return;
-            }
-            if(osutil::fdIsOpen(fdNb)){
-                logDebug << "initially closing shournal-socket" << fdNb;
-
-                try {
-                    os::close(fdNb);
-                } catch (const os::ExcOs& e){
-                    logCritical << "handleEnableRequest" << e.what();
-                }
-            } else {
-                logInfo << QString("The environment variable %1 is set, but the socket "
-                                    "%2 is not open").arg(app::ENV_VAR_SOCKET_NB).arg(fdNb);
-            }
-        }
-    });
-
-    g_shell.watchState = E_WatchState::INTERMEDIATE;
-    bool madeSafe;
-    g_shell.sessionInfo.uuid = make_uuid(&madeSafe);
-    if(! madeSafe){
-        logInfo << __func__ << qtr("session uuid not created 'safe'. Is the uuidd-daemon running?");
-    }
-    os::setenv(QByteArray("SHOURNAL_SESSION_ID"), g_shell.sessionInfo.uuid.toBase64());
-
-    g_shell.pAttchedShell->handleEnable();
-}
-
-
-} // namespace
 
 
 

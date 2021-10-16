@@ -209,8 +209,6 @@ _shournal_prompt_stop() {
         SHOURNAL_DISABLE
         return $_SHOURNAL_LAST_RETURN_VALUE
     fi
-
-    _libshournal_prepare_cmd
     return $_SHOURNAL_LAST_RETURN_VALUE
 
 }
