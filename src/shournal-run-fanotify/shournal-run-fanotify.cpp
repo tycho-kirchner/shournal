@@ -146,6 +146,13 @@ int shournal_run_main(int argc, char *argv[])
                                         "must be the string 'SHOURNAL_DUMMY_NULL=1'"));
     parser.addArg(&argEnv);
 
+    // TODO: currently only interface compatibility.
+    // We could indeed fork as well, at least in the exec-case.
+    QOptArg argFork("", "fork",
+                         qtr("NOT USED"), false);
+    argFork.setInternalOnly(true);
+    parser.addArg(&argFork);
+
     QOptArg argTmpDir("", "tmpdir",
                       qtr("Use the given TMPDIR (for non security-relevant stuff). "
                           "As a setuid binary some variables are cleared from "
