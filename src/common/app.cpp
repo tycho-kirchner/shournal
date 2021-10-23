@@ -24,6 +24,12 @@ const char* app::SHOURNAL_RUN_FANOTIFY = "shournal-run-fanotify";
 const char* app::MSENTER_ONLY_GROUP = SHOURNAL_MSENTERGROUP; // defined in cmake
 const char* app::ENV_VAR_SOCKET_NB = "_SHOURNAL_SOCKET_NB";
 
+const std::unordered_set<QString> &app::VERBOSITIES = {"dbg",
+                                            #if QT_VERSION >= QT_VERSION_CHECK(5, 5, 0)
+                                                "info",
+                                            #endif
+                                                "warning", "critical"};
+
 
 static bool g_inIntegrationTestMode=false;
 

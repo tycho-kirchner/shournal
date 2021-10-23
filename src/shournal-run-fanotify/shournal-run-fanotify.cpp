@@ -180,11 +180,7 @@ int shournal_run_main(int argc, char *argv[])
 
     QOptArg argVerbosity("", "verbosity", qtr("How much shall be printed to stderr. Note that "
                                               "for 'dbg' shournal-run must not be a 'Release'-build."));
-    argVerbosity.setAllowedOptions({"dbg",
-                                #if QT_VERSION >= QT_VERSION_CHECK(5, 5, 0)
-                                    "info",
-                                #endif
-                                    "warning", "critical"});
+    argVerbosity.setAllowedOptions(app::VERBOSITIES);
     parser.addArg(&argVerbosity);
 
     QOptArg argShellSessionUUID("", "shell-session-uuid", qtr("uuid as base64-encoded string"));
