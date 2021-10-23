@@ -1,4 +1,5 @@
 CMakeLists.txt.user*
+*.geany
 *.autosave
 package-lock.json
 html-export/node_modules
