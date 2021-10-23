@@ -29,6 +29,7 @@ GENERATE_EXPORT_HEADER(libshournal-shellwatch)
 hide_static_lib_symbols(libshournal-shellwatch)
 
 # manually set the name of the .so -> we need it later
+# Do not change the name libshournal-shellwatch.so, it is hardcoded into the shell-integration-scripts.
 set_target_properties(libshournal-shellwatch PROPERTIES OUTPUT_NAME "${libshournal_fullname}")
 set_target_properties(libshournal-shellwatch PROPERTIES PREFIX "")
 set_target_properties(libshournal-shellwatch PROPERTIES SUFFIX "")
@@ -52,10 +53,6 @@ install(TARGETS libshournal-shellwatch
      DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}/${PROJECT_NAME}
 )
 
-install(FILES
-    ../../shell-integration-scripts/bash/integration_fan.bash
-    DESTINATION ${shournal_install_dir_script}
-    )
 
 
 

@@ -1,0 +1,182 @@
+
+# Shell integration for shournal
+# This file contains all public functions and
+# must be compatible with all supported shells.
+
+SHOURNAL_ENABLE(){
+    local path_to_shournal
+    local path_to_shournal_run
+    declare -a args_array
+    local cmd_path
+
+    path_to_shournal=$(command -v shournal)
+    if [ -z "$path_to_shournal" ] ; then
+        _shournal_error "cannot enable shournal's shell integration - command <shournal> not found"
+        return 1
+    fi
+
+    path_to_shournal_run=$(command -v "$_shournal_run_backend")
+    if [ -z "$path_to_shournal_run" ] ; then
+        _shournal_error "cannot enable shournal's shell integration - " \
+                        "command «$_shournal_run_backend» not found"
+        return 1
+    fi
+
+    if ! shournal --validate-settings; then
+        # informative mesg. should have been already printed by shournal
+        _shournal_error "shell integration is *not* enabled"
+        return 1
+    fi
+
+    if [ "$_shournal_run_backend" = 'shournal-run' ] &&
+       ! shournal-run --shournalk-is-loaded; then
+        _shournal_warn "Cannot enable the shell-integration -" \
+                       "the required kernel module is not loaded."
+        return 1
+    fi
+
+    if [ -n "${_shournal_parent_launched_us_noninteractive+x}" ] ; then
+        # avoid endless recursion. However, if during execution an interactive shell is launched, allow
+        # for an "interactive" SHOURNAL_ENABLE. That applies to subprocesses. To handle multiple calls
+        # of this function within this process, set it without exporting
+        unset _shournal_parent_launched_us_noninteractive
+        _shournal_parent_launched_us_noninteractive=true
+        return 0
+    fi
+
+    if [ -n "${_shournal_is_running+x}" ] ; then
+        _shournal_debug "SHOURNAL_ENABLE: current session is already observed"
+        return 0
+    fi
+
+    if [ -n "${_shournal_shell_exec_string+x}" ]; then
+        cmd_path="$(readlink /proc/$$/exe)"
+        while IFS= read -r -d '' line; do
+            args_array+=("$line")
+        done < /proc/$$/cmdline
+
+        _shournal_debug "SHOURNAL_ENABLE: exec non-interactive $cmd_path ${args_array[@]}"
+        _shournal_parent_launched_us_noninteractive=true exec \
+            "$_shournal_run_backend" --fork --verbosity "$_SHOURNAL_VERBOSITY" \
+             --exec-filename "$cmd_path" --exec "${args_array[@]}"
+        # only get here on error
+        return 1
+    fi
+
+    # Running interactively
+    _shournal_verbose_history_check || return 1
+
+    _shournal_enable
+}
+
+
+SHOURNAL_DISABLE() {
+    # In case we were called in a sequence, e.g.
+    # $ (exit 123); SHOURNAL_DISABLE
+    # capture the exit code here
+    local exitcode=$?
+
+    # if running non-interactively, disabling SHOURNAL does not have an effect.
+    [ -n "${_shournal_parent_launched_us_noninteractive+x}" ] && return 0
+    [ -z "${_shournal_is_running+x}" ] && return 0
+
+    _shournal_disable $exitcode
+
+    unset _shournal_is_running _shournal_last_cmd_seq \
+          _shournal_session_uuid _shournal_cmd_seq_hotfix
+}
+
+
+# $1: pass one of dbg, info, warning, critical
+SHOURNAL_SET_VERBOSITY(){
+    case "$1" in
+    "dbg")
+        _shournal_shell_integration_log_level=0
+        ;;
+    "info")
+        _shournal_shell_integration_log_level=1
+        ;;
+    "warning")
+        _shournal_shell_integration_log_level=2
+        ;;
+    "critical")
+        _shournal_shell_integration_log_level=3
+        ;;
+    *)
+        _shournal_warn "Bad verbosity passed. Pass one of dbg, info, warning, critical"
+        return 1
+        ;;
+    esac
+
+    # verbosity for shournal-run*
+    export _SHOURNAL_VERBOSITY="$1"
+    _shournal_set_verbosity "$1"
+}
+
+SHOURNAL_PRINT_VERSIONS() {
+    echo "shournal $_SHOURNAL_SHELL_NAME integration version: $_shournal_version"
+    echo "shournal: $(shournal --version)"
+    _shournal_print_versions
+}
+
+
+# _________ End of public interface _________ #
+
+
+# BEGIN_SECTION auto-filled by cmake
+_shournal_version="@shournal_version@"
+
+# -z: Allow to be overwritten
+[ -z "${SHOURNAL_PATH_LIB_SHELL_INTEGRATION+x}" ] &&
+  export SHOURNAL_PATH_LIB_SHELL_INTEGRATION="@full_path_libshournal@"
+
+# END_SECTION auto-filled by cmake
+
+
+# We have to set several global variables here and _not_ in SHOURNAL_ENABLE
+# for the libshournal-shellwatch.so LD_PRELOAD-hack. If it is not
+# not loaded, on SHOURNAL_ENABLE we exec the current shell again and
+# perform the actual initialization. Therefore, *this*
+# script must be sourced within the shell's rc but we don't want to
+# require SHOURNAL_ENABLE within the rc-file.
+
+# 0: debug, 1: info, 2: warning, 3: error
+[ -z "${_shournal_shell_integration_log_level+x}" ] &&
+    _shournal_shell_integration_log_level=2
+# verbosity for shournal-run* ( _must_ be exported )
+[ -z "${_SHOURNAL_VERBOSITY+x}" ] &&
+    export _SHOURNAL_VERBOSITY="warning"
+# verbosity for libshournal-shellwatch.so ( _must_ be exported )
+[ -z "${_SHOURNAL_LIB_SHELL_VERBOSITY+x}" ] &&
+    export _SHOURNAL_LIB_SHELL_VERBOSITY="warning"
+
+
+# Setup non-portable stuff for
+# each supported shell. The following variables _must_ be set:
+# _SHOURNAL_SHELL_NAME  (name of the current shell). It must be exported
+# for libshournal-shellwatch.so.
+# _shournal_shell_exec_string - if and only if the command is executed non-interactively
+if [ -n "${BASH_VERSION+x}" ]; then
+export _SHOURNAL_SHELL_NAME='bash'
+
+# The bash execution string is e.g. set when running bash -c 'echo foo', in which case we never get to
+# any prompt. Simply execute the whole command
+# within shournal.
+# Checking $BASH_EXECUTION_STRING seems to be more reliable than [[ $- == *i* ]], because
+# of commands like e.g. bash -i -c 'echo "wtf - is that interactive?"'
+[ -n "${BASH_EXECUTION_STRING+x}" ] &&
+    _shournal_shell_exec_string="$BASH_EXECUTION_STRING"
+
+
+elif [ -n "${ZSH_VERSION+x}" ]; then
+
+export _SHOURNAL_SHELL_NAME='zsh'
+
+[ -n "${ZSH_EXECUTION_STRING+x}" ] &&
+    _shournal_shell_exec_string="$ZSH_EXECUTION_STRING"
+
+else
+    echo "shournal shell integration: sourced from unsupported shell - " \
+         "currently only bash and zsh are supported." >&2
+    return 1
+fi

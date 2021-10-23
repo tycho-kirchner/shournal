@@ -8,46 +8,61 @@
 #include <cstdio>
 #include <iostream>
 
+#include "cleanupresource.h"
 #include "event_open.h"
 #include "event_other.h"
 #include "event_process.h"
 #include "staticinitializer.h"
 #include "shell_globals.h"
-#include "logger.h"
-#include "qoutstream.h"
 #include "shell_logger.h"
-#include "translation.h"
-#include "app.h"
 
 // cmake export-symbol control:
 #include "libshournal-shellwatch_export.h"
 
-namespace  {
 
 /// Initalize the original functions close, fclose ...
 /// One might think it was a good idea, to initialize the functions
 /// in gcc's __attribute__((constructor)). This is too late,
 /// at that time fclose/close was already called several times.
-void initSymIfNeeded(){
+/// One has to be _extremely_ careful not to call anything which invokes
+/// one of the below preloaded functions (open, fork...) in here,
+/// otherwise we're lost.
+static void initSymIfNeeded(){
     static StaticInitializer loader( [](){
         try {
-            ShellGlobals& globals = ShellGlobals::instance();
-            globals.orig_fork = reinterpret_cast<fork_func_t>(os::dlsym(RTLD_NEXT, "fork"));
-            globals.orig_execve = reinterpret_cast<execve_func_t>(os::dlsym(RTLD_NEXT, "execve"));
-            globals.orig_open = reinterpret_cast<open_func_t>(os::dlsym(RTLD_NEXT, "open"));
+            ShellGlobals& g_shell = ShellGlobals::instance();
+            g_shell.orig_fork = reinterpret_cast<fork_func_t>(os::dlsym(RTLD_NEXT, "fork"));
+            g_shell.orig_execve = reinterpret_cast<execve_func_t>(os::dlsym(RTLD_NEXT, "execve"));
+            g_shell.orig_open = reinterpret_cast<open_func_t>(os::dlsym(RTLD_NEXT, "open"));
             // globals.orig_fopen = reinterpret_cast<fopen_func_t>(os::dlsym(RTLD_NEXT, "fopen"));
-            globals.orig_strcpy = reinterpret_cast<strcpy_func_t>(os::dlsym(RTLD_NEXT, "strcpy"));
+            g_shell.orig_strcpy = reinterpret_cast<strcpy_func_t>(os::dlsym(RTLD_NEXT, "strcpy"));
 
             return;
         } catch(const os::ExcOs& ex){
-            logCritical << "failed to load original symbols, expect the worst..." << ex.what();
+            std::cerr << "shournal shell integration fatal error: "
+                      << "failed to load original symbols, expect the worst..." << ex.what();
             throw ;
         }
     });
+
+#ifndef NDEBUG
+    // Ignoring events is maybe not strictly necessary here,
+    // but better safe than sorry.
+    ShellGlobals& g_shell = ShellGlobals::instance();
+    if(g_shell.ignoreEvents.test_and_set()){
+        return;
+    }
+    auto clearIgnEvents = finally([&g_shell] { g_shell.ignoreEvents.clear(); });
+
+    static StaticInitializer initPrintDbg( [](){
+        shell_earlydbg("initalizing libshournal-shellwatch.so for pid %d %s",
+                       os::getpid(),
+                       os::readlink<std::string>("/proc/self/exe").c_str());
+    });
+#endif
+
 }
 
-
-} // namespace
 
 #ifdef __cplusplus
 extern "C" {

@@ -40,9 +40,11 @@ static const int DEFAULT_CREAT_FLAGS = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 extern const int OPEN_WRONLY;
 extern const int OPEN_RDONLY;
 extern const int OPEN_RDWR;
+extern const int OPEN_CLOEXEC;
 extern const int OPEN_NONBLOCK;
 extern const int OPEN_EXCL;
 extern const int OPEN_CREAT;
+extern const int OPEN_TRUNC;
 
 
 class ExcKernelVersionParse : public std::exception

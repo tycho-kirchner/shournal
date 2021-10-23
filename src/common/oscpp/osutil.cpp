@@ -309,3 +309,24 @@ int osutil::findHighestFreeFd(int startFd, int minFd){
     }
     return -1;
 }
+
+int osutil::unnamed_tmp(int flags){
+    QByteArray p(QDir::tempPath().toUtf8());
+    // tmpfs and possibly other filesystems do not suppot O_TMPFILE, for
+    // the sake of simplicity just use mkostemp.
+#if false
+//#ifdef O_TMPFILE
+    int fd = os::open(p, O_RDWR | O_TMPFILE | O_EXCL | o_flags, true, S_IRUSR | S_IWUSR);
+#else
+    p = pathJoinFilename(p, QByteArray("tmp.XXXXXX"));
+    int fd = ::mkostemp(p.data(), flags);
+    if (fd < 0) {
+        throw os::ExcOs("unnamed_tmp failed");
+    }
+    if(remove(p) < 0){
+        fprintf(stderr, "%s: failed to delete the just created file %s - %s\n",
+                __func__, p.constData(), strerror(errno));
+    }
+#endif
+    return fd;
+}

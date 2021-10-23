@@ -13,8 +13,13 @@
 #include "shell_globals.h"
 #include "cleanupresource.h"
 #include "qoutstream.h"
-#include "translation.h"
+#include "osutil.h"
 #include "shell_request_handler.h"
+#include "shell_logger.h"
+#include "translation.h"
+
+using shell_request_handler::ShellRequest;
+using shell_request_handler::checkForTriggerAndHandle;
 
 /// @return absolute version of the passed path or an empty string in case
 /// of an error.
@@ -50,6 +55,20 @@ static std::string mkAbsPath(const char* path){
     return buf;
 }
 
+/// Write to a new unnamed tmp-file, if the shell-request
+/// was successful. Note that the shell will close the fd
+/// for us later.
+/// @return fd to deleted tmp-file.
+static int writerTriggerResponse(bool success){
+    int fd =  osutil::unnamed_tmp();
+    std::string mesg = (success) ? "ok" : "fail";
+    // write string null-terminated (size+1) so in the shell
+    // we can read -d '' trigger_response < '_///shournal_trigger_response///_'
+    os::write(fd, mesg.c_str(), mesg.size() + 1);
+    os::lseek(fd, 0, SEEK_SET);
+    return fd;
+}
+
 int event_open::handleOpen(const char *pathname, int flags, mode_t mode, bool largeFile)
 {
     if(largeFile){
@@ -62,13 +81,24 @@ int event_open::handleOpen(const char *pathname, int flags, mode_t mode, bool la
     }
     auto clearIgnEvents = finally([&g_shell] { g_shell.ignoreEvents.clear(); });
 
-    if(! g_shell.inSubshell){
-        if(shell_request_handler::checkForTriggerAndHandle()){
-            return g_shell.orig_open(pathname, flags, mode);
-        }
+    // Note: we only process shell-request if the trigger env-variable is set AND the current
+    // pathname is _///shournal_trigger_response///_
+    // So check for the pathname before calling handling the request in
+    // checkForTriggerAndHandle (this is for cases where the trigger variable is set
+    // and other redirections occurr in between).
+    if(! g_shell.inSubshell &&
+       strcmp(pathname, "_///shournal_trigger_response///_") == 0){
+        bool shellRequestSuccess = false;
+        auto shellRequest = checkForTriggerAndHandle(&shellRequestSuccess);
+        switch (shellRequest) {
+            case ShellRequest::TRIGGER_UNSET: break;
+            default:
+                return writerTriggerResponse(shellRequestSuccess);
+            }
     }
 
     if(g_shell.watchState != E_WatchState::WITHIN_CMD){
+        shell_earlydbg("ignoring pathname %s (not WITHIN_CMD)", pathname);
         return g_shell.orig_open(pathname, flags, mode);
     }
     const auto absPath = mkAbsPath(pathname);

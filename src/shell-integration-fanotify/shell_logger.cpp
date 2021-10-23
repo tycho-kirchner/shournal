@@ -1,3 +1,4 @@
+#include <stdarg.h>
 
 #include <QtGlobal>
 #include <QDateTime>
@@ -102,4 +103,29 @@ void shell_logger::flushBufferdMessages()
         sendViaSock(msg);
     }
     sLogState().bufferedMessages.clear();
+}
+
+/// Instead of logDebug use this function which works without any
+/// complex initialization. Otherwise we might mess up global variables of
+/// the attached program, e.g. qInstallMessageHandler or
+/// QCoreApplication::setApplicationName ...
+/// Note however that we remove *this shared libaray from LD_PRELOAD _before_
+/// calling qInstallMessageHandler etc. (from within the shell integration scripts),
+/// so we should be mostly safe.
+/// In general it is probably a good idea to not use foreign complex functions
+/// like qInstallMessageHandler from within the shell integration at all ..
+void __shell_earlydbg(const char* file, int line, const char *format, ...)
+{
+    const char* verbosityValue = getenv(ENV_VARNAME_SHELL_VERBOSITY);
+    if(verbosityValue == nullptr || strcmp(verbosityValue, "dbg") != 0){
+        return;
+    }
+    fprintf(stderr, "shournal shell integration Dbg: (%s:%d) pid %d: ",
+            file, line, os::getpid());
+
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fprintf(stderr, "\n");
 }

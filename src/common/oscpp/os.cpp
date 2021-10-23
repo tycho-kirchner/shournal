@@ -30,9 +30,11 @@
 const int os::OPEN_WRONLY = O_WRONLY;
 const int os::OPEN_RDONLY = O_RDONLY;
 const int os::OPEN_RDWR = O_RDWR;
+const int os::OPEN_CLOEXEC = O_CLOEXEC;
 const int os::OPEN_NONBLOCK = O_NONBLOCK;
 const int os::OPEN_CREAT = O_CREAT;
 const int os::OPEN_EXCL = O_EXCL;
+const int os::OPEN_TRUNC = O_TRUNC;
 
 
 

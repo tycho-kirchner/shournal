@@ -48,6 +48,8 @@ int reopenFdByPath(int oldFd, int openflags, bool clo_exec=true,
 
 bool sameFile(const os::stat_t& st1, const os::stat_t& st2);
 
+int unnamed_tmp(int flags=os::OPEN_CLOEXEC);
+
 void waitForSignals();
 
 

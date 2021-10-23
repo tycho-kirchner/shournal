@@ -123,12 +123,12 @@ inline int run(int argc, char *argv[])
             exit(1);
         }
         const auto shellArgs = argShell.getValue<QString>().split(" ", QString::SkipEmptyParts);
-        if(shellArgs.first() == "bash"){
+        if(shellArgs.first().startsWith("bash")){
             globals().integrationSetupCommand = "export HISTFILE=/dev/null";
-        } else if(shellArgs.first() == "zsh"){
+        } else if(shellArgs.first().startsWith("zsh")){
             globals().integrationSetupCommand = "unset HISTFILE";
         } else {
-            QIErr() << "currently only bash is supported.";
+            QIErr() << "currently only bash and zsh are supported.";
             exit(1);
         }
 

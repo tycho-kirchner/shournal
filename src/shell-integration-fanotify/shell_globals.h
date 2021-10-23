@@ -7,11 +7,13 @@
 #include <QDateTime>
 #include <mutex>
 
-#include "os.h"
-#include "fdcommunication.h"
-#include "sessioninfo.h"
 #include "attached_shell.h"
+#include "fdcommunication.h"
+#include "logger.h"
+#include "os.h"
+#include "sessioninfo.h"
 #include "util.h"
+
 
 typedef pid_t (*fork_func_t)();
 
@@ -21,6 +23,7 @@ typedef int (*execve_func_t)(const char *filename, char *const argv[],
 typedef int (*open_func_t)(const char *pathname, int flags, mode_t mode);
 typedef char * (*strcpy_func_t)(char *, const char*);
 
+extern const char* ENV_VARNAME_SHELL_VERBOSITY;
 
 enum class E_WatchState {DISABLED, WITHIN_CMD, INTERMEDIATE, ENUM_END};
 
@@ -30,6 +33,8 @@ class ShellGlobals
 
 public:
     static ShellGlobals& instance();
+    static bool performBasicInitIfNeeded();
+    static bool updateVerbosityFromEnv(bool verboseIfUnset);
 
     int shournalSocketNb {-1};
     fork_func_t orig_fork {};
@@ -49,6 +54,7 @@ public:
 
     AttachedShell* pAttchedShell {};
     QtMsgType verbosityLevel {QtMsgType::QtWarningMsg};
+    std::string shournalRunVerbosity {logger::msgTypeToStr(QtWarningMsg)};
     int shournalSockFdDescripFlags {-1};
 
     SessionInfo sessionInfo;

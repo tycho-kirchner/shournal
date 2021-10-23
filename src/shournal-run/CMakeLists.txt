@@ -25,7 +25,3 @@ install(
                 WORLD_READ WORLD_EXECUTE
 )
 
-install(FILES
-    ../../shell-integration-scripts/bash/integration_ko.bash
-    DESTINATION ${shournal_install_dir_script}
-    )

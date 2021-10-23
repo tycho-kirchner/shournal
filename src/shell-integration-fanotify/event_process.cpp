@@ -83,6 +83,7 @@ int event_process::handleExecve(const char *filename, char * const argv[], char 
 
     if(! g_shell.inSubshell ||
          g_shell.watchState != E_WatchState::WITHIN_CMD){
+        shell_earlydbg("ignore execve of %s", filename);
         return g_shell.orig_execve(filename, argv, envp);
     }
 
@@ -111,7 +112,7 @@ int event_process::handleExecve(const char *filename, char * const argv[], char 
     args.push_back(pid.c_str());
 
     args.push_back("--verbosity");
-    args.push_back(logger::msgTypeToStr(g_shell.verbosityLevel));
+    args.push_back(g_shell.shournalRunVerbosity.c_str());
 
     args.push_back("--env");
     // first value after --env is its size, which we don't know yet.

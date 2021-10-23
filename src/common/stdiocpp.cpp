@@ -9,6 +9,7 @@
 #include "util.h"
 #include "translation.h"
 #include "os.h"
+#include "osutil.h"
 
 
 stdiocpp::QExcStdio::QExcStdio
@@ -33,31 +34,18 @@ stdiocpp::QExcStdio::QExcStdio
 /// tmpfile(3)).
 FILE *stdiocpp::tmpfile(int o_flags __attribute__ ((unused)))
 {
-    QByteArray p(QDir::tempPath().toUtf8());
-    // tmpfs and possibly other filesystems do not suppot O_TMPFILE, for
-    // the sake of simplicity just use mkostemp.
-#if false
-//#ifdef O_TMPFILE
-    int fd = os::open(p, O_RDWR | O_TMPFILE | O_EXCL | o_flags, true, S_IRUSR | S_IWUSR);
-#else
-    p = pathJoinFilename(p, QByteArray("tmp.XXXXXX"));
-    int fd = ::mkostemp(p.data(), O_CLOEXEC);
-    if (fd < 0) {
-        throw QExcStdio(QString("mkstemp %1 failed: ")
-                        .arg(p.constData()), nullptr, true);
-    }
-    if(remove(p) < 0){
-        fprintf(stderr, "%s: failed to delete the just created file %s - %s\n",
-                __func__, p.constData(), strerror(errno));
-    }
-#endif
+    int fd = -1;
     try {
+        fd = osutil::unnamed_tmp();
         return stdiocpp::fdopen(fd, "w+");
+    } catch (const os::ExcOs& ex) {
+        throw QExcStdio(ex.what(), nullptr, true);
     } catch (const QExcStdio&) {
-        close(fd);
+        if(fd != -1){
+            close(fd);
+        }
         throw ;
     }
-
 }
 
 FILE *stdiocpp::fopen(const char *pathname, const char *mode)
