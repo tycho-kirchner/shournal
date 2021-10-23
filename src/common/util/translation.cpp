@@ -4,15 +4,16 @@
 #include "translation.h"
 #include "util.h"
 
-static locale_t g_locale;
+static locale_t g_locale = nullptr;
 
 
 bool translation::init()
 {
-    g_locale = newlocale(LC_CTYPE_MASK|LC_NUMERIC_MASK|LC_TIME_MASK|
-               LC_COLLATE_MASK|LC_MONETARY_MASK|LC_MESSAGES_MASK,
-               "",locale_t(nullptr));
-
+    if(g_locale == nullptr){
+        g_locale = newlocale(LC_CTYPE_MASK|LC_NUMERIC_MASK|LC_TIME_MASK|
+                    LC_COLLATE_MASK|LC_MONETARY_MASK|LC_MESSAGES_MASK,
+                    "",locale_t(nullptr));
+    }
     return g_locale != locale_t(nullptr);
 }
 
