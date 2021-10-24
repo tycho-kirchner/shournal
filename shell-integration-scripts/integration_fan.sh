@@ -67,9 +67,13 @@ _shournal_disable(){
 }
 
 _shournal_set_verbosity(){
+    local ret=0
     # for libshournal-shellwatch.so
     export _SHOURNAL_LIB_SHELL_VERBOSITY="$1"
-    _libshournal_update_verbosity
+    if _libshournal_is_loaded; then
+        _libshournal_update_verbosity || ret=$?
+    fi
+    return $ret
 }
 
 _shournal_print_versions(){
