@@ -88,9 +88,13 @@ int shournal_main(int argc, char *argv[])
                         "and its arguments (this argument has to be last). "
                         "All further parameters starting with a minus "
                         "are considered options for the shournal-run* backend until "
-                        "the first command (not starting with a minus) occurs, e.g.\n"
+                        "double dash -- or the first command "
+                        "(not starting with a minus) occurs, e.g.\n"
                         "shournal -e --print-summary echo foobar\n"
-                        "-> --print-summary is an argument for shournal-run."), false);
+                        "-> --print-summary is an argument for shournal-run.\n"
+                        "shournal --exec-filename /bin/bash -e -- -bash\n"
+                        "on the other hand can be used for commands starting "
+                        "with a dash (e.g. login-shells)."), false);
     argExec.setFinalizeFlag(true);
     parser.addArg(&argExec);
 
@@ -303,13 +307,37 @@ void execShournalRun(const QByteArray& backendFilename,
     // As long as arguments start with a minus those
     // are passed as options to the shournal-run backend, e.g.
     // shournal-run -e --no-db --print-summary echo ok
-    bool exec_pushed = false;
+    int execIdx = -1;
     for(int i=0; i < cargs.len; i++){
-        if(! exec_pushed && cargs.argv[i][0] != '-'){
-            args.push_back("--exec");
-            exec_pushed = true;
+        if(execIdx != -1){
+            args.push_back(cargs.argv[i]);
+            continue;
         }
-        args.push_back(cargs.argv[i]);
+        if(strcmp(cargs.argv[i], "--") == 0){
+            // option terminator -> all further options
+            // will be directly passed to our backend.
+            execIdx = args.size();
+            args.push_back("--exec");
+        } else if(cargs.argv[i][0] == '-'){
+            // option for shournal-run
+            args.push_back(cargs.argv[i]);
+        } else {
+            // first non-option.
+            execIdx = args.size();
+            args.push_back("--exec");
+            args.push_back(cargs.argv[i]);
+        }
+    }
+    if(execIdx == -1 || execIdx == args.size()-1){
+        QIErr() << qtr("No executable found after parsing the commandline. "
+                       "Note that for commands starting with dashes (e.g. login-shells) "
+                       "--exec has to be terminated by double-dash --\n"
+                       "Current arguments:");
+        for(const auto& arg : args){
+            QErr() << arg << " ";
+        }
+        QErr() << "\n";
+        cpp_exit(1);
     }
 
     args.push_back(nullptr);

@@ -113,7 +113,7 @@ _shournal_exec_ldpreloaded_shell(){
     exec shournal --verbosity "$_SHOURNAL_VERBOSITY"  \
         --backend-filename 'shournal-run-fanotify' \
         --msenter-orig-mountspace \
-        --exec-filename "$cmd_path" --exec "${args_array[@]}"
+        --exec-filename "$cmd_path" --exec -- "${args_array[@]}"
     # only get here on error
     return 1
 
