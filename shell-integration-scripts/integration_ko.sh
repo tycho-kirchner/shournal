@@ -47,7 +47,7 @@ _shournal_disable(){
     _shournal_detach_this_pid
 
     unset _shournal_is_running _shournal_last_cmd_seq \
-          _shournal_session_uuid _shournal_cmd_seq_hotfix \
+          _shournal_session_uuid \
           _shournal_fifo_basepath _shournal_setup_error_path_current_pid
 }
 
