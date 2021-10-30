@@ -6,6 +6,20 @@ _shournal_run_backend='shournal-run'
 
 _shournal_enable(){
     local tmpdir
+    local ret=0
+    local cmd_str
+
+    if [ -n "${_shournal_is_running+x}" ] ; then
+        # maybe_todo: check that our prompts are still there.
+        _shournal_debug "_shournal_enable: current session is already observed"
+        return 0
+    fi
+
+    if ! "$_shournal_run_backend" --shournalk-is-loaded; then
+        _shournal_warn "Cannot enable the shell-integration -" \
+                       "the required kernel module is not loaded."
+        return 1
+    fi
 
     if [ -e '/dev/shm' ]; then
         tmpdir='/dev/shm'
@@ -21,34 +35,97 @@ _shournal_enable(){
     # the pid is claimed and the old shournal-run process exits. However, in case of
     # sequence count 1 the previous and current fifo-paths collide, so just clean up
     # in any case.
-    _shournal_detach_this_pid
-
-    _shournal_session_uuid="$(shournal-run --make-session-uuid)" || return 1
+    _shournal_detach_this_pid 0
 
     # May be necessary in cases where setup fails but exec was called, so
     # we couldn't clean up previously.
     _shournal_remove_setup_error_file_if_exist
 
+    if [ -n "${_shournal_shell_exec_string+x}" ]; then
+        # invoked via sh -c
+        cmd_str=""
+        # FIXME: also collect /proc/$$/exe ?
+        while IFS= read -r -d '' line; do
+            [ -z "$cmd_str" ] && cmd_str="$line" ||
+                                 cmd_str="$cmd_str $line"
+        done < /proc/$$/cmdline
 
-    # Usually removing prompts should not be necessary here,
-    # however, if a user exports PS0/PS1/PROMPT_COMMAND
-    # and starts a new bash-session, we need to get rid of the existing commands.
-    _shournal_remove_prompts
-    _shournal_add_prompts
-    _shournal_is_running=true
+        _shournal_preexec_generic 1 "$cmd_str" || return $?
+        _shournal_is_running=true
+        _shournal_add_exit_trap '_shournal_exit_trap' ||
+            _shournal_warn "failed to add exit trap: $?"
+    else
+        _shournal_session_uuid="$(shournal-run --make-session-uuid)" || return $?
 
+        # Usually removing prompts should not be necessary here,
+        # however, if a user exports PS0/PS1/PROMPT_COMMAND
+        # and starts a new bash-session, we need to get rid of the existing commands.
+        _shournal_remove_prompts || return $?
+        _shournal_add_prompts || return $?
+        _shournal_is_running=true
+    fi
     return 0
 }
 
-
 _shournal_disable(){
+    # Note that there are at least three cases how we can get here:
+    # • User-invoked SHOURNAL_DISABLE
+    # • Error during pre/postexec
+    # • exit trap
+    local exitcode="$1"
+
+    _shournal_debug "_shournal_disable: about to disable" \
+                    "with exitcode $exitcode"
+
+    if [ -z "${_shournal_is_running+x}" ]; then
+        _shournal_debug "_shournal_disable: not running"
+        return 0
+    fi
+
+    _shournal_del_exit_trap '_shournal_exit_trap' || :
+
     _shournal_remove_setup_error_file_if_exist
     _shournal_remove_prompts
-    _shournal_detach_this_pid
+    _shournal_detach_this_pid "$exitcode"
 
-    unset _shournal_is_running _shournal_last_cmd_seq \
+    unset _shournal_is_running \
           _shournal_session_uuid \
           _shournal_fifo_basepath _shournal_setup_error_path_current_pid
+}
+
+# Trap handler invoked at the end of BASH/ZSH_EXECUTION_STRING
+_shournal_exit_trap(){
+    local exitcode=$?
+    local fifopath
+    local _shournal_fifofd
+    if _shournal_in_subshell; then
+        # zsh 5.8 calls exit traps in subshells, if explicitly calling
+        # (exit 123). On the other hand the exit function seems to be
+        # not called for the main shell, when a subshell called 'exit'
+        # immediately before. See also my email on the zhs mailing list
+        # 'exit_function - strange behavior' on Tue, 26 Oct 2021 01:28:12 +0200.
+        # In order to not loose the return value, we _always_ send it
+        # on 'exit' (last one wins).
+        # See also _shournal_run_finalize for the rationale of using an
+        # fd here.
+        fifopath="$_shournal_fifo_basepath-1" # always seq 1 when using exec_string
+
+        _shournal_debug "_shournal_exit_trap: called from subshell. " \
+                        "Attempting to send the exitcode..."
+        if ! { exec {_shournal_fifofd}<"$fifopath"; } 2>/dev/null; then
+            _shournal_debug "_shournal_exit_trap: opening fifopath \"$fifopath\" failed."
+            return 0
+        fi
+        _shournal_send_ret_val $_shournal_fifofd $exitcode
+        exec {_shournal_fifofd}<&-
+        return 0
+    fi
+
+    _shournal_debug "_shournal_exit_trap with exitcode $exitcode"
+    if [ -n "${_shournal_is_running+x}" ] ; then
+        # Don't SHOURNAL_DISABLE, we want to pass the exitcode as $1
+        _shournal_disable "$exitcode"
+    fi
 }
 
 _shournal_set_verbosity(){
@@ -67,16 +144,27 @@ _shournal_send_msg(){
     local msg_type="$2"
     local msg_data="$3"
     local pid
+    local ret=0
 
     # simple json string type-data: { "msgType":0, "data":"stuff" }
     local full_msg="{\"msgType\":$msg_type,\"data\":\"$msg_data\"}"
     _shournal_debug "_shournal_send_msg: sending message: $full_msg"
     # See _shournal_run_finalize for the rationale of using a fd instead of fifopath.
-    # For bash we need BASHPID, not $$ because
-    # bash's PS0 and PS1 are executed in subshells
-    [ "$_SHOURNAL_SHELL_NAME" = 'bash' ] && pid=$BASHPID || pid=$$
-    echo "$full_msg" > "/proc/$pid/fd/$fifofd"
-    _shournal_debug "_shournal_send_msg DONE"
+    # We may run in a subshell, so do not use $$. For bash we could use
+    # $BASHPID, however, the following works in bash and zsh (and possibly
+    # others):
+    if ! read -d ' ' pid < /proc/self/stat; then
+        ret=$?
+        _shournal_error "_shournal_send_msg: failed to read from /proc/self/stat: $ret"
+        return $ret
+    fi
+    if ! echo "$full_msg" > "/proc/$pid/fd/$fifofd"; then
+        ret=$?
+        _shournal_error "_shournal_send_msg: failed to write to " \
+                        "/proc/$pid/fd/$fifofd: $ret"
+        return $ret
+    fi
+    return 0
 }
 
 _shournal_send_ret_val(){
@@ -116,6 +204,7 @@ _shournal_run_finalize(){
 # instruct the belonging shournal-run process to stop
 # observing this pid.
 _shournal_detach_this_pid(){
+    local exitcode="$1"
     local fifopath
     local ret=0
 
@@ -133,7 +222,7 @@ _shournal_detach_this_pid(){
         if [ $# -eq 1 ]; then
             fifopath=${1%%$'\n'*} # should not be necessary
             _shournal_debug "_shournal_detach_this_pid at $fifopath"
-            _shournal_run_finalize "$fifopath" 0
+            _shournal_run_finalize "$fifopath" "$exitcode"
             ret=$?
         else
             _shournal_error "_shournal_detach_this_pid: unexpected fifos $@"
@@ -146,6 +235,7 @@ _shournal_detach_this_pid(){
 _shournal_remove_setup_error_file_if_exist(){
     test -e "$_shournal_setup_error_path_current_pid" &&
          rm "$_shournal_setup_error_path_current_pid"
+    return 0
 }
 
 
@@ -157,6 +247,7 @@ _shournal_preexec_generic(){
     local current_seq="$1"
     local cmd_str="$2"
     local fifopath
+    local args_array
 
     if ! _shournal_verbose_history_check; then
         _shournal_warn "history settings were modified after the shell integration was turned on. " \
@@ -168,6 +259,14 @@ _shournal_preexec_generic(){
     _shournal_debug "_shournal_preexec_generic: using fifo at $fifopath"
     _shournal_warn_on "[ -e \"$fifopath\" ]"
 
+    args_array=(
+        --verbosity "$_SHOURNAL_VERBOSITY" --pid $$ --fork
+        --close-fds --fifoname "$fifopath"
+        --cmd-string "$cmd_str"
+    )
+
+    [ -n "${_shournal_session_uuid+x}" ] &&
+        args_array+=(--shell-session-uuid "$_shournal_session_uuid")
 
     # Argument --close-fds is important here for the following reasons:
     # * We may run within a subshell which waits for redirected stdout to
@@ -179,10 +278,7 @@ _shournal_preexec_generic(){
     #   as the final __fput is reached during shournal-run exit().
     # Argument --fork: shournal forks itself into background once setup
     # is ready, so we can just wait here.
-    if ! shournal-run --verbosity "$_SHOURNAL_VERBOSITY" --pid $$ --fork \
-        --close-fds --fifoname "$fifopath" \
-        --shell-session-uuid "$_shournal_session_uuid" \
-        --cmd-string "$cmd_str"; then
+    if ! shournal-run "${args_array[@]}"; then
         # only debug here - there should already be two warnings - one from
         # shournal-run or bash not able to execute and (likely) one afterwards
         # from the prompt.

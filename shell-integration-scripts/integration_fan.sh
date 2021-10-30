@@ -6,21 +6,32 @@ _shournal_run_backend='shournal-run-fanotify'
 
 
 _shournal_enable(){
+    local ret=0
     if [ -n "${_shournal_is_running+x}" ] ; then
         _shournal_warn_on '! _libshournal_is_loaded'
         _shournal_debug "_shournal_enable: current session is already observed"
         return 0
     fi
 
+    if [ -n "${_shournal_shell_exec_string+x}" ]; then
+        _shournal_handle_exec_string || ret=$?
+        return $ret
+    fi
+
+    # This shell was _not_ invoked with the sh -c '...' option,
+    # so clear our flag unconditionally:
+    unset _shournal_parent_launched_us_noninteractive
+
     if ! _libshournal_is_loaded ; then
-        if [ -z "${_shournal_enable_just_called+x}" ]; then
-            _shournal_exec_ldpreloaded_shell
-        else
+        if [ -n "${_shournal_enable_just_called+x}" ]; then
             _shournal_warn "Something went wrong during preloading of " \
                            "libshournal-shellwatch.so, the shell integration " \
                            "is _not_ enabled."
             unset _shournal_enable_just_called
+            return 1
         fi
+        _shournal_interactive_exec_allowed || return $?
+        _shournal_exec_ldpreloaded_shell
         # only get here on error
         return 1
     fi
@@ -43,11 +54,28 @@ _shournal_enable(){
 _shournal_disable(){
     local exitcode=$1
 
-    # if running non-interactively, disabling SHOURNAL does not have an effect.
-    [ -n "${_shournal_parent_launched_us_noninteractive+x}" ] && return 0
-    [ -z "${_shournal_is_running+x}" ] && return 0
+    _shournal_debug "_shournal_disable: about to disable" \
+                    "with exitcode $exitcode"
 
-    _shournal_debug "_shournal_disable: about to disable..."
+    if [ -n "${_shournal_shell_exec_string+x}" ]; then
+        if [ -n "${_shournal_parent_launched_us_noninteractive+x}" ]; then
+             _shournal_warn "SHOURNAL_DISABLE called, but the fanotify-based" \
+                       "shell integration cannot be disabled for the" \
+                       "'$_SHOURNAL_SHELL_NAME -c' invocation. Please use the" \
+                       "kernel backend if this is a strong requirement."
+            return 1
+        else
+            _shournal_debug "_shournal_parent_launched_us_noninteractive is not" \
+                            "set, likely disable was called without a" \
+                            "prior enable."
+            return 0
+        fi
+    fi
+
+    if [ -z "${_shournal_is_running+x}" ]; then
+        _shournal_debug "_shournal_disable: not running"
+        return 0
+    fi
 
     # In case we were called in a sequence, e.g.
     # $ (exit 123); SHOURNAL_DISABLE
@@ -66,6 +94,37 @@ _shournal_disable(){
     return 0
 }
 
+
+# Check if it is _ok_ to call exec.
+# The shell is running interactive (no *_EXECUTION_STRING)
+# and _libshournal is not (pre-)loaded yet. To do so we
+# (currently) have to call exec. While doing so from
+# .shrc is fine, loading from interactive shell is ok (non-exported
+# variables are lost) we want to exclude the case where
+# commands are called in a row after SHOURNAL_ENABLE e.g.
+# $ SHOURNAL_ENABLE; important-command
+# because those are lost.
+_shournal_interactive_exec_allowed(){
+    local current_cmd
+    current_cmd="$(_shournal_print_current_cmd)"
+    current_cmd="$(_shournal_trim "$current_cmd")"
+    if [ -z "$current_cmd" ]; then
+        _shournal_debug "_shournal_enable exec granted, history " \
+                        "is empty (likely called from .shrc)"
+        return 0
+    fi
+
+    if ! _shournal_endswith "$current_cmd" 'SHOURNAL_ENABLE'; then
+        _shournal_warn "Command after SHOURNAL_ENABLE detected but" \
+                       "we have to call exec first to enable the" \
+                       "fanotify based shell integration." \
+                       "Please ENABLE as separate command" \
+                       "or switch backend. Command was '$current_cmd'"
+        return 1
+    fi
+    return 0
+}
+
 _shournal_set_verbosity(){
     local ret=0
     # for libshournal-shellwatch.so
@@ -81,7 +140,7 @@ _shournal_print_versions(){
     if _libshournal_is_loaded ; then
         _libshournal_print_version || _shournal_warn "printing version failed."
     else
-        echo "To see the version of shournal's shell-integration "\
+        echo "To see the version of shournal's shell-integration " \
              " (libshournal-shellwatch.so) please SHOURNAL_ENABLE first"
     fi
     return 0
@@ -94,6 +153,7 @@ _shournal_print_versions(){
 _shournal_exec_ldpreloaded_shell(){
     declare -a args_array
     local cmd_path
+    local IFS; unset IFS
 
     if ! [ -f "${SHOURNAL_PATH_LIB_SHELL_INTEGRATION-}" ]; then
         _shournal_error "Please provide a valid path for libshournal-shellwatch.so, e.g. " \
@@ -101,22 +161,83 @@ _shournal_exec_ldpreloaded_shell(){
                         "'/usr/local/lib/shournal/libshournal-shellwatch.so'"
         return 1
     fi
-    while IFS= read -r -d '' line; do
-            args_array+=("$line")
-    done < /proc/$$/cmdline
     cmd_path="$(readlink /proc/$$/exe)"
+    while IFS= read -r -d '' line; do
+        args_array+=("$line")
+    done < /proc/$$/cmdline
     export _shournal_enable_just_called=true
     export LD_PRELOAD=${LD_PRELOAD-}":$SHOURNAL_PATH_LIB_SHELL_INTEGRATION"
     _shournal_debug "_shournal_exec_ldpreloaded_shell: calling preloaded " \
                     "$cmd_path ${args_array[@]:1}"
     # Relaunch the shell with shournals .so preloaded using the original arguments.
     exec shournal --verbosity "$_SHOURNAL_VERBOSITY"  \
-        --backend-filename 'shournal-run-fanotify' \
+        --backend-filename "$_shournal_run_backend" \
         --msenter-orig-mountspace \
         --exec-filename "$cmd_path" --exec -- "${args_array[@]}"
     # only get here on error
     return 1
 
+}
+
+# Handle the sh -c '...' case. No PS0 (bash) or preexec_functions (zsh)
+_shournal_handle_exec_string(){
+    local cmd_trimmed
+    local cmd_path
+    declare -a args_array
+    local IFS; unset IFS
+
+    # In *this* backend we simply re-exec ourselves
+    # with shournal and monitor the whole command sequence (SHOURNAL_DISABLE not
+    # possible). Note that technically it would be possible to
+    # move the original shell-binary somewhere else, execute a shournal-fake-shell
+    # instead and invoke the original shell preloaded, so
+    # we could allow for flexible enabling/disabling. This however would
+    # be somewhat involved and possibly require one-time setup by the user.
+    # On the other hand the ko-based shell integration does offer this
+    # flexibility, so here we just ensure correctness:
+    # We may only re-exec, if no command was executed before we were enabled,
+    # otherwise it would be executed twice! Therefore we allow only two
+    # cases: SHOURNAL_ENABLE as first command of the invocation e.g.
+    # *sh -c 'SHOURNAL_ENABLE; ...' or when called from .shrc (which
+    # must have been sourced before the command invocation starts.
+
+
+    if [ -n "${_shournal_parent_launched_us_noninteractive+x}" ] ; then
+        _shournal_debug "_shournal_handle_exec_string: we are (likely) already observed," \
+                        "_shournal_parent_launched_us_noninteractive is set." \
+                        "NOT performing re-exec"
+        return 0
+    fi
+
+    cmd_trimmed="$(_shournal_trim "$_shournal_shell_exec_string")"
+    if ! _shournal_startswith "$cmd_trimmed" 'SHOURNAL_ENABLE' &&
+       ! _shournal_verbose_reexec_allowed; then
+        _shournal_warn "we were enabled _during_ the $_SHOURNAL_SHELL_NAME -c" \
+                       "invocation, however, the fanotify backend only supports" \
+                       "enabling _before_ or at the beginning of the invocation." \
+                       "Either switch to the kernel backend or" \
+                       "put SHOURNAL_ENABLE into your shell's rc or at the" \
+                       "beginning of the invocation. It may also be" \
+                       "possible to directly call the command with 'shournal -e ...'"
+        return 1
+    fi
+
+    cmd_path="$(readlink /proc/$$/exe)"
+    while IFS= read -r -d '' line; do
+        args_array+=("$line")
+    done < /proc/$$/cmdline
+
+    _shournal_debug "_shournal_handle_exec_string: exec non-interactive" \
+                    "$cmd_path ${args_array[@]}"
+
+    # arg --fork: do not wait writing to the database. Otherwise
+    # it blocks of course.
+    _shournal_parent_launched_us_noninteractive=true exec \
+        shournal --backend-filename "$_shournal_run_backend" \
+        --verbosity "$_SHOURNAL_VERBOSITY" \
+        --exec-filename "$cmd_path" --exec --fork -- "${args_array[@]}"
+    # only get here on error
+    return 1
 }
 
 
@@ -206,9 +327,8 @@ _libshournal_update_verbosity(){
 _libshournal_is_loaded(){
     local word_arr
     local pathname
-    local IFS
+    local IFS; unset IFS
 
-    unset IFS
     if [ -n "${ZSH_VERSION+x}" ]; then
         setopt LOCAL_OPTIONS
         setopt sh_word_split
@@ -233,6 +353,7 @@ _libshournal_is_loaded(){
 # _shournal_add_prompts
 # _shournal_remove_prompts
 # _shournal_postexec
+# _shournal_verbose_reexec_allowed
 case "$_SHOURNAL_SHELL_NAME" in
   'bash')
 
@@ -248,6 +369,20 @@ _shournal_remove_prompts(){
         PROMPT_COMMAND=${PROMPT_COMMAND//_shournal_postexec$'\n'/}
     return 0
 }
+
+# Return true in case bash -c '...' may re-exec,
+# otherwise report the error and return false.
+# Re-exec is e.g. not allowed, if the a command
+# within the -c '..' arg was already executed
+# (it would be executed twice otherwise).
+_shournal_verbose_reexec_allowed(){
+    # FIXME: this is not robust, bash -c 'echo foo; source ~/.bashrc'
+    # should _not_ be allowed.
+    [ "${BASH_SOURCE[-1]}" = "$HOME/.bashrc" ] && return 0
+    _shournal_warn "not called from ~/.bashrc but ${BASH_SOURCE[-1]}"
+    return 1
+}
+
 ## _____ End of must-override functions and variables _____ ##
 
 
@@ -286,6 +421,22 @@ _shournal_remove_prompts(){
     return 0
 }
 
+_shournal_verbose_reexec_allowed(){
+    zmodload zsh/parameter
+    local toplevel_context="${zsh_eval_context[1]}"
+    case "$toplevel_context" in
+    file) return 0;;
+    cmdarg)
+        _shournal_warn "eval-toplevel-context $toplevel_context not allowed"
+        return 1;;
+    *)
+        _shournal_warn "unhandled eval-toplevel-context $toplevel_context." \
+                       "Please report if you" \
+                       "think that SHOURNAL_ENABLE should be possible here."
+        return 1;;
+    esac
+}
+
 ## _____ End of must-override functions and variables _____ ##
 
 
@@ -305,6 +456,8 @@ _shournal_postexec(){
 }
 
 
+
+
 ;; # END_OF zsh ________________________________________________________
   *)
     echo "shournal shell integration: something is seriously wrong, " \
@@ -319,7 +472,7 @@ if [ -n "${_shournal_enable_just_called+x}" ] ; then
     # again with the same arguments and our libshournal-shellwatch.so
     # preloaded. Let the tracking begin ...
     if ! _libshournal_is_loaded ; then
-        _shournal_error "Although _'shournal_enable_just_called' is set, "\
+        _shournal_error "Although _'shournal_enable_just_called' is set, " \
                         "libshournal-shellwatch.so seems " \
                         "to be not loaded (bug?)."
         unset _shournal_enable_just_called

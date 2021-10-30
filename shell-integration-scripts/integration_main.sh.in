@@ -4,19 +4,14 @@
 # must be compatible with all supported shells.
 
 SHOURNAL_ENABLE(){
-    local path_to_shournal
-    local path_to_shournal_run
-    declare -a args_array
-    local cmd_path
+    local ret=0
 
-    path_to_shournal=$(command -v shournal)
-    if [ -z "$path_to_shournal" ] ; then
-        _shournal_error "cannot enable shournal's shell integration - command <shournal> not found"
+    if [ -z "$(command -v shournal)" ] ; then
+        _shournal_error "cannot enable shournal's shell integration - command «shournal» not found"
         return 1
     fi
 
-    path_to_shournal_run=$(command -v "$_shournal_run_backend")
-    if [ -z "$path_to_shournal_run" ] ; then
+    if [ -z "$(command -v "$_shournal_run_backend")" ] ; then
         _shournal_error "cannot enable shournal's shell integration - " \
                         "command «$_shournal_run_backend» not found"
         return 1
@@ -24,49 +19,17 @@ SHOURNAL_ENABLE(){
 
     if ! shournal --validate-settings; then
         # informative mesg. should have been already printed by shournal
-        _shournal_error "shell integration is *not* enabled"
+        _shournal_error "shell integration is _not_ enabled"
         return 1
     fi
 
-    if [ "$_shournal_run_backend" = 'shournal-run' ] &&
-       ! shournal-run --shournalk-is-loaded; then
-        _shournal_warn "Cannot enable the shell-integration -" \
-                       "the required kernel module is not loaded."
-        return 1
+    if [ -z "${_shournal_shell_exec_string+x}" ]; then
+         # Running somewhat "interactively"
+        _shournal_verbose_history_check || return $?
     fi
 
-    if [ -n "${_shournal_parent_launched_us_noninteractive+x}" ] ; then
-        # avoid endless recursion. However, if during execution an interactive shell is launched, allow
-        # for an "interactive" SHOURNAL_ENABLE. That applies to subprocesses. To handle multiple calls
-        # of this function within this process, set it without exporting
-        unset _shournal_parent_launched_us_noninteractive
-        _shournal_parent_launched_us_noninteractive=true
-        return 0
-    fi
-
-    if [ -n "${_shournal_is_running+x}" ] ; then
-        _shournal_debug "SHOURNAL_ENABLE: current session is already observed"
-        return 0
-    fi
-
-    if [ -n "${_shournal_shell_exec_string+x}" ]; then
-        cmd_path="$(readlink /proc/$$/exe)"
-        while IFS= read -r -d '' line; do
-            args_array+=("$line")
-        done < /proc/$$/cmdline
-
-        _shournal_debug "SHOURNAL_ENABLE: exec non-interactive $cmd_path ${args_array[@]}"
-        _shournal_parent_launched_us_noninteractive=true exec \
-            "$_shournal_run_backend" --fork --verbosity "$_SHOURNAL_VERBOSITY" \
-             --exec-filename "$cmd_path" --exec "${args_array[@]}"
-        # only get here on error
-        return 1
-    fi
-
-    # Running interactively
-    _shournal_verbose_history_check || return 1
-
-    _shournal_enable
+    _shournal_enable || ret=$?
+    return $ret
 }
 
 
@@ -75,15 +38,10 @@ SHOURNAL_DISABLE() {
     # $ (exit 123); SHOURNAL_DISABLE
     # capture the exit code here
     local exitcode=$?
+    local ret=0
 
-    # if running non-interactively, disabling SHOURNAL does not have an effect.
-    [ -n "${_shournal_parent_launched_us_noninteractive+x}" ] && return 0
-    [ -z "${_shournal_is_running+x}" ] && return 0
-
-    _shournal_disable $exitcode
-
-    unset _shournal_is_running _shournal_last_cmd_seq \
-          _shournal_session_uuid _shournal_cmd_seq_hotfix
+    _shournal_disable $exitcode || ret=$?
+    return $ret
 }
 
 
