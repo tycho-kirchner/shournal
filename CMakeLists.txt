@@ -73,7 +73,8 @@ IF(CMAKE_BUILD_TYPE MATCHES RelWithDebInfo)
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG")
 ENDIF()
 
-
+# Meaningful stacktraces:
+SET (CMAKE_ENABLE_EXPORTS TRUE)
 
 
 # cmake policy: allow for hidden symbols in static libs

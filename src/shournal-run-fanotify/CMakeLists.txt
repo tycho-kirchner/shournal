@@ -1,4 +1,12 @@
 
+# This program is somewhat performance-critical,
+# so disable exports. FIXME: benchmark it
+IF(CMAKE_BUILD_TYPE MATCHES Release)
+    SET (CMAKE_ENABLE_EXPORTS FALSE)
+ENDIF()
+
+
+
 include_directories(
     ../common
     ../common/qoptargparse
