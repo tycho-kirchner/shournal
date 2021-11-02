@@ -15,6 +15,7 @@ on bioRxiv.*
 *TL;DR*:
 * **Integrated tool** to increase the reproducibility of your work
   on the shell:  what did you do when and where and what files were modified/read.
+  Auto-snapshot scripts and config-files as used.
 * **Stand-alone tool** to monitor file events of a command/process (tree),
   similar to <br>
   `strace -f -e close $cmd`
@@ -27,6 +28,7 @@ Using your shell's history is nice. But sometimes you want more:
 * What files were modified or read by a command? Or reverse: What shell-command(s)
   were used to create/modify or read from a certain file?
 * You executed a script. What was the script-content by the time it was called?
+* The command read a config-file - which one, and what was in it?
 * What other commands were executed during the same shell-session?
 * What about working directory, command start- and end-time or the
   exit status ($?) ?
@@ -36,7 +38,7 @@ causing only a negligible overhead. <br>
 Besides its ability to monitor a whole process tree for file
 events it can be integrated really tight into the shell -
 you won't even notice it (; <br>
-See also: [shell-integration](./shell-integration-scripts)
+See also: [shell-integration](./README-shell-integration.md)
 
 Besides output on the command-line in a human-readable format (or JSON)
 you can export (parts of) your command-history into
@@ -55,7 +57,7 @@ a tool to *create reproducible and scalable data analyses*.
 
 ## Examples
 Please note: below examples make use of the
-[shell-integration](./shell-integration-scripts). <br>
+[shell-integration](./README-shell-integration.md). <br>
 Otherwise `shournal --exec $cmd` and
 other boilerplate-code would have been necessary. <br>
 Instead of printing the `--query`-results to terminal, you can also create
@@ -146,9 +148,15 @@ To enable the shell-integration:
 
 * for *bash*: put the following to the end of your ~/.bashrc <br>
 `source /usr/share/shournal/SOURCE_ME.bash` <br>
-and run `SHOURNAL_ENABLE` afterwards.
+* for *zsh*: put the following to the end of your ~/.zshrc <br>
+`source /usr/share/shournal/SOURCE_ME.zsh` <br>
 * for *other shells*: please open an issue, if you want your favorite
-  shell to be integrated as well (contributions welcome, zsh-support is planned).
+  shell to be integrated as well (contributions welcome).
+
+and run `SHOURNAL_ENABLE` afterwards.
+
+More details and advanced options (logging commands executed via ssh)
+can be found [here](./README-shell-integration.md).
 
 
 ### Compile and install from source
@@ -259,7 +267,7 @@ as it is faster and has less interference with the process environment -
 for example no new mount namespaces have to be created and no file
 descriptor inheritance is necessary to wait for the end of a process
 tree. See also:
-[shell-integration](./shell-integration-scripts#limitations). <br>
+[shell-integration](./README-shell-integration.md#limitations). <br>
 If both backends are installed you may configure the default one globally
 by creating the file `/etc/shournal.d/backend` or for each user by creating
 `~/.config/shournal/backend` with content `ko` or `fanotify`.
