@@ -109,54 +109,6 @@ _shournal_get_current_cmd_bash(){
     return 0
 }
 
-# Append a command to a trap, separated by newline.
-_shournal_add_trap_generic() {
-    local cmd="$1"
-    local trapname="$2"
-    local ret=0
-
-    trap -- "$(
-        extract_trap_cmd() { printf '%s\n' "$3"; }
-        # print existing trap command with newline
-        eval "extract_trap_cmd $(trap -p "${trapname}")"
-        # print the new trap command
-        printf '%s\n' "${cmd}"
-    )" "${trapname}" || ret=$?
-    return $ret
-}
-
-_shournal_add_exit_trap(){
-    _shournal_add_trap_generic "$1" EXIT
-}
-
-# Delete a command from a trap. It _must_ be in
-# a separate line (see also add_trap_generic)
-_shournal_del_trap_generic(){
-    local cmd="$1"
-    local trapname="$2"
-    local ret=0
-
-    trap -- "$(
-        extract_trap_cmd() { printf '%s\n' "$3"; }
-        oldtrap=$(eval "extract_trap_cmd $(trap -p "${trapname}")")
-        # delete regardless of position of \n
-        oldtrap=${oldtrap//$'\n'$cmd/}
-        oldtrap=${oldtrap//$cmd$'\n'/}
-
-        printf '%s\n' "${oldtrap}"
-    )" "${trapname}" || ret=$?
-    return $ret
-
-}
-
-_shournal_del_exit_trap(){
-    _shournal_del_trap_generic "$1" EXIT
-}
-
-_shournal_in_subshell(){
-    [ $BASH_SUBSHELL -ne 0 ]
-}
-
 _shournal_print_current_cmd(){
     local cmd_str
     _shournal_get_current_cmd_bash cmd_str
@@ -178,17 +130,6 @@ _shournal_verbose_history_check(){
     return 0
 }
 
-_shournal_add_exit_trap(){
-    zshexit_functions+=("$1")
-}
-
-_shournal_del_exit_trap(){
-    zshexit_functions[$zshexit_functions[(i)$1]]=()
-}
-
-_shournal_in_subshell(){
-    [ $ZSH_SUBSHELL -ne 0 ]
-}
 
 _shournal_print_current_cmd(){
     printf '%s\n' "$history[$HISTCMD]"

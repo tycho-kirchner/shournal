@@ -34,8 +34,10 @@ struct event_target {
     bool r_enable; /* record read events */
     bool ERROR; /* lazy-release references in case of an error */
     uint64_t lost_event_count;
-    struct event_consumer event_consumer;
+    struct task_struct* exit_tsk; /* task for which to collect the exit code */
+    int exit_code; /* see exit_tsk */
 
+    struct event_consumer event_consumer;
     uint64_t consumed_event_count;
     struct file* pipe_w; /* write end of pipe. Id and bridge to user space group */
     struct kbuffered_file* file; /* write events in here from kernel space */

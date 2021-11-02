@@ -84,6 +84,28 @@ __find_get_event_target_safe(struct task_struct* task){
     return event_target;
 }
 
+/// Called when we stop observing the task set in the event_target's
+/// exit_tsk, either because it exited or it was unmarked for observation.
+static inline void
+__handle_exit_tsk_remove(struct task_struct *task, bool in_exit,
+                              struct event_target* event_target){
+    if(in_exit){
+        // see kernel/exit.c: the lower 8 bits are shifted.
+        //     do_exit((error_code&0xff)<<8);
+        // Undo that:
+        unsigned lower_exit_code = (task->exit_code >> 8) & 0xff;
+        smp_store_mb(event_target->exit_code, lower_exit_code);
+        pr_devel("event_target caller %d: parent task %d exited with %d\n",
+                 event_target->caller_tsk->pid, task->pid, lower_exit_code);
+    } else {
+        WRITE_ONCE(event_target->exit_tsk, NULL);
+        pr_debug("exit_tsk pid %d unset for "
+                 "caller %d\n", task->pid,
+                 event_target->caller_tsk->pid);
+    }
+
+}
+
 
 /// Insert the given task into the table. If the task exists
 /// and param update_if_exist is true, the event_target is updated, else
@@ -123,9 +145,19 @@ __insert_task_into_table_safe(struct task_struct *task,
         goto out_unlock;
     }
     old_target = el->event_target;
-    // if old_target == new_target, nothing special happens,
-    // as we first increment ref-counter.
+    // first increment, then decrement ref-counter
+    // in case old_target == new_target.
     el->event_target = event_target_get(target);
+    if(old_target != target){
+        pr_debug("pid %d: event_target "
+                 "caller changed from %d to %d\n", task->pid,
+                 old_target->caller_tsk->pid,
+                 target->caller_tsk->pid);
+        if(unlikely(old_target->exit_tsk == task)){
+            __handle_exit_tsk_remove(task, false, old_target);
+        }
+    }
+
     spin_unlock(&task_table_lock);
     rcu_read_unlock();
 
@@ -142,7 +174,7 @@ out_unlock:
 
 
 static bool
-__remove_task_from_table_safe(struct task_struct *task){
+__remove_task_from_table_safe(struct task_struct *task, bool in_exit){
     struct task_entry* el;
     bool enqueued = false;
     u32 t_hash;
@@ -157,6 +189,9 @@ __remove_task_from_table_safe(struct task_struct *task){
         INIT_RCU_WORK(&el->destroy_rwork, __task_entry_destroy_work);
         spin_unlock(&task_table_lock);
 
+        if(unlikely(el->event_target->exit_tsk == task)){
+            __handle_exit_tsk_remove(task, in_exit, el->event_target);
+        }
         // free later
         queue_rcu_work(del_taskentries_wq, &el->destroy_rwork);
         enqueued = true; // do not "enqueued = queue_rcu_work()", we do not care, if
@@ -265,7 +300,10 @@ void event_handler_destructor(void)
 /// the caller must have the necessary capabilities. If the process is
 /// already observed by another event_target we silently replace it
 /// with the new one.
-long event_handler_add_pid(struct event_target* event_target, pid_t pid){
+/// @param collect_exitcode: if set to true, set this task as the
+/// "exit_tsk" for which to collect the exit code
+long event_handler_add_pid(struct event_target* event_target, pid_t pid,
+                           bool collect_exitcode){
     struct task_struct* task;
     long ret = 0;
 
@@ -274,6 +312,9 @@ long event_handler_add_pid(struct event_target* event_target, pid_t pid){
         return PTR_ERR(task);
     }
     ret = __insert_task_into_table_safe(task, event_target, true);
+    if(collect_exitcode && ret == 0){
+        WRITE_ONCE(event_target->exit_tsk, task);
+    }
 
     put_task_struct(task);
     return ret;
@@ -287,7 +328,7 @@ long event_handler_remove_pid(pid_t pid){
     if(IS_ERR(task)){
         return PTR_ERR(task);
     }
-    if(! __remove_task_from_table_safe(task)){
+    if(! __remove_task_from_table_safe(task, false)){
         ret = -ESRCH;
     }
     put_task_struct(task);
@@ -358,7 +399,7 @@ void event_handler_process_exit(struct task_struct *task)
         kutil_WARN_DBG(1, "called without rcu");
         return;
     }
-    __remove_task_from_table_safe(task);
+    __remove_task_from_table_safe(task, true);
 }
 
 

@@ -212,6 +212,7 @@ __event_target_create(struct file* target_file, struct file* pipe_w,
     if((error = event_consumer_init(&t->event_consumer)) )
          goto error_out;
 
+    t->exit_code = SHOURNALK_INVALID_EXIT_CODE;
     t->pid_ns = pid_ns;
     t->user_ns = current_user_ns();
     t->memcg = memcg;
@@ -507,6 +508,7 @@ void event_target_write_result_to_user_ONCE(struct event_target* event_target, l
         .r_event_count = event_target->r_event_count,
         .lost_event_count = event_target->lost_event_count,
         .stored_event_count = event_target->stored_files_count,
+        .selected_exitcode = event_target->exit_code
     };
     if(atomic_xchg(&event_target->_written_to_user_pipe, 1)){
         pr_devel("already written result (probably a previous error occurred");

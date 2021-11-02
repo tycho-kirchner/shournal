@@ -82,14 +82,19 @@ ShournalkControl::~ShournalkControl()
 
 
 /// @throws ExcShournalk
-void ShournalkControl::doMark(pid_t pid)
+void ShournalkControl::doMark(pid_t pid, bool collectExitcode)
 {
     try {
         auto ksettings = buildKSettings();
         shournalk_set_settings(m_kgrp, &ksettings);
 
         int ret;
-        if((ret = shournalk_filter_pid(m_kgrp, SHOURNALK_MARK_ADD, pid)) != 0){
+        int flags = SHOURNALK_MARK_ADD;
+        if(collectExitcode){
+            flags |= SHOURNALK_MARK_COLLECT_EXITCODE;
+        }
+
+        if((ret = shournalk_filter_pid(m_kgrp, flags, pid)) != 0){
             throw ExcShournalk(translation::strerror_l(ret));
         }
         auto & s = Settings::instance();

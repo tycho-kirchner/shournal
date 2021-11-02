@@ -21,10 +21,20 @@
 extern "C" {
 #endif
 
+#define SHOURNALK_INVALID_EXIT_CODE    -1
+
 /* flags */
-#define SHOURNALK_MARK_ADD              1
-#define SHOURNALK_MARK_REMOVE           2
-#define SHOURNALK_MARK_COMMIT           3 /* start collecting events after commit */
+#define SHOURNALK_MARK_ADD              0x00000001
+#define SHOURNALK_MARK_REMOVE           0x00000002
+/* start collecting events after commit */
+#define SHOURNALK_MARK_COMMIT           0x00000004
+
+/* If this flag is set on MARK_PID, on process-tree end, return the
+   exitcode of the given pid in the run_result
+   (selected_exitcode). If the process did not end
+   (e.g. marked by another target) it is
+   SHOURNALK_INVALID_EXIT_CODE */
+#define SHOURNALK_MARK_COLLECT_EXITCODE 0x00000008
 
 
 /* actions */
@@ -103,6 +113,7 @@ struct shournalk_run_result {
     uint32_t stored_event_count; /* number of (read) files in event target file */
     uint64_t lost_event_count;   /* if too many events occur, some may
                                     be dropped for performance reasons. */
+    int selected_exitcode;       /* see SHOURNALK_MARK_COLLECT_EXITCODE */
 };
 
 

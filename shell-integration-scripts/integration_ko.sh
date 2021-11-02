@@ -52,8 +52,6 @@ _shournal_enable(){
 
         _shournal_preexec_generic 1 "$cmd_str" || return $?
         _shournal_is_running=true
-        _shournal_add_exit_trap '_shournal_exit_trap' ||
-            _shournal_warn "failed to add exit trap: $?"
     else
         _shournal_session_uuid="$(shournal-run --make-session-uuid)" || return $?
 
@@ -82,8 +80,6 @@ _shournal_disable(){
         return 0
     fi
 
-    _shournal_del_exit_trap '_shournal_exit_trap' || :
-
     _shournal_remove_setup_error_file_if_exist
     _shournal_remove_prompts
     _shournal_detach_this_pid "$exitcode"
@@ -91,41 +87,6 @@ _shournal_disable(){
     unset _shournal_is_running \
           _shournal_session_uuid \
           _shournal_fifo_basepath _shournal_setup_error_path_current_pid
-}
-
-# Trap handler invoked at the end of BASH/ZSH_EXECUTION_STRING
-_shournal_exit_trap(){
-    local exitcode=$?
-    local fifopath
-    local _shournal_fifofd
-    if _shournal_in_subshell; then
-        # zsh 5.8 calls exit traps in subshells, if explicitly calling
-        # (exit 123). On the other hand the exit function seems to be
-        # not called for the main shell, when a subshell called 'exit'
-        # immediately before. See also my email on the zhs mailing list
-        # 'exit_function - strange behavior' on Tue, 26 Oct 2021 01:28:12 +0200.
-        # In order to not loose the return value, we _always_ send it
-        # on 'exit' (last one wins).
-        # See also _shournal_run_finalize for the rationale of using an
-        # fd here.
-        fifopath="$_shournal_fifo_basepath-1" # always seq 1 when using exec_string
-
-        _shournal_debug "_shournal_exit_trap: called from subshell. " \
-                        "Attempting to send the exitcode..."
-        if ! { exec {_shournal_fifofd}<"$fifopath"; } 2>/dev/null; then
-            _shournal_debug "_shournal_exit_trap: opening fifopath \"$fifopath\" failed."
-            return 0
-        fi
-        _shournal_send_ret_val $_shournal_fifofd $exitcode
-        exec {_shournal_fifofd}<&-
-        return 0
-    fi
-
-    _shournal_debug "_shournal_exit_trap with exitcode $exitcode"
-    if [ -n "${_shournal_is_running+x}" ] ; then
-        # Don't SHOURNAL_DISABLE, we want to pass the exitcode as $1
-        _shournal_disable "$exitcode"
-    fi
 }
 
 _shournal_set_verbosity(){

@@ -175,6 +175,7 @@ static long __handle_pid_add(struct shournalk_mark_struct* mark_struct){
     const int STORE_MAX_SIZE = 1024*1024 * 2;
     const int STORE_MAX_FILECOUNT = 100;
     long ret;
+    bool collect_exitcode = mark_struct->flags & SHOURNALK_MARK_COLLECT_EXITCODE;
 
     if((ret = verify_hash_settings(mark_struct))){
         return ret;
@@ -198,7 +199,7 @@ static long __handle_pid_add(struct shournalk_mark_struct* mark_struct){
     if(IS_ERR(event_target)){
         return PTR_ERR(event_target);
     }
-    ret = event_handler_add_pid(event_target, pid);
+    ret = event_handler_add_pid(event_target, pid, collect_exitcode);
 
     event_target_put(event_target);
     return ret;
@@ -359,28 +360,23 @@ static long __handle_commit(struct shournalk_mark_struct mark_struct){
 static ssize_t __mark(struct shournal_obj* obj  __attribute__ ((unused)),
                       struct shournal_attr* attr  __attribute__ ((unused)),
                       const char* buf, size_t count){
-    const struct shournalk_mark_struct * mark_struct;
+    const struct shournalk_mark_struct * s_mark;
     ssize_t ret = 0;
 
     if(count != sizeof (struct shournalk_mark_struct)){
         return -EILSEQ;
     }
 
-    mark_struct = (const struct shournalk_mark_struct*) buf;
+    s_mark = (const struct shournalk_mark_struct*) buf;
 
-    switch (mark_struct->flags) {
-    case SHOURNALK_MARK_ADD:
-        ret = __handle_mark_add(*mark_struct);
-        break;
-    case SHOURNALK_MARK_REMOVE:
-        ret = __handle_mark_remove(*mark_struct);
-        break;
-    case SHOURNALK_MARK_COMMIT:
-        ret = __handle_commit(*mark_struct);
-        break;
-    default:
+    if(s_mark->flags & SHOURNALK_MARK_ADD)
+        ret = __handle_mark_add(*s_mark);
+    else if(s_mark->flags & SHOURNALK_MARK_REMOVE)
+        ret = __handle_mark_remove(*s_mark);
+    else if(s_mark->flags & SHOURNALK_MARK_COMMIT)
+        ret = __handle_commit(*s_mark);
+    else
         ret = -EINVAL;
-    }
 
     if(ret != 0){
         WARN_ONCE(ret > 0, "pos. error received");

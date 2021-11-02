@@ -293,7 +293,7 @@ CommandInfo Filewatcher_shournalk::runMarkPid(ShournalK_ptr &shournalk, CEfd &to
     cmdInfo.startTime = QDateTime::currentDateTime();
 
     try {
-        shournalk->doMark(m_pid);
+        shournalk->doMark(m_pid, true);
         toplvlEfd.sendMsg(CEfd::MSG_OK);
     } catch (const ExcShournalk& ex) {
         logWarning << ex.descrip();
@@ -343,6 +343,19 @@ void Filewatcher_shournalk::run()
     auto poll_result = do_polling(shournalk, &krun_result,
                                   m_fifoname, &cmdInfo);
     cmdInfo.endTime = QDateTime::currentDateTime();
+    if(cmdInfo.returnVal == CommandInfo::INVALID_RETURN_VAL &&
+            krun_result.selected_exitcode != SHOURNALK_INVALID_EXIT_CODE){
+        if(krun_result.selected_exitcode < 0 ||
+           krun_result.selected_exitcode > 255){
+            // the kernel module currently strips higher bits,
+            // so we should never get here.
+            logWarning << qtr("Unusual exit-code %1 received. Please report.")
+                          .arg(krun_result.selected_exitcode);
+        }
+        logDebug << "using exitcode from kernel module:"
+                 << krun_result.selected_exitcode;
+        cmdInfo.returnVal = krun_result.selected_exitcode;
+    }
 
     if(poll_result != 0){
         // should never happen. Return failure regardless

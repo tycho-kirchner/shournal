@@ -11,7 +11,7 @@ struct pt_regs;
 int  event_handler_constructor(void);
 void event_handler_destructor(void);
 
-long event_handler_add_pid(struct event_target* event_target, pid_t pid);
+long event_handler_add_pid(struct event_target*, pid_t, bool collect_exitcode);
 long event_handler_remove_pid(pid_t pid);
 
 noinline notrace

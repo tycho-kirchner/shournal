@@ -20,7 +20,7 @@ public:
     ShournalkControl();
     ~ShournalkControl();
 
-    void doMark(pid_t pid);
+    void doMark(pid_t pid, bool collectExitcode=false);
     void preparePollOnce();
 
     void removePid(pid_t pid);
