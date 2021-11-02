@@ -343,9 +343,10 @@ void subprocess::Subprocess::handleChild(const char *filename, char *const argv[
         }
         os::exec(filename, argv, m_environ);
     } catch (const os::ExcOs& ex) {
-        if(startPipe[0] != -1){
-            std::cerr << __func__ << ": " << ex.what() << "\n";
-            exit(1);
+        if(startPipe[0] == -1){
+            std::cerr << "Failed to launch subprocess: "
+                      << ex.what() << "\n";
+            exit(ex.errorNumber());
         }
         LaunchMsg msg{};
         msg.msgType = LaunchMsgType::EXCEPTION;
@@ -356,7 +357,7 @@ void subprocess::Subprocess::handleChild(const char *filename, char *const argv[
             // should never happen
             std::cerr << __func__ << ": " << ex.what() << "\n";
         }
-        exit(1);
+        exit(ex.errorNumber());
     }
 }
 
