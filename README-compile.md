@@ -56,7 +56,9 @@ If you created a .deb-package, please see
 [Binary releases](./README.md#binary-releases). **Otherwise:**
 
 **Kernel-module backend** <br>
-To install and use the kernel-module (not built in SHOURNAL_EDITION's
+For a quick test, the module can be loaded right from the build-tree:
+`$ insmod kernel/shournalk.ko`. <br>
+To install the kernel-module (not built in SHOURNAL_EDITION's
 *docker* and *fanotify*) it is recommended to install it using dkms, e.g.:
 ~~~
 dkms build shournalk/2.4    # adjust version as needed.
