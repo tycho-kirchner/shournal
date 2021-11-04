@@ -23,8 +23,6 @@ QString g_logPreamble;
 const QtMsgType DEFAULT_VERBOSITY = QtMsgType::QtWarningMsg;
 QtMsgType g_verbosityLvl = DEFAULT_VERBOSITY;
 int g_verbosityLvlOrdinal=logger::msgTypeToOrdinal(DEFAULT_VERBOSITY);
-pid_t g_pid;
-
 
 
 
@@ -37,7 +35,7 @@ void messageHandler(QtMsgType msgType, const QMessageLogContext &context, const 
         if(typeOrdinal >= g_verbosityLvlOrdinal){
             QErr() << g_logPreamble << " Dbg: "
                  << "(" << QFileInfo(context.file).fileName() <<":" << context.line << ") "
-                 << " pid " << g_pid << ": "  << msg << '\n' ;
+                 << " pid " << getpid() << ": "  << msg << '\n' ;
         }
         // Don't log debug messages to file
         return;
@@ -55,7 +53,7 @@ void messageHandler(QtMsgType msgType, const QMessageLogContext &context, const 
     }
     if(logger::getLogRotate().file().isOpen()){
         logger::getLogRotate().stream() <<dateTime<<' '<< msgTypeStr
-                                       << " pid " << g_pid << ": " <<msg << "\n";
+                                       << " pid " << getpid() << ": " <<msg << "\n";
     }
 }
 
@@ -68,7 +66,6 @@ void messageHandler(QtMsgType msgType, const QMessageLogContext &context, const 
 void logger::setup(const QString& preamble)
 {
     g_logPreamble = preamble;
-    g_pid = getpid();
     qInstallMessageHandler(messageHandler);
 
 }

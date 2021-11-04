@@ -19,7 +19,6 @@ namespace {
 struct ShellLogState {
     QString logPreamble;
     QVarLengthArray<QByteArray, 8192> bufferedMessages;
-    pid_t pid{};
 };
 
 ShellLogState& sLogState(){
@@ -49,7 +48,7 @@ void messageHandler(QtMsgType msgType, const QMessageLogContext &context, const 
         if(typeOrdinal >= desiredVerbosity){
             QErr() << sLogState().logPreamble << " Dbg: "
                    << "(" << QFileInfo(context.file).fileName() <<":" << context.line << ") "
-                   << "pid " << sLogState().pid << ": "
+                   << "pid " << getpid() << ": "
                    << msg << '\n' ;
         }
         return;
@@ -68,7 +67,7 @@ void messageHandler(QtMsgType msgType, const QMessageLogContext &context, const 
     }
      QByteArray msgArr =
              (QString(dateTime + ' ' + msgTypeStr + " pid %1" + ": " + msg)
-              .arg(sLogState().pid)).toLocal8Bit();
+              .arg(getpid())).toLocal8Bit();
      if(g_shell.watchState == E_WatchState::WITHIN_CMD){
          sendViaSock(msgArr);
      } else {
@@ -89,7 +88,6 @@ void messageHandler(QtMsgType msgType, const QMessageLogContext &context, const 
 void shell_logger::setup()
 {
     sLogState().logPreamble = QString(app::SHOURNAL) + " shell-integration";
-    sLogState().pid = os::getpid();
     qInstallMessageHandler(messageHandler);
 }
 
