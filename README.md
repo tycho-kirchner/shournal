@@ -20,7 +20,7 @@ on bioRxiv.*
   similar to <br>
   `strace -f -e close $cmd`
   but without the limitations imposed by ptrace-based solutions
-  and **a lot** faster.
+  and **a lot** faster ([Overhead](#overhead)).
 
 *More details please*:
 
@@ -361,6 +361,76 @@ For further limitations please visit the fanotify manpage.
   - open a file readable for you on a NFS storage
   - chmod it 000
   - close it --> the event is lost
+
+
+
+## How does it work?
+shournal attempts to deterministically associate files and shell-
+commands without changing the users workflow. Under Linux file operations are
+performed by the kernel, tracing these operations thus requires OS-level support.
+During the execution of a shell-command, shournal instruments the kernel to
+trace files used by the shell-process and any of it’s descendant processes. More
+particular, to keep the tracing-overhead low, only the closing of files is traced
+and (meta-)data collection starts afterwards in an asynchronous manner.
+
+**shournalk** as a kernel module runs directly in *kernel space* and is based on
+[tracepoints](https://www.kernel.org/doc/html/latest/trace/tracepoints.html)
+and the
+[ftrace-framework](https://www.kernel.org/doc/Documentation/trace/ftrace.txt)
+which basically allow for custom code to be run at certain kernel
+execution paths without recompilation of the kernel itself. Only three
+events are traced: closing of files, fork and exit. (Meta-)data collection
+also takes place entirely in kernel space.
+
+The **fanotify backend** employs the kernel-native
+[fanotify filesystem API]( https://man7.org/linux/man-pages/man7/fanotify.7.html)
+to register for close-events of whole
+mount-points which are isolated against unrelated
+processes using unshared
+[mount namespaces](https://man7.org/linux/man-pages/man7/mount_namespaces.7.html).
+shournal thereby ensures that all file-operations during the execution of a shell-
+command refer to the same, unique mount namespace. While the process-filtering
+takes place in kernel space — so only file-events of observed processes
+are copied to user-space — the (meta-)data collection happens in user
+space.
+
+
+## Overhead
+File tracing imposes a **runtime overhead**.
+A detailed performance evaluation may follow soon. For now:
+We measured the following command executions with shournal v2.5:
+* compile elfutils-0.176
+* git checkout — checkout the Linux kernel’s source code from v4.19 to v3.10.
+* kernel copy — cp of the 4.19 Linux source.
+
+The benchmark involves tracing, (meta-)data collection and saving to
+a binary temporary file. As this file can be kept indefinitely, the
+final storing into the SQL-database is not part of the measurement.
+
+The relative runtime-overheads are shown in below table,
+strace listed for comparison with ptrace-based solutions:
+
+|    Backend    | compile | checkout |  cp   |
+| ------------- | ------- | -------- | ----- |
+| kernel module |  0,03%  |   0,4%   | 0,35% |
+| fanotify      |  0,4%   |   2,4%   | 28,7% |
+| (strace)      |  125%   |   93%    | 494%  |
+
+For the `cp` benchmark, where ~120.000 file-events occurred
+in ~4 seconds, the runtime overhead of the fanotify backend becomes
+significant. Note that many file-events in short time constitute a
+worst-case. Where performance is critical, the kernel module backend
+should be used.
+
+The **storage overhead** largely depends on configuration, e.g. the number
+of stored scripts and file-metadata is limited by default, to avoid e.g.
+a backup-script from flooding the database. For the cp-test
+the average disk-usage per file-event is approx. 174 bytes which already
+includes indexes to speed up queries. So one GiB of disk-space is
+sufficient for approx. 6 million events. Based on the experience of real-world
+users the database is typically not larger than a few hundred megabytes
+after months of usage.
+
 
 
 ## Credits
