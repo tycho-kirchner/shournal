@@ -2,13 +2,20 @@
 
 #include "attached_shell.h"
 
-/// I was unable to find a reliable way to find out, whether the
-/// last entered command was empty (invalid) from within the bash_integration.sh.
-/// Especially, when IgnoreDups is on, or the history get reloaded from file
-/// (at each PROMPT_COMMAND). Therefor we fetch the bash-internal counter
-/// 'current_command_number' at runtime, which is only incremented in case of
-/// non-empty commands and is independent of history-reloads.
-/// The symbol-name has been stable for at least a decade as of March 2019.
+/// We read the env-variable set in bash's PS0
+/// in order to prepare the observation of the next command
+/// sequence. We cannot do this easily from within a function
+/// called in PS0, because that is run in a subshell.
+/// Another possibility is to run a signal handler but there we must
+/// again be careful not to interfere with custom handlers of the
+/// user.
+/// counter=0
+/// trap_handler(){
+///     counter=$((counter+1))
+///     echo "hi from trap_handler: $counter: $(history 1)" >&2
+/// }
+/// trap trap_handler SIGRTMIN
+/// PS0='$(echo "sending signal... "; kill -SIGRTMIN  $$; )'
 class AttachedBash : public AttachedShell
 {
 public:
@@ -19,7 +26,6 @@ public:
     bool cmdCounterJustIncremented() override;
 
 private:
-    int *m_pExternCurrentCmdNumber;
-    int m_lastCmdNumber;
+    int m_lastSeq;
 };
 

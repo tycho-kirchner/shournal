@@ -285,12 +285,14 @@ _shournal_trigger_update(){
     local ret
 
     export _LIBSHOURNAL_TRIGGER="$desired_state";
+    export _SHOURNAL_SHELL_PID=$$
 
     # Note: our .so detects this special (non-)filename and
     # writes its response to an unnamed tmp file.
     ret=0
     read -d '' trigger_response < '_///shournal_trigger_response///_' || ret=$?
     unset _LIBSHOURNAL_TRIGGER
+    unset _SHOURNAL_SHELL_PID
 
     if [ $ret -ne 0 ]; then
         _shournal_debug "_shournal_trigger_update: failed to read " \
@@ -356,15 +358,25 @@ _libshournal_is_loaded(){
 # _shournal_verbose_reexec_allowed
 case "$_SHOURNAL_SHELL_NAME" in
   'bash')
+export _LIBSHOURNAL_SEQ_COUNTER=1
+_shournal_ps0='${_SHOURNAL_SHELL_NAME:((_LIBSHOURNAL_SEQ_COUNTER++)):0}$(:)'
 
 _shournal_add_prompts(){
+    [ -z "${PS0+x}" ] && PS0=''
     [ -z "${PROMPT_COMMAND+x}" ] && PROMPT_COMMAND=''
+
+    # Allright, what happens here? We use _SHOURNAL_SHELL_NAME as a dummy
+    # variable in order to increment _LIBSHOURNAL_SEQ_COUNTER without printing
+    # anything. Then we fork to notify libshournal-shellwatch.so that
+    # we're about to execute a command.
+    PS0="$PS0""$_shournal_ps0"
     PROMPT_COMMAND=$'_shournal_postexec\n'"$PROMPT_COMMAND"
     # no _shournal_preexec for bash, see below ...
     return 0
 }
 
 _shournal_remove_prompts(){
+    [ -n "${PS0+x}" ] && PS0=${PS0//"$_shournal_ps0"/}
     [ -n "${PROMPT_COMMAND+x}" ] &&
         PROMPT_COMMAND=${PROMPT_COMMAND//_shournal_postexec$'\n'/}
     return 0
@@ -388,9 +400,7 @@ _shournal_verbose_reexec_allowed(){
 
 # _shournal_preexec(){
 #   For bash preexec is not implemented here but in
-#   libshournal-shellwatch.so, because the DEBUG trap is
-#   somewhat unreliable and PS0 can only run commands in
-#   a subshell which would require additional care (more IPC).
+#   in an interplay of above PS0 and libshournal-shellwatch.so.
 # }
 
 _shournal_postexec(){

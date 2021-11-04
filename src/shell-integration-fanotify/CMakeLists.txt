@@ -16,7 +16,6 @@ add_library(libshournal-shellwatch SHARED
     attached_bash
     attached_shell
     event_open
-    event_other
     event_process
     shell_globals
     shell_logger

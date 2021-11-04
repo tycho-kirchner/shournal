@@ -10,7 +10,6 @@
 
 #include "cleanupresource.h"
 #include "event_open.h"
-#include "event_other.h"
 #include "event_process.h"
 #include "staticinitializer.h"
 #include "shell_globals.h"
@@ -154,17 +153,6 @@ int execve(const char *filename, char *const argv[],
     return ShellGlobals::instance().orig_execve(filename, argv, envp);
 }
 
-
-LIBSHOURNAL_SHELLWATCH_EXPORT
-char *strcpy(char *dest, const char *src){
-    initSymIfNeeded();
-    try {
-        return event_other::handleStrcpy(dest, src);
-    } catch (const std::exception& ex ) {
-        std::cerr << __func__ << " fatal: " << ex.what() << "\n";
-    }
-    return ShellGlobals::instance().orig_strcpy(dest, src);
-}
 
 #ifdef __cplusplus
 }

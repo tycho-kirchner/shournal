@@ -45,7 +45,7 @@ public:
     std::atomic_flag ignoreEvents{};
 
     E_WatchState watchState {E_WatchState::DISABLED};
-    bool inSubshell {false};
+    bool inParentShell {false};
     fdcommunication::SocketCommunication shournalSocket;
     pid_t lastMountNamespacePid {-1};
 
@@ -59,6 +59,8 @@ public:
 
     SessionInfo sessionInfo;
     int shournalRootDirFd {-1};
+
+    pid_t shellParentPid {0};
 
 public:
     ~ShellGlobals() = default;

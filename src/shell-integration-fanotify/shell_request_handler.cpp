@@ -179,6 +179,36 @@ static void verboseCloseRootDirFd(){
     g_shell.shournalRootDirFd = -1;
 }
 
+static bool updateShellPID(){
+    const char* _SHOURNAL_SHELL_PID = "_SHOURNAL_SHELL_PID";
+    const char* pidValue = getenv(_SHOURNAL_SHELL_PID);
+    if(pidValue == nullptr){
+        logWarning << qtr("Required environment variable '%1' "
+                          "is unset.").arg(_SHOURNAL_SHELL_PID);
+        return false;
+    }
+    pid_t pid;
+    try {
+        qVariantTo_throw(pidValue, &pid);
+    } catch (const ExcQVariantConvert& ex) {
+        logWarning << "Failed to convert pid:"
+                   << ex.descrip();
+        return false;
+    }
+    auto realPid = getpid();
+    if(pid != realPid){
+        logWarning << qtr("Apparently we were enabled from a subshell, which "
+                          "is not supported.");
+        return false;
+    }
+
+    auto& g_shell = ShellGlobals::instance();
+    g_shell.shellParentPid = pid;
+    g_shell.inParentShell = true;
+
+    return true;
+}
+
 
 static bool handleDisableRequest(){
     auto& g_shell = ShellGlobals::instance();
@@ -493,6 +523,10 @@ ShellRequest shell_request_handler::checkForTriggerAndHandle(bool *success){
             return request;
         }
     }
+    if(! updateShellPID()){
+        return ShellRequest::TRIGGER_MALFORMED;
+    }
+
     switch (request) {
     case ShellRequest::ENABLE:
         *success = handleEnableRequest();

@@ -83,11 +83,10 @@ int event_open::handleOpen(const char *pathname, int flags, mode_t mode, bool la
 
     // Note: we only process shell-request if the trigger env-variable is set AND the current
     // pathname is _///shournal_trigger_response///_
-    // So check for the pathname before calling handling the request in
+    // So check for the pathname before handling the request in
     // checkForTriggerAndHandle (this is for cases where the trigger variable is set
     // and other redirections occurr in between).
-    if(! g_shell.inSubshell &&
-       strcmp(pathname, "_///shournal_trigger_response///_") == 0){
+    if(strcmp(pathname, "_///shournal_trigger_response///_") == 0){
         bool shellRequestSuccess = false;
         auto shellRequest = checkForTriggerAndHandle(&shellRequestSuccess);
         switch (shellRequest) {

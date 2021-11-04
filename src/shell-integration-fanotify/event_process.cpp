@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include <csignal>
 
-
+#include "attached_bash.h"
 #include "cleanupresource.h"
 #include "logger.h"
 
@@ -57,18 +57,21 @@ pid_t event_process::handleFork()
     }
     auto clearIgnEvents = finally([&g_shell] {g_shell.ignoreEvents.clear(); });
 
-    switch (g_shell.watchState) {
-    case E_WatchState::WITHIN_CMD: {
-        pid_t ret = g_shell.orig_fork();
-        if(ret == 0){
-            g_shell.inSubshell = true;
-        }
-        return ret;
-    }    
-    default:
-        break;
+    if( g_shell.inParentShell &&
+         g_shell.watchState == E_WatchState::INTERMEDIATE &&
+          dynamic_cast<const AttachedBash*>(g_shell.pAttchedShell) != nullptr &&
+         g_shell.pAttchedShell->cmdCounterJustIncremented()){
+        shell_request_handler::handlePrepareCmd();
     }
-    return g_shell.orig_fork();
+
+    pid_t ret = g_shell.orig_fork();
+    if(ret == 0){
+        if(g_shell.shellParentPid != 0){
+            // our parent shell is initialized, so we can't be it
+            g_shell.inParentShell = false;
+        }
+    }
+    return ret;
 }
 
 
@@ -81,7 +84,7 @@ int event_process::handleExecve(const char *filename, char * const argv[], char 
     }
     auto clearIgnEvents = finally([&g_shell] {g_shell.ignoreEvents.clear(); });
 
-    if(! g_shell.inSubshell ||
+    if( g_shell.inParentShell ||
          g_shell.watchState != E_WatchState::WITHIN_CMD){
         shell_earlydbg("ignore execve of %s", filename);
         return g_shell.orig_execve(filename, argv, envp);
