@@ -68,6 +68,7 @@ static ssize_t __read_and_hash(xxh_common_file_t file,
         // we always provide a valid buffer, so no
         // need to check for errors in production.
         kuassert(xxh_ret == 0);
+        (void)xxh_ret; // avoid unused warning for release builds
     }
     return readBytes;
 }
