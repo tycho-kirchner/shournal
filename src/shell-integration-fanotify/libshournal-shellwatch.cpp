@@ -37,10 +37,11 @@ static void initSymIfNeeded(){
             g_shell.orig_strcpy = reinterpret_cast<strcpy_func_t>(os::dlsym(RTLD_NEXT, "strcpy"));
 
             return;
-        } catch(const os::ExcOs& ex){
-            std::cerr << "shournal shell integration fatal error: "
-                      << "failed to load original symbols, expect the worst..." << ex.what();
-            throw ;
+        } catch(const std::exception& ex){
+            fprintf(stderr,
+                    "shournal shell integration fatal error: "
+                    "failed to load original symbols, expect "
+                    "the worst: %s", ex.what());
         }
     });
 
