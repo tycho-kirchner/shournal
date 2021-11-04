@@ -20,7 +20,6 @@ __shournal_select_backend(){
     local backend_name_ko
     local backend_name_fan
     local backend_name_selected
-    local backend_config_file
     local backend_origin
 
     backend_name_ko="integration_ko.$this_shell"
@@ -33,27 +32,26 @@ __shournal_select_backend(){
         for p in "$HOME/.config/shournal/backend" \
                  "/etc/shournal.d/backend"; do
             if test -f "$p"; then
-                backend_config_file="$p"
+                read -r backend_name_selected < "$p"
+                backend_origin="$p"
                 break
             fi
         done
     fi
 
-    if [ -n "$backend_config_file" ]; then
-        read -r backend_name_selected < "$backend_config_file"
-        backend_origin="$backend_config_file"
-    fi
-
-    if [ "$backend_name_selected" = 'ko' ]; then
-            backend_name_selected="$backend_name_ko"
-        elif [ "$backend_name_selected" = 'fanotify' ]; then
-            backend_name_selected="$backend_name_fan"
-        else
-            backend_name_selected=""
-            __shournal_eprint "Unsupported backend $backend_name_selected set in " \
-                              "$backend_origin. Supported options: [fanotify, ko]. " \
-                              "Using defaults..."
-    fi
+    case "$backend_name_selected" in
+    '')
+        : ;; # use fallback below
+    ko)
+        backend_name_selected="$backend_name_ko";;
+    fanotify)
+        backend_name_selected="$backend_name_fan";;
+    *)
+        __shournal_eprint "Unsupported backend '$backend_name_selected' set in" \
+                          "'$backend_origin'. Supported options: [fanotify, ko]." \
+                          "Using defaults..."
+        backend_name_selected="" ;;
+    esac
 
     if [ -z "$backend_name_selected" ]; then
         if __shournal_cmd_exists 'shournal-run'; then
