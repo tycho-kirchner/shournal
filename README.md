@@ -34,7 +34,7 @@ Using your shell's history is nice. But sometimes you want more:
   exit status ($?) ?
 
 *shournal* provides the answer to these questions while
-causing only a negligible overhead. <br>
+causing only a negligible [overhead](#overhead). <br>
 Besides its ability to monitor a whole process tree for file
 events it can be integrated really tight into the shell -
 you won't even notice it (; <br>
