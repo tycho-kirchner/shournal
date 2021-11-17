@@ -14,7 +14,7 @@ shournalk-y += shournalk_main.o event_handler.o shournalk_sysfs.o \
 			kpathtree.o shournalk_test.o shournalk_global.o \
 			hash_table_str.o kfileextensions.o \
 			event_consumer_cache.o \
-                        ${common_prefix}xxhash_common.o \
+			${common_prefix}xxhash_common.o \
 
 ifneq (${shournal_cmake_build}, true)
 # dkms build
@@ -24,7 +24,7 @@ KBASE		?= /lib/modules/$(KVER)
 KBUILD_DIR	?= $(KBASE)/build
 MDEST_DIR	?= $(KBASE)/kernel
 
-PWD  := $(shell pwd)
+PWD	:= $(shell pwd)
 
 all:
 	@$(MAKE) -C $(KBUILD_DIR) M=$(PWD) EXTRA_CFLAGS="-O3" modules
