@@ -41,7 +41,7 @@ static int __open_sysfs_mark(void){
 
     if(errno != EROFS){
         perror("Failed to open shournalk's sysfs-interface at "
-               SHOURNALK_MARK_PATH);
+               SHOURNALK_MARK_PATH ". Is the kernel module loaded? modprobe shournalk");
         return -1;
     }
 
@@ -51,7 +51,8 @@ static int __open_sysfs_mark(void){
         return fd;
 
     perror("Failed to open shournalk's sysfs-interface at\n"
-           SHOURNALK_MARK_PATH " and\n" SHOURNALK_DOCKER_MARK_PATH);
+           SHOURNALK_MARK_PATH " and\n" SHOURNALK_DOCKER_MARK_PATH
+           ". Is the kernel module loaded? modprobe shournalk");
     return -1;
 }
 
