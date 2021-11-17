@@ -13,15 +13,22 @@
 
   *Packages lists*:
 
-  Debian/Ubuntu:
+  Debian:
   ~~~
   apt-get install g++ cmake make qtbase5-dev libqt5sql5-sqlite \
-   uuid-dev libcap-dev uuid-runtime
+   uuid-dev libcap-dev uuid-runtime linux-headers-$(uname -r) dkms
+
+  ~~~
+  Ubuntu:
+  ~~~
+  apt-get install g++ cmake make qtbase5-dev libqt5sql5-sqlite \
+   uuid-dev libcap-dev uuid-runtime linux-headers-generic dkms
   ~~~
   Opensuse:
   ~~~
   zypper install gcc-c++ cmake make libqt5-qtbase-devel \
-   libQt5Sql5-sqlite libuuid-devel libcap-devel uuidd
+   libQt5Sql5-sqlite libuuid-devel libcap-devel uuidd \
+   kernel-default-devel dkms
   ~~~
 
   CentOS (note: CentOS 7 as of July 2019 only ships with gcc 4.8
@@ -31,7 +38,7 @@
   Either install a newer one or stick with the fanotify-edition):
   ~~~
   yum install gcc-c++ cmake3 make qt5-qtbase-devel libuuid-devel \
-  libcap-devel uuidd
+  libcap-devel uuidd kernel-devel dkms
   ~~~
 
 * In the source-tree-directory, enter the following commands to
