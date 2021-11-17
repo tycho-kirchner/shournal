@@ -531,7 +531,7 @@ void event_consumer_thread_setup(struct event_target* event_target){
         consumer->consume_tsk_oldfs = get_fs();
         set_fs(USER_DS);
 #endif
-        kthread_use_mm(event_target->mm);
+        kutil_use_mm(event_target->mm);
     }
 
     // use_mm() -> We want this kthread's page-cache memory allocations to account to
@@ -582,7 +582,7 @@ void event_consumer_thread_cleanup(struct event_target* event_target){
                             "current != consumer->consume_task");
     revert_creds(consumer->consume_task_orig_cred);
     if(event_target->mm){
-        kthread_unuse_mm(event_target->mm);
+        kutil_unuse_mm(event_target->mm);
 #ifdef USE_MM_SET_FS_OFF
         set_fs(consumer->consume_tsk_oldfs);
 #endif

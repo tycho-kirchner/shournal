@@ -178,11 +178,21 @@ kutil_set_active_memcg(struct mem_cgroup *memcg)
 
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0))
+
+#define kutil_BACKPORT_USE_MM
+
+// see commit f5678e7f2ac31c270334b936352f0ef2fe7dd2b3
+void kutil_use_mm(struct mm_struct*);
+void kutil_unuse_mm(struct mm_struct*);
+
 // see commit 37c54f9bd48663f7657a9178fe08c47e4f5b537b
 #define USE_MM_SET_FS_OFF
-// see commit f5678e7f2ac31c270334b936352f0ef2fe7dd2b3
-#define kthread_use_mm use_mm
-#define kthread_unuse_mm unuse_mm
+
+#else
+
+#define kutil_use_mm kthread_use_mm
+#define kutil_unuse_mm kthread_unuse_mm
+
 #endif
 
 

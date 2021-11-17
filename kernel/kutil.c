@@ -208,6 +208,38 @@ void kutil_release_name_snapshot(struct kutil_name_snapshot *name __attribute__ 
 {}
 
 
+#ifdef kutil_BACKPORT_USE_MM
+
+#include <linux/mmu_context.h>
+
+// declare as weak to satisfy compiler. However,
+// one of use_mm or kthread_use_mm _must_ be defined (by kernel).
+void use_mm(struct mm_struct *mm) __attribute__((weak));
+void unuse_mm(struct mm_struct *mm) __attribute__((weak));
+void kthread_use_mm(struct mm_struct*) __attribute__((weak));
+void kthread_unuse_mm(struct mm_struct*) __attribute__((weak));
+
+
+void kutil_use_mm(struct mm_struct *mm) {
+    if(use_mm)
+        use_mm(mm);
+    else if(kthread_use_mm)
+        kthread_use_mm(mm);
+    else
+        pr_warn_once("kthread_use_mm and use_mm not defined - please report");
+}
+
+void kutil_unuse_mm(struct mm_struct *mm) {
+    if(unuse_mm)
+        unuse_mm(mm);
+    else if(kthread_unuse_mm)
+        kthread_unuse_mm(mm);
+    else
+        pr_warn_once("kthread_unuse_mm and unuse_mm not defined - please report");
+}
+
+#endif // kutil_BACKPORT_USE_MM
+
 
 #ifdef RCU_WORK_BACKPORT
 
