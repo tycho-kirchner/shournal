@@ -15,7 +15,7 @@ include_directories(
 add_subdirectory("common")
 add_subdirectory("shournal")
 
-if(${SHOURNAL_EDITION} MATCHES "full|docker")
+if(${SHOURNAL_EDITION} MATCHES "full|docker|ko")
     add_subdirectory("shournal-run")
 endif()
 if(${SHOURNAL_EDITION} MATCHES "full|docker|fanotify")

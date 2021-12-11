@@ -11,7 +11,7 @@ configure_file( shournalk-load.conf shournalk.conf )
 configure_file( postinst-dkms.in postinst-dkms )
 configure_file( prerm-dkms.in prerm-dkms )
 
-if(${SHOURNAL_EDITION} MATCHES "full")
+if(${SHOURNAL_EDITION} MATCHES "full|ko")
 
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/90-shournaladd.rules"

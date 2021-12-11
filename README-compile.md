@@ -42,11 +42,15 @@
   ~~~
 
 * In the source-tree-directory, enter the following commands to
-  compile and install:
+  compile and install. By default `SHOURNAL_EDITION` `full` is built (see below).
+  Supported options include `full, docker, ko, fanotify`.
+  The `ko` (kernel module) edition does not install the fanotify backend
+  which may be desirable for security reasons as the setuid-binary
+  `shournal-run-fanotify` is omitted. For a description of the other editions
+  refer to [Binary releases](./README.md#binary-releases).
   ~~~
   mkdir -p build
   cd build
-  # Other SHOURNAL_EDITION's are 'docker' and 'fanotify' (see also above).
   # If you later want to generate a deb-package, it is recommended
   # to use /usr as prefix: -DCMAKE_INSTALL_PREFIX=/usr
   cmake -DSHOURNAL_EDITION=full ..

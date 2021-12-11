@@ -11,6 +11,9 @@ set(shournal_version "2.7")
 cmake_policy( SET CMP0048 NEW )
 project(shournal VERSION ${shournal_version} LANGUAGES CXX C)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+find_package(ShournalUtil REQUIRED)
+
 if (NOT DEFINED MSENTER_GROUPNAME)
     set(MSENTER_GROUPNAME "shournalmsenter")
 endif()
@@ -26,13 +29,13 @@ set(GROUPNAME_SHOURNALK "shournalk")
 # but we default to using the host's kernel-module.
 # When only shournal-run-fanotify is desired, no need to
 # compile shournal-run.
-# -DSHOURNAL_EDITION={full, docker, fanotify}
+# -DSHOURNAL_EDITION={full, docker, ko, fanotify}
 if(NOT DEFINED SHOURNAL_EDITION)
     set(SHOURNAL_EDITION "full")
 endif()
 
 
-if(NOT ${SHOURNAL_EDITION} MATCHES "full|docker|fanotify")
+if(NOT ${SHOURNAL_EDITION} MATCHES "full|docker|ko|fanotify")
      message( FATAL_ERROR "invalid SHOURNAL_EDITION passed: ${SHOURNAL_EDITION}" )
 endif()
 
@@ -148,7 +151,7 @@ add_subdirectory("shell-integration-scripts")
 add_subdirectory("install")
 
 # Kernel module
-if(${SHOURNAL_EDITION} MATCHES "full")
+if(${SHOURNAL_EDITION} MATCHES "full|ko")
     add_subdirectory("kernel")
 endif()
 
@@ -183,21 +186,31 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
    "File-journal for your shell"
 )
 
+set(SHOURNAL_CONFLICTS_LIST
+    "shournal" "shournal-docker"
+    "shournal-ko" "shournal-fanotify"
+)
+
 if(${SHOURNAL_EDITION} STREQUAL "full")
     set(CPACK_PACKAGE_NAME "shournal")
-    set(SHOURNAL_CONFLICTS "shournal-fanotify, shournal-docker")
     set(edition_description "full suite (all backends)")
+elseif(${SHOURNAL_EDITION} STREQUAL "ko")
+    set(CPACK_PACKAGE_NAME "shournal-ko")
+    set(edition_description "kernel backend only (fanotify backend not included)")
 elseif(${SHOURNAL_EDITION} STREQUAL "fanotify")
     set(CPACK_PACKAGE_NAME "shournal-fanotify")
-    set(SHOURNAL_CONFLICTS "shournal, shournal-docker")
     set(edition_description "fanotify backend only (no kernel module included)")
 elseif(${SHOURNAL_EDITION} STREQUAL "docker")
     set(CPACK_PACKAGE_NAME "shournal-docker")
-    set(SHOURNAL_CONFLICTS "shournal-fanotify, shournal")
     set(edition_description "docker-version to be installed inside containers")
 else()
     message( FATAL_ERROR "invalid cpack COMPONENT: ${SHOURNAL_EDITION}" )
 endif()
+
+list(REMOVE_ITEM SHOURNAL_CONFLICTS_LIST
+    "${CPACK_PACKAGE_NAME}"
+    )
+JOIN("${SHOURNAL_CONFLICTS_LIST}" ", " SHOURNAL_CONFLICTS)
 
 # CPACK_DEBIAN_PACKAGE_DESCRIPTION requires newlines
 # be indented by one space. For the sake of simplicity:
@@ -233,7 +246,7 @@ set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
     )
 set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION TRUE)
 
-if(${SHOURNAL_EDITION} MATCHES "full")
+if(${SHOURNAL_EDITION} MATCHES "full|ko")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS
         "${CPACK_DEBIAN_PACKAGE_DEPENDS}, dkms")
     append_to_file( "${debPostinstPath}" ${CMAKE_BINARY_DIR}/install/postinst-dkms )
