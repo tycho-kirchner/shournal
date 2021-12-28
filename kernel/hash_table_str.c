@@ -12,11 +12,11 @@ struct hash_entry_str*
 hash_entry_str_create(const char* str, size_t str_len){
     struct hash_entry_str* str_entry = kmalloc(sizeof (struct hash_entry_str),
                                           HASH_GFP_FLAGS);
-    if(str_entry == NULL){
+    if(!str_entry){
         return ERR_PTR(-ENOMEM);
     }
     str_entry->str = kmalloc(str_len, HASH_GFP_FLAGS);
-    if(str_entry->str == NULL){
+    if(!str_entry->str){
         kfree(str_entry);
         return ERR_PTR(-ENOMEM);
     }

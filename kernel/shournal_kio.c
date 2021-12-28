@@ -16,7 +16,7 @@ struct kbuffered_file* shournal_kio_from_file(struct file* file, size_t bufsize)
         return ERR_PTR(-ENOMEM);
     }
     buf_file = kmalloc(sizeof(struct kbuffered_file), SHOURNALK_GFP);
-    if(buf_file == NULL){
+    if(!buf_file){
         kvfree(buf);
         return ERR_PTR(-ENOMEM);
     }

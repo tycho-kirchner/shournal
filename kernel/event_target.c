@@ -123,7 +123,7 @@ static struct file* __get_check_pipe(int pipe_fd){
     new_pipe = dentry_open(&orig_pipe->f_path,
                            O_WRONLY | O_NONBLOCK,
                            current->cred);
-    if(new_pipe == NULL){
+    if(!new_pipe){
         error_nb = -EXDEV;
         goto err_cleanup_ret;
     }
@@ -158,7 +158,7 @@ __event_target_create(struct file* target_file, struct file* pipe_w,
     long error = -ENOSYS;
     struct mm_struct * mm = NULL;
 
-    if(pid_ns == NULL){
+    if(!pid_ns){
         WARN(1, "pid_ns == NULL");
         return ERR_PTR(-ENXIO);
     }
@@ -176,7 +176,7 @@ __event_target_create(struct file* target_file, struct file* pipe_w,
     }
 
     t = kvzalloc(sizeof (struct event_target), SHOURNALK_GFP | __GFP_RETRY_MAYFAIL);
-    if(t == NULL) {
+    if(!t) {
         error = -ENOMEM;
         goto error_out;
     }
@@ -189,7 +189,7 @@ __event_target_create(struct file* target_file, struct file* pipe_w,
     }
 
     t->partial_hash.xxh_state = kmalloc(sizeof (struct xxh64_state), SHOURNALK_GFP);
-    if(t->partial_hash.xxh_state == NULL){
+    if(!t->partial_hash.xxh_state){
         error = -ENOMEM;
         goto error_out;
     }
@@ -336,7 +336,7 @@ __event_target_get_or_create(const struct shournalk_mark_struct * mark_struct, b
     // allocate new event target
 
     el = kmalloc((sizeof(struct table_entry)), SHOURNALK_GFP);
-    if(el == NULL){
+    if(!el){
         error = -ENOMEM;
         goto err_put_unlock;
     }

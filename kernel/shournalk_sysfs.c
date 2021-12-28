@@ -234,7 +234,7 @@ static long __add_user_path(struct kpathtree* pathtree, const char* __user src){
     char* path_tmp;
 
     path_tmp = kzalloc(PATH_MAX, SHOURNALK_GFP);
-    if(path_tmp == NULL) return -ENOMEM;
+    if(!path_tmp) return -ENOMEM;
 
     if((ret = __copy_path_from_user(path_tmp, src)) < 0){
          goto out;
@@ -270,7 +270,7 @@ static long __add_user_file_extensions(struct file_extensions* exts, const char*
     char* ext_tmp;
 
     ext_tmp = kzalloc(PAGE_SIZE, SHOURNALK_GFP);
-    if(ext_tmp == NULL) return -ENOMEM;
+    if(!ext_tmp) return -ENOMEM;
 
     if((ret = __copy_file_extensions_from_user(ext_tmp, PAGE_SIZE, src)) < 0){
          goto out;

@@ -40,7 +40,7 @@ static bool __path_len_exists(struct kpathtree* pathtree, int path_len){
 
 struct kpathtree* kpathtree_create(void){
     struct kpathtree* pathtree = kzalloc(sizeof (struct kpathtree), SHOURNALK_GFP);
-    if(pathtree == NULL){
+    if(!pathtree){
         return ERR_PTR(-ENOMEM);
     }
     kpathtree_init(pathtree);
