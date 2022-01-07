@@ -1,39 +1,52 @@
 
+$(info building kernel module shournalk version @shournal_version@)
+
 obj-m := shournalk.o
 
-CFLAGS_MODULE += "-DSHOURNAL_VERSION=\"${shournal_version}\""
+# shournal_version filled by cmake (see Makefile in generated dkms dir)
+CFLAGS_MODULE += "-DSHOURNAL_VERSION=\"@shournal_version@\""
 
-
-ifeq (${shournal_cmake_build}, true)
-	common_prefix := ../src/common/
-endif
 
 shournalk-y += shournalk_main.o event_handler.o shournalk_sysfs.o \
-			tracepoint_helper.o event_target.o kutil.o event_queue.o \
-			event_consumer.o shournal_kio.o xxhash_shournalk.o \
-			kpathtree.o shournalk_test.o shournalk_global.o \
-			hash_table_str.o kfileextensions.o \
-			event_consumer_cache.o \
-			${common_prefix}xxhash_common.o \
+               tracepoint_helper.o event_target.o kutil.o event_queue.o \
+               event_consumer.o shournal_kio.o xxhash_shournalk.o \
+               kpathtree.o shournalk_test.o shournalk_global.o \
+               hash_table_str.o kfileextensions.o \
+               event_consumer_cache.o \
+               xxhash_common.o \
 
-ifneq (${shournal_cmake_build}, true)
-# dkms build
+ifeq ($(shournal_cmake_build), true)
+$(info building kernel module from cmake)
 
-KVER		?= $(shell uname -r)
-KBASE		?= /lib/modules/$(KVER)
-KBUILD_DIR	?= $(KBASE)/build
-MDEST_DIR	?= $(KBASE)/kernel
+else
+# usually called by dkms but can also be used standalone
 
-PWD	:= $(shell pwd)
+PWD         := $(shell pwd)
+KVER        ?= $(shell uname -r)
+KBASE       ?= /lib/modules/$(KVER)
+KBUILD_DIR  ?= $(KBASE)/build
 
-all:
-	@$(MAKE) -C $(KBUILD_DIR) M=$(PWD) EXTRA_CFLAGS="-O3" modules
+no_strip    ?= false
 
-install:
-	install -D -m 755 shournalk.ko $(MDEST_DIR)
+common_make_args = @$(MAKE) -C $(KBUILD_DIR) M=$(PWD) EXTRA_CFLAGS="-O3"
 
+# strip module by default
+ifndef INSTALL_MOD_STRIP
+ifneq ($(no_strip), true)
+    $(info stripping is ON by default, use no_strip=true or define \
+      INSTALL_MOD_STRIP if this is not desired.)
+    common_make_args += INSTALL_MOD_STRIP=1
+endif
 endif
 
+
+all:
+	$(common_make_args) modules
+
+install:
+	$(common_make_args) modules_install
+	depmod -A
+endif
 
 clean:
 	@rm -rf *~ *.o *.mod *.mod.c .*.cmd .tmp_versions

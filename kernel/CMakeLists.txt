@@ -63,14 +63,26 @@ else()
     )
 endif()
 
+
+# The kernel module is compiled from
+# the dkms-directory, where the necessary source
+# files are copied to beforehand.
+# This has the advantage that the Kbuild file
+# can be generated with the version and
+# does not need to know about the files
+# in ../src/common, in other words we compile
+# the source code in the same way as
+# a later user from the installed /usr/src/shournalk*.
+
+set(dkms_dir "${CMAKE_BINARY_DIR}/dkms")
+
 set(KBUILD_CMD $(MAKE)
     -C "${mod_buildir}"
     M=${CMAKE_CURRENT_BINARY_DIR}
-    src=${CMAKE_CURRENT_SOURCE_DIR}
+    src=${dkms_dir}
     EXTRA_CFLAGS=${k_extra_cflags}
     modules
     shournal_cmake_build=true
-    shournal_version=${shournal_version}
 )
 
 # For development purposes, create the kernel module
@@ -81,21 +93,18 @@ add_custom_target(shournalk ALL
     VERBATIM
 )
 
-set(dkms_dir "${CMAKE_BINARY_DIR}/dkms")
-
 # Copy required files to dkms dir
 # Better be safe and copy the files on cmake and make.
 file(COPY ${kernel_src} DESTINATION "${dkms_dir}" )
 add_custom_command(
-        TARGET shournalk POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
+        TARGET shournalk PRE_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${kernel_src}
                 "${dkms_dir}")
 
 
-# copy-and-rename workaround (not really a 'configure_file')
-configure_file(Kbuild "${dkms_dir}/Makefile" COPYONLY)
-configure_file( "dkms.conf.in" "${dkms_dir}/dkms.conf")
+configure_file(Kbuild "${dkms_dir}/Makefile" @ONLY)
+configure_file( "dkms.conf.in" "${dkms_dir}/dkms.conf" @ONLY)
 
 
 install( DIRECTORY "${dkms_dir}/" DESTINATION "${shournal_install_dir_shournalk_src}" )
