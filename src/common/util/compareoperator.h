@@ -5,7 +5,7 @@
 #include <QVector>
 
 
-enum class E_CompareOperator { GT,GE,LT,LE,EQ,NE,LIKE,BETWEEN };
+enum class E_CompareOperator { GT,GE,LT,LE,EQ,NE,LIKE,BETWEEN,ENUM_END };
 
 
 /// The most important sql-operators which are used

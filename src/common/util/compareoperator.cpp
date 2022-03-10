@@ -54,6 +54,7 @@ QString CompareOperator::asSql() const
     case E_CompareOperator::NE: sqlOperator = "!="; break;
     case E_CompareOperator::LIKE: sqlOperator = " LIKE "; break;
     case E_CompareOperator::BETWEEN: sqlOperator = " BETWEEN "; break;
+    case E_CompareOperator::ENUM_END: throw QExcProgramming("E_CompareOperator::ENUM_END");
     }
     return sqlOperator;
 }
@@ -70,6 +71,7 @@ QString CompareOperator::asTerminal() const
     case E_CompareOperator::NE: sqlOperator = "-ne"; break;
     case E_CompareOperator::LIKE: sqlOperator = "-like"; break;
     case E_CompareOperator::BETWEEN: sqlOperator = "-between"; break;
+    case E_CompareOperator::ENUM_END: throw QExcProgramming("E_CompareOperator::ENUM_END");
     }
     return sqlOperator;
 }

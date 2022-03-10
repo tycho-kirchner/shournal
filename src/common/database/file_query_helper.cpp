@@ -39,9 +39,11 @@ QVariantList generateAllNeededHashes(HashControl& hashCtrl, int fd, qint64 files
 /// Add the following file-attributes to the query, which are collected automatically:
 /// size, hash and mtime. It is looked preliminarily, if a file exactly matching the specs
 /// exists, in which case the passed query is filled with those (result is discarded).
-/// If no entry was found, the query is set to
-/// an mtime not later than the file's current mtime,
-/// because changing the mtime afterwards should only increase it.
+/// If no entry was found, the query is set to ignore the mtime.
+/// In previous shournal versions an mtime not later than the file's current mtime
+/// was set in the assumption that changing the mtime afterwards should only increase it.
+/// However, for example wget uses the «Last-Modified header» for HTTP if available,
+/// which is naturally older than the system's mtime of the just downloaded file.
 void file_query_helper::addWrittenFileSmart(SqlQuery &query, const QString &filename)
 {
     QFileThrow file(filename);
@@ -69,17 +71,18 @@ void file_query_helper::addWrittenFileSmart(SqlQuery &query, const QString &file
 
     E_CompareOperator mtimeCmpOperator;
     if(! db_controller::queryForCmd(mtimeExactQuery)->next()){
-        // expand the passed query also for files with mtimes less than the current one,
-        // if the timestamp was changed (increased) afterwards (e.g. by 'touch').
-        mtimeCmpOperator = E_CompareOperator::LE;
+        // ignore mtime
+        mtimeCmpOperator = E_CompareOperator::ENUM_END;
     } else {
         mtimeCmpOperator = E_CompareOperator::EQ;
     }
 
     query.addWithAnd(queryCols.wFile_hash, hashValues);
     query.addWithAnd(queryCols.wFile_size, static_cast<qint64>(st.st_size));
-    query.addWithAnd(queryCols.wfile_mtime,
-                     mtimeVar, mtimeCmpOperator);
+    if(mtimeCmpOperator != E_CompareOperator::ENUM_END){
+        query.addWithAnd(queryCols.wfile_mtime,
+                         mtimeVar, mtimeCmpOperator);
+    }
 
 }
 
