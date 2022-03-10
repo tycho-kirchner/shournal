@@ -125,7 +125,7 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     parser.addArg(&argWName);
 
     QOptSqlArg argWPath("wp", "wpath", wFilePreamble + qtr("by (full) directory-path."),
-                        QOptSqlArg::cmpOpsText());
+                        QOptSqlArg::cmpOpsText(), E_CompareOperator::LIKE);
     parser.addArg(&argWPath);
 
     QOptSqlArg argWSize("ws", "wsize", wFilePreamble + qtr("by filesize."),
@@ -149,7 +149,7 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     parser.addArg(&argRName);
 
     QOptSqlArg argRPath("rp", "rpath", rFilePreamble + qtr("by (full) directory-path."),
-                        QOptSqlArg::cmpOpsText());
+                        QOptSqlArg::cmpOpsText(), E_CompareOperator::LIKE);
     parser.addArg(&argRPath);
 
     QOptSqlArg argRSize("rs", "rsize", rFilePreamble + qtr("by filesize."),
@@ -192,12 +192,12 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     // ------------ cmd
 
     QOptSqlArg argCmdText("cmdtxt", "command-text", qtr("Query for commands with matching command-string."),
-                        QOptSqlArg::cmpOpsText());
+                        QOptSqlArg::cmpOpsText(), E_CompareOperator::LIKE);
     parser.addArg(&argCmdText);
 
     QOptSqlArg argCmdCwd("cwd", "command-working-dir",
                          qtr("Query for commands with matching working-directory."),
-                          QOptSqlArg::cmpOpsText());
+                          QOptSqlArg::cmpOpsText(), E_CompareOperator::LIKE);
     parser.addArg(&argCmdCwd);
 
     QOptSqlArg argCmdId("cmdid", "command-id", qtr("Query for commands with matching ids. "
