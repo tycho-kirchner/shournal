@@ -91,13 +91,15 @@ add_custom_target(shournalk ALL
     COMMAND ${KBUILD_CMD}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     VERBATIM
+    DEPENDS shournalk_dep_file
 )
 
 # Copy required files to dkms dir
 # Better be safe and copy the files on cmake and make.
 file(COPY ${kernel_src} DESTINATION "${dkms_dir}" )
 add_custom_command(
-        TARGET shournalk PRE_BUILD
+        OUTPUT shournalk_dep_file
+        PRE_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${kernel_src}
                 "${dkms_dir}")
