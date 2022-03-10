@@ -353,8 +353,7 @@ void event_handler_fput(unsigned long ip __attribute__ ((unused)),
     if(unlikely(current->flags & PF_KTHREAD))
         return;
 
-    file = (struct file*)(SYSCALL_GET_FIRST_ARG(current,
-                                                tracepoint_helper_get_ftrace_regs(regs)));
+    file = (struct file*)(kutil_get_first_arg_from_reg(tracepoint_helper_get_ftrace_regs(regs)));
 
     // Ideally we would ftrace fsnotify_close which is, however, inlined
     // (thus cannot be traced).

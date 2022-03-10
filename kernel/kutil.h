@@ -98,41 +98,15 @@ ssize_t kutil_kernel_read_locked(struct file *file, void *buf, size_t count);
 ssize_t
 kutil_kernel_read_cachefriendly(struct file *file, void *buf, size_t count, loff_t *pos);
 
-typedef unsigned long sysargs_t[6];
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0))
-#define SYSCALL_GET_ARGUMENTS(current, regs, args) syscall_get_arguments((current), (regs), 0, 6, (args))
+
+static inline unsigned long kutil_get_first_arg_from_reg(struct pt_regs *regs){
+    // see 3c88ee194c288205733d248b51f0aca516ff4940
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0)) && defined CONFIG_X86_64
+    return regs->di;
 #else
-#define SYSCALL_GET_ARGUMENTS(current, regs, args) syscall_get_arguments((current), (regs), (args))
+    return regs_get_kernel_argument(regs, 0);
 #endif
 
-static inline unsigned long SYSCALL_GET_FIRST_ARG(struct task_struct *task,
-                                  struct pt_regs *regs){
-    // Optimization for:
-#ifdef CONFIG_X86_64
-    unsigned long val;
-#ifdef CONFIG_IA32_EMULATION
-// see b9d989c7218ac922185d82ad46f3e58b27a4bea9
-// and 37a8f7c38339b22b69876d6f5a0ab851565284e3
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 8, 0) && \
-    LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0) && \
-    !defined TIF_SPEC_FORCE_UPDATE
-    if (task->thread.status & TS_COMPAT){
-#else
-    // if (task_thread_info(task)->status & TS_COMPAT){
-    if (task->thread_info.status & TS_COMPAT) {
-#endif
-        val = regs->bx;
-    } else
-#endif
-    {
-        val = regs->di;
-    }
-    return val;
-#else
-    sysargs_t args;
-    SYSCALL_GET_ARGUMENTS(task, regs, args);
-    return args[0];
-#endif
 }
 
 

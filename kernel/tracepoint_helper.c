@@ -38,8 +38,7 @@ __probe_process_exit(unsigned long ip __attribute__ ((unused)),
                      struct pt_regs *regs){
     struct task_struct *task;
     task = (struct task_struct*)(
-                SYSCALL_GET_FIRST_ARG(current,
-                                      tracepoint_helper_get_ftrace_regs(regs)));
+                kutil_get_first_arg_from_reg(tracepoint_helper_get_ftrace_regs(regs)));
     event_handler_process_exit(task);
 }
 
