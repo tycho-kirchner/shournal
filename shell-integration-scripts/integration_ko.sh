@@ -312,6 +312,14 @@ _shournal_remove_prompts(){
 _shournal_preexec(){
     local current_seq="$1"
     local cmd_str
+    if [[ -z "${PS1+x}" || $PS1 != *'`_shournal_postexec \#`'* ]]; then
+        _shournal_warn "_shournal_preexec: Invalid PS1. Apparently PS1 was modified after SHOURNAL_ENABLE" \
+            "was called. This is often caused by double-sourcing the bashrc, e.g. from" \
+            "~/.profile or .bash_profile."
+        echo 1 > "$_shournal_setup_error_path_current_pid"
+        return 1
+    fi
+
     $_shournal_cmd_seq_hotfix && current_seq=$((current_seq - 1))
     _shournal_get_current_cmd_bash cmd_str
     _shournal_preexec_generic "$current_seq" "$cmd_str"
