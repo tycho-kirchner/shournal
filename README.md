@@ -4,28 +4,41 @@
 
 ## A (file-) journal for your shell
 
-![Example session animation](images/shournal-example-session.gif)
+*There are two kinds of people: those who backup, and those who have never
+ lost their data.* <br>
+**Log shell-commands and used files. Snapshot executed scripts. Fully automatic.** <br>
 
-*Note: for a more formal introduction please read
-[Bashing irreproducibility with
-shournal](https://doi.org/10.1101/2020.08.03.232843)
-on bioRxiv.*
 
-#### What is it (good for)?
-*TL;DR*:
-* **Integrated tool** to increase the reproducibility of your work
-  on the shell:  what did you do when and where and what files were modified/read.
-  Auto-snapshot scripts and config-files as used.
-* **Stand-alone tool** to monitor file events of a command/process (tree),
-  similar to <br>
-  `strace -f -e close $cmd`
-  but without the limitations imposed by ptrace-based solutions
-  and **a lot** faster ([Overhead](#overhead)).
+~~~
+$ SHOURNAL_ENABLE
+$ cat demo.sh
+#!/usr/bin/env bash
+echo hi | tee out.log
+$ ./demo.sh
+hi
+$ shournal -q --wfile out.log
+cmd-id 2: $?: 0 2019-30-11 08:46 :  ./demo.sh
+Working directory: /home/user
+  1 written file(s):
+     /home/user/out.log (3 bytes) Hash: 15349503233279147316
+  1 read file(s):
+     /home/user/demo.sh (42 bytes) Hash: 13559791986335963073 id 1
+          #!/usr/bin/env bash
+          echo hi | tee out.log
+~~~
 
-*More details please*:
+***shournal* records that `out.log` was written by the command `./demo.sh` and
+created a backup of the script `demo.sh` because it was read by
+the bash interpreter.**
 
-Using your shell's history is nice. But sometimes you want more:
-* What files were modified or read by a command? Or reverse: What shell-command(s)
+*shournal* does not guess the files - it asks the Linux kernel. It's fast enough,
+see [Overhead](#overhead).
+
+
+After installation and easy setup of the
+[shell-integration](./README-shell-integration.md) the following questions
+may be answered within seconds:
+* What files were modified or read by a command? Or reverse: What shell-commands
   were used to create/modify or read from a certain file?
 * You executed a script. What was the script-content by the time it was called?
 * The command read a config-file - which one, and what was in it?
@@ -33,18 +46,12 @@ Using your shell's history is nice. But sometimes you want more:
 * What about working directory, command start- and end-time or the
   exit status ($?) ?
 
-*shournal* provides the answer to these questions while
-causing only a negligible [overhead](#overhead). <br>
-Besides its ability to monitor a whole process tree for file
-events it can be integrated really tight into the shell -
-you won't even notice it (; <br>
-See also: [shell-integration](./README-shell-integration.md)
 
 Besides output on the command-line in a human-readable format (or JSON)
 you can export (parts of) your command-history into
 a standalone html-file where it is displayed in an interactive
 time-line-plot. Further miscellaneous statistics are displayed in
-bar-plots, e.g. the commands with most file-modifications (see also above gif).
+bar-plots, e.g. the commands with most file-modifications.
 
 Using the external software
 [shournal-to-snakemake]( https://github.com/snakemake/shournal-to-snakemake)
@@ -54,16 +61,15 @@ a tool to *create reproducible and scalable data analyses*.
 
 *shournal* runs only on GNU/Linux.
 
+ *For a more formal introduction please also check out our preprint
+[Bashing irreproducibility with
+shournal](https://doi.org/10.1101/2020.08.03.232843)
+on bioRxiv.*
+
 
 ## Examples
 Please note: below examples make use of the
 [shell-integration](./README-shell-integration.md). <br>
-Otherwise `shournal --exec $cmd` and
-other boilerplate-code would have been necessary. <br>
-Instead of printing the `--query`-results to terminal, you can also create
-fancy html-plots, by appending `--output-format html -o out.html`.
-Use an ordinary web-browser for display.
-
 
 * Create a file and ask shournal, how it came to be:
   ~~~
@@ -76,16 +82,31 @@ Use an ordinary web-browser for display.
 
   ~~~
 * shournal can be configured, to store *specific* read files, like shell-scripts,
-  within it's database. An unmodified file occupies space only once.
+  within it's database. Sometimes old script versions are of interest. Query
+  by **read filename** and optionally restore the files with `--restore-rfiles`:
   ~~~
-  $ ./test.sh
-  $ shournal -q --history 1
-  Command id 2 returned 0 - 14.05.19 14:01 : ./test.sh
-    Read file(s):
-       /home/user/test.sh (213 bytes) id 1
-           #!/usr/bin/env bash
-           echo 'Hello world'
-
+  $ shournal -q --rname demo.sh
+  cmd-id 34: $?: 0 21.04.22 15:15 :  ./demo.sh
+    1 read file(s):
+       /home/user/demo.sh (34 bytes) Hash: 16696055267278105544 id 3
+            #!/usr/bin/env bash
+            echo version1
+  cmd-id 35: $?: 0 21.04.22 15:15 :  ./demo.sh
+    1 read file(s):
+       /home/user/demo.sh (34 bytes) Hash: 17683376525180966954 id 4
+            #!/usr/bin/env bash
+            echo version2
+  $ shournal -q --rname demo.sh --restore-rfiles # restore read files
+  ...
+  2 file(s) restored at /tmp/shournal-restore-user
+  ~~~
+* List all commands which contained the string `demo` (<kbd>%</kbd> is wildcard):
+  ~~~
+  $ shournal -q -cmdtxt %demo%
+  cmd-id 1: $?: 0 20.04.22 15:46 :  cat demo.sh
+  ...
+  cmd-id 2: $?: 0 20.04.22 15:46 :  ./demo.sh
+  ...
   ~~~
 * What commands were executed at the current working directory?
   ~~~
@@ -100,6 +121,10 @@ Use an ordinary web-browser for display.
   ~~~
   shournal --query --help
   ~~~
+
+Instead of printing the `--query`-results to terminal, you can also create
+fancy html-plots, by appending `--output-format html -o out.html`.
+Use an ordinary web-browser for display.
 
 
 ## Installation
