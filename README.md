@@ -140,7 +140,7 @@ want to install *shournal* on a real host (or virtual machine) and
 is targeted at institutions where the usage of *out-of-tree kernel-modules*
 is discouraged. <br>
 Only LTS-releases are officially supported, the packages are known to work on
-Debian 9 (Stretch), Debian 10 (Buster), Ubuntu 18.04 (Bionic) and Ubuntu 20.04 (Focal).
+Debian 10 (Buster), Debian 11 (Bullseye), Ubuntu 18.04 (Bionic) and Ubuntu 20.04 (Focal).
 Install deb-packages as usual, e.g. <br>
 `sudo apt install ./shournal_2.2_amd64.deb` <br>
 An **update** of *shournal* should be performed after all users have
