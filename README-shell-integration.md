@@ -166,7 +166,7 @@ to restart your shell. A more elegant way than logout-login might be to `exec` y
   *subprocess*-module do not inherit file descriptors by default.
   There seems to be no general solution to this problem, but in most cases
   there should be some mechanism to wait for the processes to finish,
-  within the the interactive shell-session or a script.
+  within the interactive shell-session or a script.
 * For further limitations please also read the general
   [README](/../../).
 
