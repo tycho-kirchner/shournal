@@ -4,9 +4,9 @@
 
 ## A (file-) journal for your shell
 
+**Log shell-commands and used files. Snapshot executed scripts. Fully automatic.** <br>
 *There are two kinds of people: those who backup, and those who have never
  lost their data.* <br>
-**Log shell-commands and used files. Snapshot executed scripts. Fully automatic.** <br>
 
 
 ~~~
