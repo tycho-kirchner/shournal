@@ -437,7 +437,7 @@ strace listed for comparison with ptrace-based solutions:
 
 |    Backend    | compile | checkout |  cp   |
 | ------------- | ------- | -------- | ----- |
-| kernel module |  0,03%  |   0,4%   | 0,35% |
+| kernel module |  0,04%  |   0,47%  | 0,38% |
 | fanotify      |  0,4%   |   2,4%   | 28,7% |
 | (strace)      |  125%   |   93%    | 494%  |
 
