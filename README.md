@@ -66,6 +66,7 @@ a tool to *create reproducible and scalable data analyses*.
 shournal](https://doi.org/10.1101/2020.08.03.232843)
 on bioRxiv.*
 
+![Example session animation](images/shournal-example-session.gif)
 
 ## Examples
 Please note: below examples make use of the
