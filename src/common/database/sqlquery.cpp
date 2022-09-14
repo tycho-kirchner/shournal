@@ -31,7 +31,7 @@ void SqlQuery::clear()
     m_limit = NO_LIMIT;
 }
 
-bool SqlQuery::isEmpty()
+bool SqlQuery::isEmpty() const
 {
     return m_query.isEmpty();
 }

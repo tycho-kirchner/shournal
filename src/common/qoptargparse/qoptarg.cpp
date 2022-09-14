@@ -116,7 +116,7 @@ void QOptArg::setParsedTrigger(const QString &parsedTrigger)
 
 /// See also: setAllowedOptions()
 /// @param maxCount: throw, in case more options than maxCount were parsed.
-QStringList QOptArg::getOptions(int maxCount)
+QStringList QOptArg::getOptions(int maxCount) const
 {
     if(m_allowedOptions.empty()){
         throw QExcProgramming(QString("%1 called without previous setAllowedOptions")
@@ -128,8 +128,6 @@ QStringList QOptArg::getOptions(int maxCount)
 
     QStringList valList;
     for(int i=0; i < m_vals.len; i++){
-
-
         QStringList newVals = QString(m_vals.argv[i])
                 .split(m_allowedOptionsDelimeter,
                        QString::SplitBehavior::SkipEmptyParts);
@@ -245,7 +243,7 @@ const QVector<const QOptArg *>& QOptArg::requiredArs() const
     return m_requiredArs;
 }
 
-void QOptArg::throwgetValueCalledOnFlag(const char *functionname)
+void QOptArg::throwgetValueCalledOnFlag(const char *functionname) const
 {
     throw QExcProgramming(QString("%1() was called although argument %2 "
                                   "was marked as flag (no value)").arg(functionname, m_name));

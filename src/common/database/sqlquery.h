@@ -34,7 +34,7 @@ public:
 
     void clear();
 
-    bool isEmpty();
+    bool isEmpty() const;
 
     bool ascending() const;
     const QString& ascendingStr() const;

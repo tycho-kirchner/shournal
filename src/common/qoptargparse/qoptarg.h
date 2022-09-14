@@ -45,7 +45,7 @@ public:
 
 
     template <typename T>
-    T getValue(const T& defaultValue=T());
+    T getValue(const T& defaultValue=T()) const;
 
     template <typename ContainerT>
     ContainerT getValues(const ContainerT& defaultValues={});
@@ -59,7 +59,7 @@ public:
     template <typename T>
     QVariantList getVariantValues(const QVariantList& defaultValues={});
 
-    QStringList getOptions(int maxCount=std::numeric_limits<int>::max());
+    QStringList getOptions(int maxCount=std::numeric_limits<int>::max()) const;
     QVariantList getVariantByteSizes(const QVariantList& defaultValues={});
     QVariantList getVariantRelativeDateTimes(const QVariantList& defaultValues={});
 
@@ -93,7 +93,7 @@ public:
 
 protected:
     [[noreturn]]
-    void throwgetValueCalledOnFlag(const char* functionname);
+    void throwgetValueCalledOnFlag(const char* functionname) const;
 
     QString m_shortName;
     QString m_name;
@@ -124,7 +124,7 @@ protected:
 /// is empty (not parsed), the default one is returned.
 /// @throws ExcCfg
 template <typename T>
-T QOptArg::getValue(const T& defaultValue){
+T QOptArg::getValue(const T& defaultValue) const{
     if(! m_hasValue){
         throwgetValueCalledOnFlag(__func__);
     }
