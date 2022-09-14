@@ -48,6 +48,11 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
     while(cmdIter->next()){
         m_cmdStats.collectCmd(cmdIter->value());
         s.setLineStart(m_indentlvl0);
+        // for indentlvl0 line-word-wrapping makes almost no
+        // sense and hinders copy-pasting  of long terminal commands.
+        auto oldMaxLineWidth = s.maxLineWidth();
+        s.setMaxLineWidth(std::numeric_limits<int>::max());
+
         auto & cmd = cmdIter->value();
         s << qtr("cmd-id %1:").arg(cmd.idInDb);
         if(cmd.returnVal != CommandInfo::INVALID_RETURN_VAL){
@@ -63,6 +68,7 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
         if(cmd.hostname != currentHostname){
             s << qtr("Hostname: %1\n").arg(cmd.hostname);
         }
+        s.setMaxLineWidth(oldMaxLineWidth);
 
         printWriteInfos(s, cmd.fileWriteInfos);
         printReadInfos(s, cmd);
