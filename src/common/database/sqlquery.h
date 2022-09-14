@@ -26,6 +26,9 @@ public:
     void addWithAnd(const QString& columnName, const QVariantList& values,
                     const QVector<CompareOperator>& operators, bool innerAND=false);
 
+    void addWithAnd(const SqlQuery& sqlQ);
+    void addWithOr(const SqlQuery& sqlQ);
+
     const QString& query() const;
     QString& query();
 
@@ -52,9 +55,18 @@ public:
     bool containsTablename(const QString& table) const;
 
 private:
+
+    void addWithConnector(const QString& columnName, const QVariantList& values,
+                          const QVector<CompareOperator>& operators, bool innerAND=false,
+                          bool outerAnd=false);
+    void addWithConnector(const SqlQuery& sqlQ, bool outerAnd);
+
+
     QVector<CompareOperator> expandOperatorsIfNeeded(
             const QVector<CompareOperator> &operators, int nValues) const;
     void addToTableCols(const QString& tableCol);
+    void writeConnectorPrefix(bool outerAnd);
+    void writeConnectorSuffix();
 
     QString m_query;
     QVariantList m_values;
@@ -65,4 +77,6 @@ private:
 
 };
 
+
+SqlQuery mkInertSqlQuery();
 

@@ -415,15 +415,31 @@ FileReadInfos db_controller::queryReadInfos_byCmdId(qint64 cmdId, const QueryPtr
 
 /// @param restrictingFilesize: only return hashmeta-entries for which at least one file
 /// exists which was recorded using a given hashmeta and whose size is exactly that.
+/// Set to -1 to return all HashMeta entries.
+/// @param isReadFile: if true, consider read files, else written. Only used, if
+/// restrictingFilesize!=-1
 db_controller::HashMetas
-db_controller::queryHashmetas(qint64 restrictingFilesize){
+db_controller::queryHashmetas(qint64 restrictingFilesize, bool isReadFile){
+    const QString FIELDS = " chunkSize,maxCountOfReads,hashmeta.id ";
 
+    QString sql;
+    if(restrictingFilesize == -1){
+        sql = "select "+FIELDS+" from `hashmeta`";
+    } else {
+        sql = (isReadFile) ?
+              "select "+FIELDS+" from `readFile` "
+              "left join hashmeta on readFile.hashmetaId=hashmeta.id "
+              "where readFile.size=? "
+              "group by chunkSize,maxCountOfReads "
+            :
+              "select "+FIELDS+" from cmd "
+              "join `writtenFile` on cmd.id=writtenFile.cmdId "
+              "left join hashmeta on cmd.hashmetaId=hashmeta.id "
+              "where writtenFile.size=? "
+              "group by chunkSize,maxCountOfReads ";
+    }
     auto query = db_connection::mkQuery();
-    query->prepare("select chunkSize, maxCountOfReads from cmd "
-                  "join `writtenFile` on cmd.id=writtenFile.cmdId "
-                  "left join hashmeta on cmd.hashmetaId=hashmeta.id "
-                  "where writtenFile.size=? "
-                  "group by chunkSize,maxCountOfReads ");
+    query->prepare(sql);
     query->addBindValue(restrictingFilesize);
     query->exec();
     db_controller::HashMetas hashMetas;
@@ -438,11 +454,27 @@ db_controller::queryHashmetas(qint64 restrictingFilesize){
             HashMeta h;
             qVariantTo_throw(query->value(0), &h.chunkSize);
             qVariantTo_throw(query->value(1), &h.maxCountOfReads);
+            qVariantTo_throw(query->value(2), &h.idInDb);
             hashMetas.push_back(h);
         }
     }
     return hashMetas;
 }
 
-
+/// Find the database id of a given hasmeta entry (by chunkSize and maxCountOfReads)
+qint64
+db_controller::queryHashmetaId(const HashMeta &hashMeta )
+{
+    qint64 idIndDb = db::INVALID_INT_ID;
+    auto query = db_connection::mkQuery();
+    query->prepare("select `id` from hashmeta where "
+                   "chunkSize=? and maxCountOfReads=?");
+    query->addBindValue(hashMeta.chunkSize);
+    query->addBindValue(hashMeta.maxCountOfReads);
+    query->exec();
+    if(query->next()){
+        qVariantTo_throw(query->value(0), &idIndDb);
+    }
+    return idIndDb;
+}
 

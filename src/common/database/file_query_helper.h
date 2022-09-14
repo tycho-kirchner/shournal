@@ -7,9 +7,9 @@
 #include "fileinfos.h"
 
 namespace file_query_helper {
-    void addWrittenFileSmart(SqlQuery& query, const QString& filename);
-    void addWrittenFile(SqlQuery& query, const QString& filename,
-                               bool mtime, bool hash_, bool size);
+    SqlQuery buildFileQuerySmart(const QString& filename, bool readFile);
+    SqlQuery buildFileQuery(const QString& filename, bool readFile,
+                              bool use_mtime, bool use_hash, bool use_size);
 }
 
 

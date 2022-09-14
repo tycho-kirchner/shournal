@@ -18,6 +18,8 @@ public:
     const QString cmd_comment {"cmd.comment"};
     const QString cmd_endtime {"cmd.endTime"};
     const QString cmd_starttime {"cmd.startTime"};
+    const QString cmd_hashmetaId {"cmd.hashmetaId"};
+
     const QString env_hostname {"env.hostname"};
     const QString env_username {"env.username"};
 
@@ -25,10 +27,12 @@ public:
     const QString rFile_path {"readFile_path.path"}; // separate table, join alias
     const QString rFile_mtime {"readFile.mtime"};
     const QString rFile_size {"readFile.size"};
+    const QString rFile_hash  {"readFile.hash"};
+    const QString rFile_hashmetaId {"readFile.hashmetaId"};
 
     const QString wFile_id    {"writtenFile.id"};
     const QString wFile_name  {"writtenFile.name"};
-    const QString wfile_mtime {"writtenFile.mtime"};
+    const QString wFile_mtime {"writtenFile.mtime"};
     const QString wFile_size  {"writtenFile.size"};
     const QString wFile_hash  {"writtenFile.hash"};
     const QString wFile_path  {"writtenFile_path.path"}; // separate table, join alias

@@ -120,8 +120,8 @@ private:
     void cmdWrittenFileCheck(const std::string& cmd, const std::string& fpath,
                              const std::string& setupCommand){
         executeCmdInbservedShell(cmd, setupCommand);
-        SqlQuery query;
-        file_query_helper::addWrittenFileSmart(query, QString::fromStdString(fpath));
+        auto query = file_query_helper::buildFileQuerySmart(
+                    QString::fromStdString(fpath), false);
         auto cmdIter = db_controller::queryForCmd(query);
         auto dbCleanup = finally([] { db_connection::close(); });
         QVERIFY(cmdIter->next());

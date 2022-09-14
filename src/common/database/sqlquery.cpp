@@ -5,7 +5,6 @@
 #include "util.h"
 
 
-
 const QString &SqlQuery::query() const
 {
     return m_query;
@@ -36,7 +35,8 @@ bool SqlQuery::isEmpty() const
     return m_query.isEmpty();
 }
 
-/// @overload
+
+
 void SqlQuery::addWithAnd(const QString &columnName, const QVariant &value,
                           const CompareOperator &operator_)
 {
@@ -52,6 +52,23 @@ void SqlQuery::addWithAnd(const QString &columnName,
 }
 
 
+
+void SqlQuery::addWithAnd(const QString &columnName, const QVariantList &values,
+                          const QVector<CompareOperator> &operators, bool innerAND)
+{
+    addWithConnector(columnName, values, operators, innerAND, true);
+}
+
+void SqlQuery::addWithAnd(const SqlQuery &sqlQ)
+{
+    addWithConnector(sqlQ, true);
+}
+
+void SqlQuery::addWithOr(const SqlQuery &sqlQ)
+{
+    addWithConnector(sqlQ, false);
+}
+
 /// Add the given values to the query-string and -values.
 /// If a QVariant.isNull insert "is null" instead of a placeholder.
 /// @param values: The number of values must match to the number of operators,
@@ -60,11 +77,13 @@ void SqlQuery::addWithAnd(const QString &columnName,
 ///                   BETWEEN, only one operator may be passed.
 /// @param innerAnd: If true, connect the column-value pair with AND, else with OR
 ///                  (in case of BETWEEN it is ignored)
+/// @param outerAnd: if true, connect the whole column-value pair with a single
+///                  AND, else use OR.
 ///
 /// @throws QExcIllegalArgument
-void SqlQuery::addWithAnd(const QString &columnName, const QVariantList &values,
-                          const QVector<CompareOperator> &operators, bool innerAND)
-{
+void SqlQuery::addWithConnector(const QString& columnName, const QVariantList& values,
+                      const QVector<CompareOperator>& operators, bool innerAND,
+                                bool outerAnd){
     if(values.isEmpty()){
         throw QExcIllegalArgument(QString("%1: %2 must no be empty")
                                     .arg(__func__,
@@ -73,10 +92,7 @@ void SqlQuery::addWithAnd(const QString &columnName, const QVariantList &values,
 
     auto actualOps = expandOperatorsIfNeeded(operators, values.size());
 
-    if(! m_query.isEmpty()){
-        m_query += " and ";
-    }
-    m_query += " ( ";
+    writeConnectorPrefix(outerAnd);
 
     auto valueIt = values.begin();
     auto operatorIt = actualOps.begin();
@@ -124,8 +140,25 @@ void SqlQuery::addWithAnd(const QString &columnName, const QVariantList &values,
         ++operatorIt;
     }
 
-    m_query += " ) ";
+    writeConnectorSuffix();
     addToTableCols(columnName);
+}
+
+
+/// Add the other query "as is" using the given connector
+void SqlQuery::addWithConnector(const SqlQuery& other, bool outerAnd){
+    if(other.isEmpty()){
+        return;
+    }
+
+    writeConnectorPrefix(outerAnd);
+
+    m_query += other.query();
+    m_values.append(other.values());
+    m_columnSet.insert(other.m_columnSet.begin(), other.m_columnSet.end());
+    m_tablenames.insert(other.m_tablenames.begin(), other.m_tablenames.end());
+
+    writeConnectorSuffix();
 }
 
 
@@ -178,6 +211,19 @@ void SqlQuery::addToTableCols(const QString &tableCol)
     }
 }
 
+void SqlQuery::writeConnectorPrefix(bool outerAnd)
+{
+    if(! m_query.isEmpty()){
+        m_query += (outerAnd) ? " and " : " or ";
+    }
+    m_query += " ( ";
+}
+
+void SqlQuery::writeConnectorSuffix()
+{
+     m_query += " ) ";
+}
+
 /// setting the query is only allowed, it no values were set (yet)
 void SqlQuery::setQuery(const QString &query)
 {
@@ -197,6 +243,7 @@ bool SqlQuery::containsTablename(const QString &table) const
 {
     return m_tablenames.find(table) != m_tablenames.end();
 }
+
 
 int SqlQuery::limit() const
 {
@@ -231,4 +278,12 @@ const QString &SqlQuery::ascendingStr() const
 void SqlQuery::setAscending(bool ascending)
 {
     m_ascending = ascending;
+}
+
+/// Make an sql-query that always finds zero results (where 0)
+SqlQuery mkInertSqlQuery()
+{
+    SqlQuery q;
+    q.query() = " 0 ";
+    return q;
 }

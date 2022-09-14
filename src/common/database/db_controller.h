@@ -28,8 +28,8 @@ std::unique_ptr<CommandQueryIterator> queryForCmd(const SqlQuery& sqlQ, bool rev
 FileReadInfo queryReadInfo_byId(qint64 id, const QueryPtr& query_=nullptr);
 FileReadInfos queryReadInfos_byCmdId(qint64 cmdId, const QueryPtr& query_=nullptr);
 
-HashMetas queryHashmetas(qint64 restrictingFilesize);
-
+HashMetas queryHashmetas(qint64 restrictingFilesize=-1, bool isReadFile=false);
+qint64 queryHashmetaId(const HashMeta&);
 
 }
 

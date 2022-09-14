@@ -28,9 +28,9 @@ using translation::TrSnippets;
 
 using db_controller::QueryColumns;
 
-namespace  {
+
 [[noreturn]]
-void
+static void
 queryCmdPrintAndExit(std::unique_ptr<CommandPrinter>& cmdPrinter,
                           SqlQuery& sqlQ,
                           bool reverseResultIter ){
@@ -40,7 +40,7 @@ queryCmdPrintAndExit(std::unique_ptr<CommandPrinter>& cmdPrinter,
 }
 
 [[noreturn]]
-void
+static void
 restoreSingleReadFile(QOptArg& argRestoreRfileId){
     auto fReadInfo = db_controller::queryReadInfo_byId(
                 static_cast<qint64>(argRestoreRfileId.getValue<uint64_t>())
@@ -67,7 +67,30 @@ restoreSingleReadFile(QOptArg& argRestoreRfileId){
     cpp_exit(0);
 }
 
-} // namespace
+static void addFileQuery(SqlQuery &query, const QOptArg& argFile,
+                         const QOptArg& argTakeFromFile, bool readFile){
+    SqlQuery fQuery;
+    if(argTakeFromFile.wasParsed()){
+        bool mtime=false;
+        bool hash=false;
+        bool size=false;
+        for(auto opt : argTakeFromFile.getOptions()){
+            switch(opt[0].toLatin1()){
+            case 'm': mtime = true; break;
+            case 'h': hash = true; break;
+            case 's': size = true; break;
+            default: throw QExcProgramming("Bad "+argFile.name()+" option: "+opt);
+            }
+        }
+        fQuery = file_query_helper::buildFileQuery(argFile.getValue<QString>(),
+                                      readFile, mtime, hash, size);
+    } else {
+        fQuery = file_query_helper::buildFileQuerySmart(
+                    argFile.getValue<QString>(), readFile);
+    }
+    query.addWithAnd(fQuery);
+}
+
 
 
 void argcontol_dbquery::addBytesizeSqlArgToQueryIfParsed(SqlQuery &query, QOptSqlArg &arg,
@@ -81,6 +104,8 @@ void argcontol_dbquery::addBytesizeSqlArgToQueryIfParsed(SqlQuery &query, QOptSq
 void argcontol_dbquery::parse(int argc, char *argv[])
 {
     QOptArgParse parser;
+    const std::unordered_set<QString> &TAKE_FROM_FILE_OPTIONS {
+        "mtime", "hash", "size"};
 
     parser.setHelpIntroduction(qtr(
         "Query the command/file-database for several parameters which are\n"
@@ -116,7 +141,7 @@ void argcontol_dbquery::parse(int argc, char *argv[])
                                 "Typically you do not need this.").arg(argWFile.name())
                             );
     argTakeFromWFile.addRequiredArg(&argWFile);
-    argTakeFromWFile.setAllowedOptions({"mtime", "hash", "size"});
+    argTakeFromWFile.setAllowedOptions(TAKE_FROM_FILE_OPTIONS);
     parser.addArg(&argTakeFromWFile);
 
     const QString wFilePreamble = qtr("Query for files written to ");
@@ -142,6 +167,22 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     parser.addArg(&argWMtime);
 
     // ------------ rfile
+    QOptArg argRFile("rf", "rfile",
+                    qtr("Pass an existing file(-path) to find out the command(s), "
+                        "which read from it "
+                        "(rfile stands for 'read file'). Per default the query is performed on "
+                        "the basis of hash(es), mtime and size." ));
+    parser.addArg(&argRFile);
+
+    QOptArg argTakeFromRFile("", "take-from-rfile",
+                            qtr("Specify explicitly which properties to collect "
+                                "from the given file passed via %1. "
+                                "Typically you do not need this.").arg(argRFile.name())
+                            );
+    argTakeFromRFile.addRequiredArg(&argRFile);
+    argTakeFromRFile.setAllowedOptions(TAKE_FROM_FILE_OPTIONS);
+    parser.addArg(&argTakeFromRFile);
+
 
     const QString rFilePreamble = qtr("Query for read files ");
     QOptSqlArg argRName("rn", "rname", rFilePreamble + qtr("by filename."),
@@ -333,7 +374,7 @@ void argcontol_dbquery::parse(int argc, char *argv[])
         query.addWithAnd(cols.wFile_hash, db_conversions::fromHashValue(hashVal),
                          argWHash.parsedOperator());
     }
-    addVariantSqlArgToQueryIfParsed<QDateTime>(query, argWMtime, cols.wfile_mtime);
+    addVariantSqlArgToQueryIfParsed<QDateTime>(query, argWMtime, cols.wFile_mtime);
 
 
     addSimpleSqlArgToQueryIfParsed<QString>(query, argRName, cols.rFile_name);
@@ -353,24 +394,10 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     }
 
     if(argWFile.wasParsed()){
-        if(argTakeFromWFile.wasParsed()){
-            bool mtime=false;
-            bool hash=false;
-            bool size=false;
-            for(auto opt : argTakeFromWFile.getOptions()){
-                switch(opt[0].toLatin1()){
-                case 'm': mtime = true; break;
-                case 'h': hash = true; break;
-                case 's': size = true; break;
-                default: throw QExcProgramming("Bad argTakeFromWFile option:" + opt);
-                }
-            }
-            file_query_helper::addWrittenFile(query, argWFile.getValue<QString>(),
-                                          mtime, hash, size);
-        } else {
-            file_query_helper::addWrittenFileSmart(query, argWFile.getValue<QString>());
-        }
-
+        addFileQuery(query, argWFile, argTakeFromWFile, false);
+    }
+    if(argRFile.wasParsed()){
+        addFileQuery(query, argRFile, argTakeFromRFile, true);
     }
 
 
