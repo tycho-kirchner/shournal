@@ -198,11 +198,13 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     argRSize.setIsByteSizeArg(true);
     parser.addArg(&argRSize);
 
+    QOptSqlArg argRHash("rh", "rhash", rFilePreamble + qtr("by hash."),
+                        QOptSqlArg::cmpOpsEqNe() );
+    parser.addArg(&argRHash);
+
     QOptSqlArg argRMtime("rm", "rmtime", rFilePreamble + qtr("by mtime."),
                        QOptSqlArg::cmpOpsAllButLike() );
     parser.addArg(&argRMtime);
-
-    // TODO: argRHash (and others?)
 
     QOptArg argMaxReadFileLines("", "max-rfile-lines",
                             qtr("Display at most the first N lines for each "
@@ -381,6 +383,11 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     addSimpleSqlArgToQueryIfParsed<QString>(query, argRPath, cols.rFile_path);
     addBytesizeSqlArgToQueryIfParsed(query, argRSize, cols.rFile_size);
     addVariantSqlArgToQueryIfParsed<QDateTime>(query, argRMtime, cols.rFile_mtime);
+    if(argRHash.wasParsed()){
+        HashValue hashVal(argRHash.getValue<uint64_t>());
+        query.addWithAnd(cols.rFile_hash, db_conversions::fromHashValue(hashVal),
+                         argRHash.parsedOperator());
+    }
 
     addVariantSqlArgToQueryIfParsed<qint64>(query, argCmdId, cols.cmd_id);
     addSimpleSqlArgToQueryIfParsed<QString>(query, argCmdText, cols.cmd_txt);
