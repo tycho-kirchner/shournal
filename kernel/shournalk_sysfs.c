@@ -14,6 +14,14 @@
 #include "event_target.h"
 #include "kutil.h"
 
+// Use «default attribute groups». Kernel v5.1-rc3,
+// aa30f47cf666111f6bbfd15f290a27e8a7b9d854 added default attribute groups
+// while v5.18-rc1, cdb4f26a63c391317e335e6e683a614358e70aeb
+// dropped legacy support. So we switch somewhere in the middle.
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 8, 0))
+#define SHOURNALK_USE_ATTR_GROUPS
+#endif
+
 struct shournal_obj {
     struct kobject kobj;
 };
@@ -75,11 +83,15 @@ static struct shournal_attr attr_mark = __ATTR(mark, 0664, NULL, __mark);
 static struct shournal_attr attr_version = __ATTR(version, 0444, __show_version, NULL);
 
 
-static struct attribute *shournal_attrs[] = {
+static struct attribute *shournal_default_attrs[] = {
     &attr_mark.attr,
     &attr_version.attr,
     NULL,
 };
+#ifdef SHOURNALK_USE_ATTR_GROUPS
+ATTRIBUTE_GROUPS(shournal_default);
+#endif
+
 
 static void shournal_obj_release(struct kobject *kobj){
     struct shournal_obj* o;
@@ -89,7 +101,11 @@ static void shournal_obj_release(struct kobject *kobj){
 
 static struct kobj_type shournal_kobj_ktype = {
     .sysfs_ops	= &shournalk_ops,
-    .default_attrs = (struct attribute **)&shournal_attrs,
+#ifdef SHOURNALK_USE_ATTR_GROUPS
+    .default_groups = shournal_default_groups,
+#else
+    .default_attrs = (struct attribute **)&shournal_default_attrs,
+#endif
     .release = shournal_obj_release,
 };
 
@@ -116,7 +132,10 @@ int shournalk_sysfs_constructor(void){
 
     ret = kobject_init_and_add(&shournal_obj->kobj, &shournal_kobj_ktype, NULL,
                                "%s", "shournalk_ctrl");
-    if (ret) goto err_shournal_obj_add;
+    if (ret){
+        pr_err("kobject_init_and_add failed");
+        goto err_shournal_obj_add;
+    }
 
     if((ret=kobject_uevent(&shournal_obj->kobj, KOBJ_ADD) )) {
         pr_warn("kobject_uevent failed\n");
