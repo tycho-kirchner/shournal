@@ -492,7 +492,7 @@ void __event_target_put(struct event_target* event_target){
 
     if(we_are_consume_thread){
         // we just released the final reference - that's it.
-        do_exit(0);
+        kutil_kthread_exit(NULL, 0);
     }
 }
 

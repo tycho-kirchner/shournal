@@ -122,7 +122,8 @@ int event_queue_consume_thread(void* data){
     // puts the final event_target-ref, we never get here.
     __consume_close_events(event_target);
     event_consumer_thread_cleanup(event_target);
-    do_exit(0);
+    kutil_kthread_exit(NULL, 0);
+    return 0;
 }
 
 

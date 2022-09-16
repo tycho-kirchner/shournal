@@ -169,6 +169,7 @@ void kutil_unuse_mm(struct mm_struct*);
 
 #endif
 
+void kutil_kthread_exit(struct completion *comp, long code);
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)) && \
     !defined (INIT_RCU_WORK)

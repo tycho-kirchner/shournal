@@ -241,6 +241,25 @@ void kutil_unuse_mm(struct mm_struct *mm) {
 #endif // kutil_BACKPORT_USE_MM
 
 
+// see commit cead18552660702a4a46f58e65188fe5f36e9dfe
+// declare as weak to satisfy compiler. However,
+// one of complete_and_exit and kthread_complete_and_exit
+// _must_ be defined (by kernel).
+void complete_and_exit(struct completion *comp, long code)__attribute__((weak));
+void kthread_complete_and_exit(struct completion *comp, long code)__attribute__((weak));
+
+void kutil_kthread_exit(struct completion *comp, long code){
+    if(complete_and_exit)
+        complete_and_exit(comp, code);
+    else if(kthread_complete_and_exit)
+        kthread_complete_and_exit(comp, code);
+    else {
+        pr_err("cannot stop kernel thread. Please unload this module "
+               "immediatly and report this fatal bug.");
+    }
+}
+
+
 #ifdef RCU_WORK_BACKPORT
 
 static void rcu_work_rcufn(struct rcu_head *rcu)
