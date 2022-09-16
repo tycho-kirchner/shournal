@@ -12,6 +12,7 @@
 #include <linux/compiler.h>
 #include <linux/circ_buf.h>
 
+#include "kutil.h"
 
 struct event_target;
 struct consumer_cache;
