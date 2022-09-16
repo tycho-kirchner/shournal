@@ -34,7 +34,10 @@ struct event_consumer {
     struct consumer_cache* r_cache;
     struct path r_last_written_path;
     struct semaphore start_sema;
-    mm_segment_t consume_tsk_oldfs;
+#ifdef USE_MM_SET_FS_OFF
+       mm_segment_t consume_tsk_oldfs;
+#endif
+
 };
 
 
