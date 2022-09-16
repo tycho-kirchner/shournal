@@ -251,13 +251,21 @@ int shournal_run_main(int argc, char *argv[])
             if(weAreAnotheUser) os::seteuid(os::getuid());
             logger::enableLogToFile(app::CURRENT_NAME);
             if(weAreAnotheUser) os::seteuid(0);
+
+            // [[noreturn]]
             orig_mountspace_process::msenterOrig(cmdFilename, cmdArgv, cmdEnv);
-            // never get here
         }
 
         // ------------------------------  //
 
         // In file observation mode (or invalid commandline-input)
+
+        // Starting from this line, we effectively work as non-root
+        // and only (shortly) switch to root to unshare the mount namespace
+        // and initialize fanotify.
+        // Also load settings and enable logging already, *before* unsharing the
+        // mount-namespace, so we do not log events, we create ourselves.
+        os::seteuid(os::getuid());
 
         FileWatcher fwatcher;
         fwatcher.setCommandEnvp(cmdEnv);
@@ -274,10 +282,7 @@ int shournal_run_main(int argc, char *argv[])
         fwatcher.setStoreToDatabase(! argNoDb.wasParsed());
         fwatcher.setPrintSummary(argPrintSummary.wasParsed());
 
-        // load settings as real user (this is a setuid-program)
-        // also enable logging already, *before* possibly unsharing the
-        // mount-namespace.
-        os::seteuid(os::getuid());
+
         try {
             logger::enableLogToFile(app::CURRENT_NAME);
             Settings::instance().load();
@@ -295,7 +300,6 @@ int shournal_run_main(int argc, char *argv[])
             logCritical << ex.what();
             cpp_exit(1);
         }
-        os::seteuid(0);
 
         if(argShellSessionUUID.wasParsed()){
             fwatcher.setShellSessionUUID(
@@ -306,14 +310,14 @@ int shournal_run_main(int argc, char *argv[])
             int socketFd = argSocketFd.getValue<int>(-1);
             os::setFdDescriptorFlags(socketFd, FD_CLOEXEC);
             fwatcher.setSockFd(socketFd);
-            callFilewatcherSafe(fwatcher);
+            callFilewatcherSafe(fwatcher); // [[noreturn]]
         }
 
         if(argExec.wasParsed()){
             assert(!argMsenterOrig.wasParsed());
             auto externCmd = parser.rest();
             fwatcher.setArgv(externCmd.argv, externCmd.len);
-            callFilewatcherSafe(fwatcher);
+            callFilewatcherSafe(fwatcher); // [[noreturn]]
         }
 
         if(parser.rest().len != 0){

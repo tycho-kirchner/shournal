@@ -178,9 +178,13 @@ void FileWatcher::run()
 {
     m_msenterGid = findMsenterGidOrDie();
     orig_mountspace_process::setupIfNotExist();
+    m_fEventHandler = createFileEventHandler();
 
+    os::seteuid(0);
     unshareOrDie();
     auto fanotifyCtrl = FanotifyController_ptr(new FanotifyController);
+    fanotifyCtrl->setFileEventHandler(m_fEventHandler);
+    fanotifyCtrl->setupPaths();
 
     // We process events (filedescriptor-receive- and fanotify-events) with the
     // effective uid of the caller, because read events for files, for which
@@ -188,9 +192,6 @@ void FileWatcher::run()
     // root in case of NFS-storages. See also man 5 exports, look for 'root squashing'.
     os::seteuid(m_realUid);
 
-    m_fEventHandler = createFileEventHandler();
-    fanotifyCtrl->setFileEventHandler(m_fEventHandler);
-    fanotifyCtrl->setupPaths();
 
     // maybe_todo: change scheduler?
     // struct sched_param sched{};

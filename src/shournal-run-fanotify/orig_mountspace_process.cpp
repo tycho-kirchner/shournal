@@ -49,6 +49,7 @@ void setupIfNotExistAsChild(const QString& pidPath) {
         exit(1);
     }
 
+    os::seteuid(0);
     os::setgid(allowedGroupInfo->gr_gid);
     os::setuid(os::getuid());
 
