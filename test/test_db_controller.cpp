@@ -474,7 +474,19 @@ private slots:
         // are automatically performed upon the first database-usage.
         // Until including v2.2 nothing testworthy happened
         // -> src-path for database defined in cmake.
-        QVERIFY(testhelper::copyRecursively(SHOURNALTEST_SQLITE_v_2_2, dbDir));
+        QString testDbPath;
+        if (QDir(SHOURNALTEST_SQLITE_v_2_2).exists()){
+            testDbPath = SHOURNALTEST_SQLITE_v_2_2;
+        } else {
+            // also consider current directory to allow for easy testing
+            // on another machine.
+            testDbPath = splitAbsPath<QString>(SHOURNALTEST_SQLITE_v_2_2).second;
+            if (! QDir(testDbPath).exists()){
+                QIErr() << QString("dir of testdatabase not found: %1").arg(testDbPath);
+                QVERIFY(false);
+            }
+        }
+        QVERIFY(testhelper::copyRecursively(testDbPath, dbDir));
 
         QueryColumns & queryCols = QueryColumns::instance();
         SqlQuery q;
