@@ -10,7 +10,9 @@ string(REGEX REPLACE "-[^-]+$" "" KERNEL_RELEASE_NO_ARCH ${KERNEL_RELEASE})
 # Find the headers
 foreach(header_path
         /usr/src/linux-headers-${KERNEL_RELEASE_NO_ARCH}-common # Debian
-        /usr/src/linux-${KERNEL_RELEASE_NO_ARCH}/include)       # Opensuse
+        /usr/src/linux-${KERNEL_RELEASE_NO_ARCH}/include        # Opensuse
+        /usr/src/linux-headers-${KERNEL_RELEASE_NO_ARCH}        # Ubuntu
+        )
     if(EXISTS "${header_path}")
         set(KERNELHEADERS_DIR "${header_path}")
         break()
