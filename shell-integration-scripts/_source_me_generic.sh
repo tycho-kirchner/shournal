@@ -17,13 +17,11 @@ __shournal_cmd_exists(){
 __shournal_select_backend(){
     local scriptname="$1"
     local this_shell="$2"
-    local backend_name_ko
-    local backend_name_fan
-    local backend_name_selected
-    local backend_origin
+    local backend_name_ko="integration_ko.$this_shell"
+    local backend_name_fan="integration_fan.$this_shell"
+    local backend_name_selected=""
+    local backend_origin="UNKNOWN"
 
-    backend_name_ko="integration_ko.$this_shell"
-    backend_name_fan="integration_fan.$this_shell"
 
     if [ -n "${SHOURNAL_BACKEND+x}" ]; then
         backend_name_selected="$SHOURNAL_BACKEND"
