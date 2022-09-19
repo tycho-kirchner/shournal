@@ -30,6 +30,10 @@
    libQt5Sql5-sqlite libuuid-devel libcap-devel uuidd \
    kernel-default-devel dkms
   ~~~
+  Arch Linux:
+  ~~~
+  yay -S gcc cmake make qt5-base uuid libcap linux-headers dkms
+  ~~~
 
   CentOS (note: CentOS 7 as of July 2019 only ships with gcc 4.8
   -> compile gcc >= 5.0 yourself. cmake3 and cmake are seperate packages
