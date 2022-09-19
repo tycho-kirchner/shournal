@@ -103,7 +103,25 @@ private:
         writeLine(writeFd, "exit 123");
 
         os::close(writeFd);
-        QCOMPARE(proc.waitFinish(), 123);
+        auto proc_ret = proc.waitFinish();
+        if(proc_ret == 42){
+            QIErr() << QString::fromUtf8("As of zsh 5.7.1 the fanotify shell integration backend "
+                       "*must* be enabled during zsh-startup (e.g .zshrc) for the "
+                       "integration-tests to succeed. Otherwise the first zsh-process "
+                       "*may* consume stdin so no commands remain after «exec zsh» "
+                       "which is called to preload libshournal-shellwatch.so. "
+                       "See also my email 'Unexpected stdin-behavior' from 2021-10-21 "
+                       "on the zsh mailing list zsh-workers@zsh.org. Note that zsh "
+                       "does not follow posix shell behaviour here: "
+                       "«When the shell is using "
+                       "standard input and it invokes a command that also uses standard "
+                       "input, the shell shall ensure that the standard input file "
+                       "pointer points directly after the command it has read when "
+                       "the command begins execution».");
+            throw QExcIllegalArgument("Bad integration-test environment (see above)");
+        }
+
+        QCOMPARE(proc_ret, 123);
         char c;
         // wait for shournal grand-child process to finish (close it's write end)
         os::read(pipe_[0], &c, 1);

@@ -126,7 +126,11 @@ inline int run(int argc, char *argv[])
         if(shellArgs.first().startsWith("bash")){
             globals().integrationSetupCommand = "export HISTFILE=/dev/null";
         } else if(shellArgs.first().startsWith("zsh")){
-            globals().integrationSetupCommand = "unset HISTFILE";
+            globals().integrationSetupCommand =
+                    "unset HISTFILE\n"
+                    // search for 42 in integration_test_shell.cpp for the rationale
+                    "[ $_shournal_run_backend='shournal-run-fanotify' ] && "
+                    "[ -z \"${_shournal_is_running+x}\" ] && exit 42\n";
         } else {
             QIErr() << "currently only bash and zsh are supported.";
             exit(1);
