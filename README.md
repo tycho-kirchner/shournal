@@ -17,11 +17,11 @@ echo hi | tee out.log
 $ ./demo.sh
 hi
 $ shournal -q --wfile out.log
-cmd-id 2: $?: 0 2019-30-11 08:46 :  ./demo.sh
+cmd-id 2 $?=0 2022-11-08 08:46 $ ./demo.sh
 Working directory: /home/user
-  1 written file(s):
+  1 written file:
      /home/user/out.log (3 bytes) Hash: 15349503233279147316
-  1 read file(s):
+  1 read file:
      /home/user/demo.sh (42 bytes) Hash: 13559791986335963073 id 1
           #!/usr/bin/env bash
           echo hi | tee out.log
@@ -77,8 +77,8 @@ Please note: below examples make use of the
   $ SHOURNAL_ENABLE # monitor all commands using the shell-integration
   $ echo hi > foo
   $ shournal --query --wfile foo
-  Command id 1 returned 0 - 14.05.19 10:19 : echo hi > foo
-    Written file(s):
+  cmd-id 1 $?=0 2019-05-14 10:19 $ echo hi > foo
+    1 written file:
        /home/user/foo (3 bytes) Hash: 15349503233279147316
 
   ~~~
@@ -87,13 +87,13 @@ Please note: below examples make use of the
   by **read filename** and optionally restore the files with `--restore-rfiles`:
   ~~~
   $ shournal -q --rname demo.sh
-  cmd-id 34: $?: 0 21.04.22 15:15 :  ./demo.sh
-    1 read file(s):
+  cmd-id 34 $?=0 2022-04-21 15:15 $ ./demo.sh
+    1 read file:
        /home/user/demo.sh (34 bytes) Hash: 16696055267278105544 id 3
             #!/usr/bin/env bash
             echo version1
-  cmd-id 35: $?: 0 21.04.22 15:15 :  ./demo.sh
-    1 read file(s):
+  cmd-id 35 $?=0 2022-04-21 15:15 $ ./demo.sh
+    1 read file:
        /home/user/demo.sh (34 bytes) Hash: 17683376525180966954 id 4
             #!/usr/bin/env bash
             echo version2
@@ -104,14 +104,14 @@ Please note: below examples make use of the
 * List all commands which contained the string `demo` (<kbd>%</kbd> is wildcard):
   ~~~
   $ shournal -q -cmdtxt %demo%
-  cmd-id 1: $?: 0 20.04.22 15:46 :  cat demo.sh
+  cmd-id 1 $?=0 2022-04-20 15:46 $ cat demo.sh
   ...
-  cmd-id 2: $?: 0 20.04.22 15:46 :  ./demo.sh
+  cmd-id 2 $?=0 2022-04-20 15:46 $ ./demo.sh
   ...
   ~~~
 * What commands were executed at the current working directory?
   ~~~
-  shournal --query --command-working-dir "$PWD"
+  shournal --query -cwd "$PWD"
   ~~~
 * What commands were executed within a specific shell-session? The
   uuid can be taken from the command output of a previous query.

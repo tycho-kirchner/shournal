@@ -23,10 +23,10 @@ Launch a new shell afterwards and check whether it's working:
 ~~~
 $ echo foo > bar
 $ shournal --query --wfile bar
-cmd-id 66075: $?: 0 02.11.21 14:23 :  echo foo > bar
+cmd-id 66075 $?=0 2021-11-02 14:23 $ echo foo > bar
 Working directory: /home/tycho
 session-uuid 3hIZtDwhEey5WPDVv9W/Cw==
-  1 written file(s):
+  1 written file:
      /home/tycho/bar (4 bytes) Hash: 8087352826690557229
 $ # or just look into the history:
 $ shournal --query --history 3
