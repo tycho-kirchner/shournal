@@ -9,6 +9,7 @@
 
 #include <assert.h>
 
+#include <QDateTime>
 #include <QtGlobal>
 #include <QObject>
 #include <QVariant>
@@ -205,6 +206,28 @@ bool contains(const Container& container, const typename Container::value_type& 
     return std::find(container.begin(), container.end(), element) != container.end();
 }
 
+/// Drop certain fields of the time, e.g. milliseconds. Also
+/// sets lower fields, e.g. dropping minutes sets seconds
+/// and ms to 0 as well
+/// @param c one of M(inutes), s(econds), m(illiseconds)
+static inline void dropFromTime(QTime& t, char c){
+    int m=t.minute(), s=t.second(), ms=t.msec();
+    switch (c) {
+    case 'M': m = 0;
+    case 's': s = 0;
+    case 'm': ms = 0;
+              break;
+    default: throw QExcIllegalArgument(QString("Bad format c %1").arg(c));
+    }
+    t.setHMS(t.hour(), m, s, ms);
+}
+
+/// @overload
+static inline void dropFromTime(QDateTime& d, char c){
+    auto t = d.time();
+    dropFromTime(t, c);
+    d.setTime(t);
+}
 
 QString absPath(const QString& path);
 

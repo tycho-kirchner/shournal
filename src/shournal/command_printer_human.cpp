@@ -54,12 +54,21 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
         s.setMaxLineWidth(std::numeric_limits<int>::max());
 
         auto & cmd = cmdIter->value();
-        s << qtr("cmd-id %1:").arg(cmd.idInDb);
+        s << qtr("cmd-id %1").arg(cmd.idInDb);
         if(cmd.returnVal != CommandInfo::INVALID_RETURN_VAL){
-            s << qtr("$?:") << QString::number(cmd.returnVal);
+            s << qtr("$?=%1").arg(QString::number(cmd.returnVal));
         }
-        s << cmd.startTime.toString( Qt::DefaultLocaleShortDate) << "-"
-          << cmd.endTime.toString( Qt::DefaultLocaleShortDate) << ": "
+
+        // Only print end-date/time, if different from start-date/time, ignoring seconds.
+        dropFromTime(cmd.startTime, 's');
+        dropFromTime(cmd.endTime, 's');
+        const QString tformat = "hh:mm";
+        const QString dtformat = QString("yyyy-MM-dd") + " " + tformat;
+        QString cmdEndTime = (cmd.startTime.date() != cmd.endTime.date()) ?
+                              " - " + cmd.endTime.toString(dtformat) :
+                                (cmd.startTime.time() != cmd.endTime.time()) ?
+                                "-" + cmd.endTime.time().toString(tformat) : "";
+        s << cmd.startTime.toString(dtformat) + cmdEndTime << "$"
           << cmd.text << "\n";
         s << qtr("Working directory: %1\n").arg(cmd.workingDirectory);
         if(! cmd.sessionInfo.uuid.isNull()){
@@ -196,7 +205,8 @@ void CommandPrinterHuman::printWriteInfos(QFormattedStream &s, const FileWriteIn
     }
     s.setLineStart(m_indentlvl1);
     const char dotOrColon = (m_maxCountWfiles == 0) ? '.' : ':';
-    s << qtr("%1 written file(s)%2\n").arg(fileWriteInfos.size()).arg(dotOrColon);
+    const QString fileStr = (fileWriteInfos.size() == 1) ? "file" : "files";
+    s << qtr("%1 written %2%3\n").arg(fileWriteInfos.size()).arg(fileStr).arg(dotOrColon);
     s.setLineStart(m_indentlvl2);
     int counter = 0;
     for(const auto& f : fileWriteInfos){
@@ -224,7 +234,8 @@ void CommandPrinterHuman::printReadInfos(QFormattedStream &s, const CommandInfo 
     s.setLineStart(m_indentlvl1);
 
     const char dotOrColon = (m_maxCountRfiles == 0) ? '.' : ':';
-    s << qtr("%1 read file(s)%2\n").arg(cmd.fileReadInfos.size()).arg(dotOrColon);
+    const QString fileStr = (cmd.fileReadInfos.size() == 1) ? "file" : "files";
+    s << qtr("%1 read %2%3\n").arg(cmd.fileReadInfos.size()).arg(fileStr).arg(dotOrColon);
     const QString cmdIdStr = QString::number(cmd.idInDb);
     int counter = 0;
     for(const auto & f : cmd.fileReadInfos){
