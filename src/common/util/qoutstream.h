@@ -12,6 +12,12 @@ public:
     QOut();
     ~QOut();
 
+    /// See QTextStream::operator<<(const char*) - ISO-8859-1 encoding is assumed.
+    /// We use UTF-8 everywhere.
+    QOut& operator<<(const char* str){
+        return *this << QString::fromUtf8(str);
+    }
+
     template<class T>
     QOut& operator<<(const T& t) {
         m_textStream << t;
@@ -29,6 +35,11 @@ class QErr
 public:
     QErr();
     ~QErr();
+
+    QErr& operator<<(const char* str){
+        return *this << QString::fromUtf8(str);
+    }
+
     template<class T>
     QErr& operator<<(const T& t) {
         m_textStream << t;
@@ -53,6 +64,10 @@ class QIErr
 public:
     QIErr();
     ~QIErr();
+
+    QIErr& operator<<(const char* str){
+        return *this << QString::fromUtf8(str);
+    }
 
     template<class T>
     QIErr& operator<<(const T& t) {
