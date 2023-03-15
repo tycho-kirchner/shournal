@@ -70,31 +70,29 @@ case "$_SHOURNAL_SHELL_NAME" in
 _shournal_verbose_history_check(){
     # no history needed if running non-interactively
     [ -n "${BASH_EXECUTION_STRING+x}" ] && return 0
-    local success=true
+    local ret=0
 
     if ! [ -o history ]; then
-        success=false
+        ret=1
         _shournal_error "bash history is off. Please enable it: set -o history"
     fi
 
     if [[ ${HISTSIZE-0} -lt 2 ]]; then
-        success=false
+        ret=1
         _shournal_error "bash HISTSIZE is too small (or not set). Please set it at least to 2: HISTSIZE=2"
     fi
 
     if [[ ${HISTCONTROL-} == *"ignorespace"* || ${HISTCONTROL-} == *"ignoreboth"* ]]; then
-        success=false
+        ret=1
         _shournal_error "Commands with spaces are set to be ignored from history. Please disable that, " \
                        "e.g. HISTCONTROL=ignoredups or HISTCONTROL=''"
     fi
 
     if [[ -n ${HISTIGNORE-} ]] ; then
-        success=false
+        ret=1
         _shournal_error "HISTIGNORE is not empty. Please unset it: unset HISTIGNORE"
     fi
-
-    $success
-    return $?
+    return $ret
 }
 
 _shournal_get_current_cmd_bash(){
