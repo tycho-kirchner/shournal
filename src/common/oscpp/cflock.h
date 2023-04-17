@@ -1,10 +1,16 @@
 #pragma once
 
 
-/// Warpper class for flock
+/// Wrapper class for flock.
+/// Due to NFS emulating flock as fcntl(2) byte-range locks
+/// the fd open mode must match the locking operations:
+/// In order to place a shared lock, fd must be open for reading,
+/// In order to place an exclusive lock, fd must be open for writing. To
+/// place both types of lock, open a file read-write.
 class CFlock
 {
 public:
+    /// fd should in general be opened read-write (see above)!
     CFlock(int fd);
     ~CFlock();
 

@@ -11,9 +11,11 @@
 #include <unistd.h>
 
 #include "db_connection.h"
+#include "cflock.h"
 #include "sqlite_database_scheme.h"
 #include "sqlite_database_scheme_updates.h"
 #include "qexcdatabase.h"
+#include "qfilethrow.h"
 #include "qsqlquerythrow.h"
 #include "logger.h"
 #include "app.h"
@@ -21,6 +23,12 @@
 #include "staticinitializer.h"
 
 static QSqlDatabase* g_db = nullptr;
+
+static bool versionTableExists(QSqlQueryThrow& query){
+    logDebug << "checking for version table...";
+    query.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='version'");
+    return query.next();
+}
 
 static QVersionNumber queryVersion(QSqlQueryThrow& query){
     query.exec("select ver from version");
@@ -88,55 +96,76 @@ static void handleDifferentVersions(const QVersionNumber& dbVersion,
 
 }
 
-/// @param versionAction: if true, update version, if needed
+static void
+createOrUpDateDb(QSqlQueryThrow &query, CFlock& lock){
+    logDebug << "about to lockExclusive database for scheme update...";
+    // quoting sqlite.org/foreignkeys.html
+    // "It is not possible to enable or disable foreign key constraints in the
+    //  middle of a multi-statement transaction (when SQLite is not in autocommit mode)"
+    // The scheme-updates require foreign_keys=OFF, so call below pragma:
+    query.exec("PRAGMA foreign_keys=OFF");
+    lock.lockExclusive();
+    query.transaction();
+
+    if(! versionTableExists(query)){
+        logInfo << qtr("Creating new sqlite database");
+        QStringList statements = QString(
+                    SQLITE_DATABASE_SCHEME).split(';', QString::SkipEmptyParts);
+        for(const QString& stmt : statements){
+            query.exec(stmt);
+        }
+
+        QFile dbDir(db_connection::getDatabaseDir());
+        if(! dbDir.setPermissions(
+             QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner)){
+            logWarning << qtr("Failed to initially set permissions on the database-"
+                              "directory at %1: %2. Other users might be able "
+                              "to browse your command history...")
+                          .arg(db_connection::getDatabaseDir(), dbDir.errorString());
+        }
+    }
+    const auto dbVersion = queryVersion(query);
+    if(dbVersion != app::version()){
+        handleDifferentVersions(dbVersion, query);
+    }
+    query.commit();
+    // outside of transaction (see above):
+    // Allow for delete queries with cascades
+    query.exec("PRAGMA foreign_keys=ON");
+}
+
 /// @throws QExcDatabase
 static void openAndPrepareSqliteDb()
 {
     const QString appDataLoc = db_connection::mkDbPath();
     const QString dbPath = appDataLoc + "/database.db";
-
-    bool pathExisted = QFileInfo::exists(dbPath);
+    QFileThrow lockfile(appDataLoc + "/.shournal-dblock");
+    lockfile.open(QFile::OpenModeFlag::ReadWrite);
+    // Lock to allow for concurrent database scheme updates. First, we lock shared,
+    // upgrading to exclusive on scheme update. Note that for some reason concurrent
+    // processes executing "PRAGMA locking_mode=EXCLUSIVE; BEGIN EXCLUSIVE;" deadlocked
+    // during integration tests, so be careful with that directive.
+    CFlock lock(lockfile.handle());
+    lock.lockShared();
     g_db->setDatabaseName(dbPath);
     if(! g_db->open()) {
         throw QExcDatabase(__func__, g_db->lastError());
     }
 
     QSqlQueryThrow query(*g_db);
+    if(! versionTableExists(query)){
+        logDebug << "version table did not exist yet..";
+        createOrUpDateDb(query, lock);
+    } else {
+        const auto dbVersion = queryVersion(query);
+        logDebug << "current db-version" << dbVersion.toString();
+        if(dbVersion != app::version()){
+            createOrUpDateDb(query, lock);
+        }
+    }
+    lock.unlock();
+
     // Allow for delete queries with cascades
-
-    // quoting sqlite.org/foreignkeys.html
-    // "It is not possible to enable or disable foreign key constraints in the
-    //  middle of a multi-statement transaction (when SQLite is not in autocommit mode)"
-    // The scheme-updates require foreign_keys=OFF, so enable below
-    query.exec("PRAGMA foreign_keys=OFF");
-
-    query.transaction();
-
-    if(! pathExisted){
-        // Initially create the database
-        logInfo << qtr("Creating new sqlite database");
-        QStringList statements = QString(SQLITE_DATABASE_SCHEME).split(';', QString::SkipEmptyParts);
-
-        for(const QString& stmt : statements){
-            query.exec(stmt);
-        }
-        QFile dbfile(appDataLoc);
-        if(! dbfile.setPermissions(
-                    QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner)){
-            logWarning << qtr("Failed to initially set permissions on the database-directory "
-                              "at %1: %2. Other users might be able "
-                              "to browse your command history...")
-                          .arg(dbPath, dbfile.errorString());
-        }
-    }
-    const auto dbVersion = queryVersion(query);
-    logDebug << "current db-version" << dbVersion.toString();
-    if(dbVersion != app::version()){
-        handleDifferentVersions(dbVersion, query);
-    }
-
-    query.commit();
-    // outside of transaction (see above):
     query.exec("PRAGMA foreign_keys=ON");
 }
 
