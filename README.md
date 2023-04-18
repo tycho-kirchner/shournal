@@ -1,6 +1,6 @@
 
 
-# shournal
+![shournal logo](images/shournal.png)
 
 ## A (file-) journal for your shell
 
