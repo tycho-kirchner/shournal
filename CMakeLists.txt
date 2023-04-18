@@ -6,7 +6,7 @@ endif()
 
 # version applies to all released files: shournal, shournal-run, libshournal-shellwatch.so
 # and shell-integration-scripts (e.g. integration_ko.bash)
-set(shournal_version "2.9")
+set(shournal_version "3.0")
 
 cmake_policy( SET CMP0048 NEW )
 project(shournal VERSION ${shournal_version} LANGUAGES CXX C)
