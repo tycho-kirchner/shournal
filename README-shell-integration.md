@@ -52,15 +52,19 @@ debugging symbols. A verbosity higher than *warning* is not recommended.
 
 
 ## Advanced setup (non-interactive)
-To also observe non-interactive commands, e.g. those executed via ssh
+To also observe non-interactive commands executed via ssh
 ~~~
 ssh localhost echo foo
 ~~~
-the following setup is recommended: <br> <br>
+or the *Sun Grid Engine* (SGE) the following setup is recommended:
+<br> <br>
 **bash** <br>
 Put the following near the **beginning** of your bashrc:
 ~~~
-if [ -n "${BASH_EXECUTION_STRING+x}" ] ; then
+if [[ -n ${SGE_O_WORKDIR+x} || (
+     -n ${BASH_EXECUTION_STRING+x} &&
+    ( -n ${SSH_CLIENT+x} || -n ${SSH_TTY+x} )
+    ) ]]; then
     source /usr/share/shournal/SOURCE_ME.bash
     SHOURNAL_ENABLE
 fi
@@ -76,21 +80,32 @@ esac
 ~~~
 
 **zsh** <br>
-For the special case of a non-interactive command invocation via ssh
-put the following into ~/.zshenv
+Put the following into ~/.zprofile
 ~~~
-if [[ $SHLVL -eq 1 && -n "${ZSH_EXECUTION_STRING+x}" &&
-    ( -n "${SSH_CLIENT+x}" || -n "$SSH_TTY" ) ]]; then
+if [[ -n ${SGE_O_WORKDIR+x} || (
+    -n ${ZSH_EXECUTION_STRING+x} &&
+    ( -n ${SSH_CLIENT+x} || -n ${SSH_TTY+x} )
+    ) ]]; then
     source /usr/share/shournal/SOURCE_ME.zsh
     SHOURNAL_ENABLE
 fi
 ~~~
-Beware that ~/.zshenv is always sourced, also by zsh -c ':' invocations
-on the interactive command-line, so the check for `$SHLVL -eq 1`
-should not be omitted in most cases. Note that ~/.zprofile is only sourced
-during interactive ssh-logins, not during command-invocations as illustrated
-above.
+Note that depending on your server environment, this requires zsh to be
+executed as login shell, e.g. <br>
+`ssh HOST zsh -l -c command`. Alternatively
+you may use ~/.zshenv but beware that this file is always sourced, also
+during `zsh -c ':'` invocations on the interactive command-line, so at least
+an additional check for <br>
+`[ $SHLVL -eq 1 ]` is recommended.
 
+For cluster software systems other than SGE, you may
+`export SHOURNAL_IS_CLUSTERJOB=true`, before `SHOURNAL_ENABLE`, if and
+only if the shell is about to execute a cluster job. Note
+that in this case, shournal performs a re-execution of the current
+command and only returns control flow after flushing the database, because
+cluster software systems tend to kill background processes, once the
+main job script finished. To totally disable cluster job detection,
+set `SHOURNAL_NO_CLUSTER_JOB_DETECT=true` before `SHOURNAL_ENABLE`.
 
 
 ## Prerequisites of the fanotify backend

@@ -14,8 +14,7 @@ _shournal_enable(){
     fi
 
     if [ -n "${_shournal_shell_exec_string+x}" ]; then
-        _shournal_handle_exec_string || ret=$?
-        return $ret
+        _shournal_handle_exec_string || return $?
     fi
 
     # This shell was _not_ invoked with the sh -c '...' option,
@@ -382,19 +381,6 @@ _shournal_remove_prompts(){
     return 0
 }
 
-# Return true in case bash -c '...' may re-exec,
-# otherwise report the error and return false.
-# Re-exec is e.g. not allowed, if the a command
-# within the -c '..' arg was already executed
-# (it would be executed twice otherwise).
-_shournal_verbose_reexec_allowed(){
-    # FIXME: this is not robust, bash -c 'echo foo; source ~/.bashrc'
-    # should _not_ be allowed.
-    [ "${BASH_SOURCE[-1]}" = "$HOME/.bashrc" ] && return 0
-    _shournal_warn "not called from ~/.bashrc but ${BASH_SOURCE[-1]}"
-    return 1
-}
-
 ## _____ End of must-override functions and variables _____ ##
 
 
@@ -429,22 +415,6 @@ _shournal_remove_prompts(){
     preexec_functions[$preexec_functions[(i)_shournal_preexec]]=()
     precmd_functions[$precmd_functions[(i)_shournal_postexec]]=()
     return 0
-}
-
-_shournal_verbose_reexec_allowed(){
-    zmodload zsh/parameter
-    local toplevel_context="${zsh_eval_context[1]}"
-    case "$toplevel_context" in
-    file) return 0;;
-    cmdarg)
-        _shournal_warn "eval-toplevel-context $toplevel_context not allowed"
-        return 1;;
-    *)
-        _shournal_warn "unhandled eval-toplevel-context $toplevel_context." \
-                       "Please report if you" \
-                       "think that SHOURNAL_ENABLE should be possible here."
-        return 1;;
-    esac
 }
 
 ## _____ End of must-override functions and variables _____ ##

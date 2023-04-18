@@ -4,7 +4,14 @@
 # must be compatible with all supported shells.
 
 SHOURNAL_ENABLE(){
-    local ret=0
+    local cmd_path args_array line ret=0
+    local clusterjob_reexec_counter
+
+    if _shournal_is_subshell; then
+        _shournal_warn "shournal's shell integration must not be enabled from" \
+                       "within a subshell"
+        return 1
+    fi
 
     if [ -z "$(command -v shournal)" ] ; then
         _shournal_error "cannot enable shournal's shell integration - command «shournal» not found"
@@ -21,6 +28,39 @@ SHOURNAL_ENABLE(){
         # informative mesg. should have been already printed by shournal
         _shournal_error "shell integration is _not_ enabled"
         return 1
+    fi
+
+    if [ -n "${_SHOURNAL_CLUSTERJOB_JUST_REEXECUTED+x}" ]; then
+        _shournal_debug "shournal just re-executed this clusterjob." \
+                        "SHOURNAL_ENABLE is ignored this time."
+        unset _SHOURNAL_CLUSTERJOB_JUST_REEXECUTED
+        return 0
+    fi
+
+    if _shournal_clusterjob_reexec_ok; then
+        # Do not use BASH_EXECUTION_STRING, it is not set in all cluster jobs.
+        args_array=()
+        while IFS= read -r -d '' line; do
+            args_array+=("$line")
+        done < /proc/$$/cmdline
+        if [ ${#args_array[@]} -lt 2 ]; then
+            _shournal_warn "SHOURNAL_ENABLE: we detected ${args_array[*]} as" \
+                           "cluster job without arguments. Please report."
+        else
+            cmd_path="$(readlink /proc/$$/exe)"
+            _shournal_debug "running cluster job: $cmd_path ${args_array[*]}"
+            clusterjob_reexec_counter=${_SHOURNAL_CLUSTERJOB_REEXEC_COUNTER:-0}
+            [ $clusterjob_reexec_counter -gt 0 ] &&
+                _shournal_debug "unusual clusterjob_reexec_counter of $clusterjob_reexec_counter"
+            ((++clusterjob_reexec_counter))
+            _SHOURNAL_CLUSTERJOB_REEXEC_COUNTER="$clusterjob_reexec_counter" \
+                _SHOURNAL_CLUSTERJOB_JUST_REEXECUTED=true exec \
+                shournal --backend-filename "$_shournal_run_backend" \
+                --verbosity "$_SHOURNAL_VERBOSITY" \
+                --exec-filename "$cmd_path" --exec -- "${args_array[@]}"
+            # only get here on error
+            return 1
+        fi
     fi
 
     if [ -z "${_shournal_shell_exec_string+x}" ]; then
@@ -40,7 +80,22 @@ SHOURNAL_DISABLE() {
     local exitcode=$?
     local ret=0
 
-    _shournal_disable $exitcode || ret=$?
+    if _shournal_is_subshell; then
+        _shournal_warn "shournal's shell integration must not be disabled from" \
+                       "within a subshell"
+        return 1
+    fi
+
+    if _shournal_is_clusterjob && [ -n "${_SHOURNAL_CLUSTERJOB_REEXEC_COUNTER+x}" ]; then
+        _shournal_warn "shournal seems to trace this process as a cluster job" \
+                       "and cannot be disabled in that mode."
+        return 1
+    fi
+
+    _shournal_disable $exitcode || return ret=$?
+    if [ $ret -eq 0 ]; then
+        unset _shournal_current_pid SHOURNAL_SESSION_ID SHOURNAL_CMD_COUNTER
+    fi
     return $ret
 }
 
