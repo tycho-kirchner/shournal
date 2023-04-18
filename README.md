@@ -424,27 +424,27 @@ space.
 ## Overhead
 File tracing imposes a **runtime overhead**.
 A detailed performance evaluation may follow soon. For now:
-We measured the following command executions with shournal v2.5:
+We measured the following command executions with shournal v2.9:
 * compile elfutils-0.176
 * git checkout — checkout the Linux kernel’s source code from v4.19 to v3.10.
 * kernel copy — cp of the 4.19 Linux source.
 
-The benchmark involves tracing, (meta-)data collection and saving to
-a binary temporary file. As this file can be kept indefinitely, the
-final storing into the SQL-database is not part of the measurement.
-
 The relative runtime-overheads are shown in below table,
-strace listed for comparison with ptrace-based solutions:
+strace is listed for comparison with ptrace-based solutions:
 
 |    Backend    | compile | checkout |  cp   |
 | ------------- | ------- | -------- | ----- |
-| kernel module |  0,04%  |   0,47%  | 0,38% |
-| fanotify      |  0,4%   |   2,4%   | 28,7% |
-| (strace)      |  125%   |   93%    | 494%  |
+| kernel module |  0.05%  |   0.49%  | 0.29% |
+| fanotify      |  1.2%   |   1.3%   | 6.2% |
+| (strace)      |  140%   |   41%    | 100%  |
+
+The benchmark involves tracing, (meta-)data collection and saving to
+a binary temporary file. As this file can be kept indefinitely, the
+final storing into the SQL-database is not part of the runtime-measurement.
 
 For the `cp` benchmark, where ~120.000 file-events occurred
-in ~4 seconds, the runtime overhead of the fanotify backend becomes
-significant. Note that many file-events in short time constitute a
+in ~4 seconds, the runtime overhead of the fanotify backend may become
+noticeable. Note that many file-events in short time constitute a
 worst-case. Where performance is critical, the kernel module backend
 should be used.
 
