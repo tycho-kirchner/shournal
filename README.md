@@ -284,6 +284,17 @@ SYS_NICE are required, e.g. <br>
 You may need to [configure the backend](#backend-configuration).
 
 
+## Running on a Amazon AWS EC2 instance
+In order to run *shournal* on a Amazon AWS EC2 instance it may be
+necessary, to enable additional software package repositories. For
+Ubuntu 22.04 on a t3.micro instance enter the following commands before
+installing *shournal*
+~~~
+sudo add-apt-repository universe
+sudo apt update
+~~~
+
+
 ## Backend configuration
 shournal provides two backends, a custom *kernel module* and *fanotify*.
 The *kernel module* is used by default, except the *shournal-fanotify*
