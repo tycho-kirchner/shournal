@@ -138,7 +138,7 @@ Use an ordinary web-browser for display.
 ## Installation
 
 ### Binary releases
-For Debian/Ubuntu-based distributions .deb-packages are available on the
+For **Debian/Ubuntu-based** distributions .deb-packages are available on the
 [release-page](https://github.com/tycho-kirchner/shournal/releases/latest).
 Three different editions are provided for different use-cases: most users will
 want to install *shournal* on a real host (or virtual machine) and
@@ -148,9 +148,34 @@ want to install *shournal* on a real host (or virtual machine) and
 is targeted at institutions where the usage of *out-of-tree kernel-modules*
 is discouraged. <br>
 Only LTS-releases are officially supported, the packages are known to work on
-Debian 10 (Buster), Debian 11 (Bullseye), Ubuntu 18.04 (Bionic) and Ubuntu 20.04 (Focal).
+Debian 10 (Buster), Debian 11 (Bullseye), Ubuntu 18.04 (Bionic), Ubuntu 20.04 (Focal)
+and Ubuntu 22.04 (Jammy Jellyfish).
 Install deb-packages as usual, e.g. <br>
 `sudo apt install ./shournal_2.2_amd64.deb` <br>
+To enable the shell-integration:
+* for *bash*: put the following to the end of your ~/.bashrc <br>
+`source /usr/share/shournal/SOURCE_ME.bash` <br>
+* for *zsh*: put the following to the end of your ~/.zshrc <br>
+`source /usr/share/shournal/SOURCE_ME.zsh` <br>
+and run `SHOURNAL_ENABLE` afterwards.
+
+For **any Linux**, a flat binary is available on the
+[release-page](https://github.com/tycho-kirchner/shournal/releases/latest)
+to be used without installation:
+
+~~~
+tar -xf shournal-fanotify*.tar.xz
+cd shournal-fanotify/
+sudo groupadd shournalmsenter
+sudo chown root shournal-run-fanotify && sudo chmod u+s shournal-run-fanotify
+./shournal-run-fanotify -e echo Hello World
+
+# Source shournal's shell integration from bashrc/zshrc, e.g.
+# echo "source '$PWD/SOURCE_ME.bash'" >> ~/.bashrc
+# echo "source '$PWD/SOURCE_ME.zsh'" >> ~/.zshrc
+# Enable with: SHOURNAL_ENABLE.
+~~~
+
 An **update** of *shournal* should be performed after all users have
 logged out, because the shell integrations need to be resourced.
 Further in case of the *kernel module* backend unloading the old
@@ -175,18 +200,6 @@ echo GROUPNAME > /etc/shournal.d/kgroup
 replacing GROUPNAME with the value of your choice. This rule takes
 into effect the next time shournal's kernel module is loaded ( so
 call e.g. `modprobe -r shournalk; modprobe shournalk` or reboot).
-
-
-To enable the shell-integration:
-
-* for *bash*: put the following to the end of your ~/.bashrc <br>
-`source /usr/share/shournal/SOURCE_ME.bash` <br>
-* for *zsh*: put the following to the end of your ~/.zshrc <br>
-`source /usr/share/shournal/SOURCE_ME.zsh` <br>
-* for *other shells*: please open an issue, if you want your favorite
-  shell to be integrated as well (contributions welcome).
-
-and run `SHOURNAL_ENABLE` afterwards.
 
 More details and advanced options (logging commands executed via ssh)
 can be found [here](./README-shell-integration.md).
