@@ -118,6 +118,13 @@ Please note: below examples make use of the
   ~~~
   shournal --query --shell-session-id $uuid
   ~~~
+* Find out the value of a variable.
+  For instance, the command `echo $foo > bar` was executed in the shell-session
+  with id `puLvkEizEe6CgvXjQlmnIQ==`. If `foo` was set within that shell
+  session, its value can often be retrieved by
+  ~~~
+  shournal -q -sid puLvkEizEe6CgvXjQlmnIQ==  | fgrep 'foo='
+  ~~~
 * For the full list of query-options, please enter
   ~~~
   shournal --query --help
