@@ -56,14 +56,11 @@ typedef std::array<int, 2> SocketPair_t;
 typedef std::vector<gid_t> Groups;
 typedef std::array<int, 3> KernelVersion; // major minor patch
 typedef struct stat stat_t;
-//typedef QVarLengthArray<int, 64> CatchableTermSignals;
-const int CATCHABLE_TERM_SIGNALS_SIZE = 5;
-typedef std::array<int, CATCHABLE_TERM_SIGNALS_SIZE> CatchableTermSignals;
 
 
 enum DirFilter { NoDot=0x2000, NoDotDot=0x4000, NoDotAndDotDot=NoDot | NoDotDot };
 
-const CatchableTermSignals &catchableTermSignals();
+const std::vector<int> &catchableTermSignals();
 
 void chdir(const char *path);
 void chdir(const std::string& path);

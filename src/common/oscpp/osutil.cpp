@@ -27,6 +27,16 @@
 #include "qoutstream.h"
 #include "fdentries.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void intertSighandler(int){}
+
+#ifdef __cplusplus
+}
+#endif
+
 int osutil::countOpenFds() {
      int count = 0;
      for(const int fd : osutil::FdEntries()){
@@ -279,6 +289,21 @@ void osutil::waitForSignals()
 
 }
 
+/// Set a signal handler doing nothing for the specified signales.
+/// Note that this is *not* equivalent to SIG_IGN:
+/// SIG_IGN is inherited on execve, our signal handler is not.
+void osutil::setInertSighandler(const std::vector<int> &sigs)
+{
+    struct sigaction act{};
+    act.sa_handler = intertSighandler;
+    sigemptyset (&act.sa_mask);
+    act.sa_flags = SA_RESTART;
+    for(auto s : sigs){
+        os::sigaction(s, &act, nullptr);
+    }
+}
+
+
 /// be verbose in case os::close fails
 void osutil::closeVerbose(int fd)
 {
@@ -330,3 +355,4 @@ int osutil::unnamed_tmp(int flags){
 #endif
     return fd;
 }
+

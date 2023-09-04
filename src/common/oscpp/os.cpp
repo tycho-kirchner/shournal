@@ -866,9 +866,9 @@ void os::unsetenv(const char *name)
 
 /// Return a rather random array of signals which are catchable and would by default
 /// cause a process to end.
-const os::CatchableTermSignals& os::catchableTermSignals()
+const std::vector<int>& os::catchableTermSignals()
 {
-    static const CatchableTermSignals sigs {SIGHUP, SIGINT, SIGQUIT, SIGTERM, SIGPIPE};
+    static const std::vector<int> sigs {SIGHUP, SIGINT, SIGQUIT, SIGTERM, SIGPIPE};
     return sigs;
 }
 

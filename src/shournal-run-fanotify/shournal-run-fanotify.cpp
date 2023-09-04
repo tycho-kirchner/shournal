@@ -10,6 +10,7 @@
 #include "qoptvarlenarg.h"
 #include "excoptargparse.h"
 #include "os.h"
+#include "osutil.h"
 #include "excos.h"
 #include "filewatcher_fan.h"
 #include "msenter.h"
@@ -75,11 +76,9 @@ void callFilewatcherSafe(FileWatcher& fwatcher){
 int shournal_run_main(int argc, char *argv[])
 {    
     // Since we are waiting for other processes to finish, ignore typical
-    // signals. Note that the below dummy-function is *not* equivalent to SIG_IGN:
-    // while the dummy is reset, SIG_IGN is inherited on execve...
-    for(int s : os::catchableTermSignals()){
-        os::signal(s, [](int){});
-    }
+    // signals.
+    osutil::setInertSighandler(os::catchableTermSignals());
+
     // Using app::SHOURNAL for several common paths (database, config) used
     // by QStandardPaths but app::CURRENT_NAME for others (log-filename)
     app::setupNameAndVersion(app::SHOURNAL_RUN_FANOTIFY);

@@ -52,7 +52,7 @@ int unnamed_tmp(int flags=os::OPEN_CLOEXEC);
 
 void waitForSignals();
 
-
+void setInertSighandler(const std::vector<int>& sigs);
 
 
 } // namespace fdcontrol
