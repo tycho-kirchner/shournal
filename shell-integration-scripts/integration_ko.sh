@@ -5,6 +5,15 @@
 _shournal_run_backend='shournal-run'
 
 _shournal_enable(){
+    local ret=0
+    [ -n "${_shournal_int_traps+x}" ] || _shournal_int_traps=()
+    _shournal_trap_push '' INT || return
+    _shournal_do_enable || ret=$?
+    _shournal_trap_pop || :
+    return $ret
+}
+
+_shournal_do_enable(){
     local tmpdir
     local ret=0
     local cmd_str
@@ -26,8 +35,8 @@ _shournal_enable(){
     else
         [ -n "${TMPDIR+x}" ] && tmpdir="$TMPDIR" || tmpdir=/tmp
     fi
+
     _shournal_fifo_basepath="$tmpdir/shournal-fifo-$USER-$$"
-    _shournal_setup_error_path_current_pid="$tmpdir/shournal-setup-error-$USER-$$"
 
     # If an observed shell calls "exec bash" we end
     # up with an already existing fifo.
@@ -36,10 +45,6 @@ _shournal_enable(){
     # sequence count 1 the previous and current fifo-paths collide, so just clean up
     # in any case.
     _shournal_detach_this_pid 0
-
-    # May be necessary in cases where setup fails but exec was called, so
-    # we couldn't clean up previously.
-    _shournal_remove_setup_error_file_if_exist
 
     if [ -n "${_shournal_shell_exec_string+x}" ]; then
         # invoked via sh -c
@@ -82,12 +87,15 @@ _shournal_disable(){
         return 0
     fi
 
-    _shournal_remove_setup_error_file_if_exist
+    _shournal_trap_push '' INT || :
+
     _shournal_remove_prompts
     _shournal_detach_this_pid "$exitcode"
+    # Don't unset _shournal_int_traps here - we may have been called nested!
+    unset _shournal_is_running _shournal_preexec_ret \
+          _shournal_fifo_basepath
 
-    unset _shournal_is_running \
-          _shournal_fifo_basepath _shournal_setup_error_path_current_pid
+    _shournal_trap_pop || :
     return 0
 }
 
@@ -106,19 +114,15 @@ _shournal_send_msg(){
     local fifofd="$1"
     local msg_type="$2"
     local msg_data="$3"
-    local fdpath
     local ret=0
 
     # simple json string type-data: { "msgType":0, "data":"stuff" }
     local full_msg="{\"msgType\":$msg_type,\"data\":\"$msg_data\"}"
     _shournal_debug "_shournal_send_msg: sending message: $full_msg"
-    # See _shournal_run_finalize for the rationale of using a fd instead of fifopath.
-    # We may run in a subshell, so do not use $$.
-    _shournal_refresh_current_pid || return $?
-    fdpath="/proc/$_shournal_current_pid/fd/$fifofd"
-    echo "$full_msg" > "$fdpath" || ret=$?
+
+    echo "$full_msg" >&$fifofd || ret=$?
     if [ $ret -ne 0 ]; then
-        _shournal_error "_shournal_send_msg: failed to write to $fdpath: $ret"
+        _shournal_error "_shournal_send_msg: failed to write to fifo-FD $fifofd: $ret"
         return $ret
     fi
     return 0
@@ -138,22 +142,21 @@ _shournal_run_finalize(){
     local exitcode="$2"
     local _shournal_fifofd
 
-    # We race with the fifo-removal of a potential previous
-    # _shournal_postexec_generic and the removal shournal-run performs. To
-    # avoid creating a file (instead of writing to the fifo), whose
-    # event pollutes shournal's history, first open a descriptor
-    # read only and on success write to it later using /proc/PID/fd/$_shournal_fifofd
-    # This also protects us from a potential deadlock. shournal-run first deletes
-    # the fifo and then closes it. If it is deleted after we opened it readonly,
-    # reopen and writing to it does *not* block.
-    if ! { exec {_shournal_fifofd}<"$fifopath"; } 2>/dev/null; then
+    # Open the FIFO RDWR to be protected against deadlocks which may occur, e.g.,
+    # if shournal dies after having set up the FIFO. Note that shournal will ignore
+    # this event, because a FIFO is not a regular file.
+    if ! { exec {_shournal_fifofd}<>"$fifopath"; } 2>/dev/null; then
         _shournal_debug "_shournal_run_finalize: opening fifopath \"$fifopath\" failed."
         return 0
     fi
     _shournal_send_ret_val $_shournal_fifofd $exitcode
     _shournal_send_unmark_pid $_shournal_fifofd $$
-    rm "$fifopath" 2>/dev/null
     exec {_shournal_fifofd}<&-
+
+    # If everything goes well, this rm is not needed, as shournal performs it for us.
+    # However, if shournal died in the background, we have created the now REGULAR file at
+    # $fifopath ourselves. So KISS and delete always.
+    rm "$fifopath" 2>/dev/null
 }
 
 
@@ -188,17 +191,9 @@ _shournal_detach_this_pid(){
     return $ret
 }
 
-_shournal_remove_setup_error_file_if_exist(){
-    test -e "$_shournal_setup_error_path_current_pid" &&
-         rm "$_shournal_setup_error_path_current_pid"
-    return 0
-}
-
-
 # preexec is run before a valid command (but not when ENTER or Ctrl+C is hit).
 # We launch a shournal-run process and wait for it to setup and
-# fork into background. Note that the command sequence counter is not
-# incremented yet
+# fork into background.
 _shournal_preexec_generic(){
     local current_seq="$1"
     local cmd_str="$2"
@@ -239,9 +234,6 @@ _shournal_preexec_generic(){
         # shournal-run or bash not able to execute and (likely) one afterwards
         # from the prompt.
         _shournal_debug "_shournal_preexec_generic: shournal-run setup failed"
-        # maybe_todo: If we successfully call "exec" immediatly afterwards,
-        # we leak this file. This however should happen rarely.
-        echo 1 > "$_shournal_setup_error_path_current_pid"
         return 1
     fi
     return 0
@@ -251,16 +243,49 @@ _shournal_preexec_generic(){
 # postexec is run after any command, but eventually also after hitting ENTER
 # or Ctrl (other than PS0). However, the command sequence counter
 # SHOURNAL_CMD_COUNTER is only incremented in case of valid commands.
-# So we try to open the fifo-path according to the current counter.
-# If open succeeds, write the last exit-code to the fifo and unmark this process.
+# To avoid duplicate cleanups, we look at the return value set in PS0.
+# * If it's unset, no preexec has run yet.
+# * if it's -1, preexec was possibly run, but aborted in between
 _shournal_postexec_generic(){
     local current_seq="$1"
     local exitcode="$2"
     local fifopath
+    local die=false
+
+    if [ -z "${_shournal_preexec_ret+x}" ]; then
+        _shournal_debug "_shournal_postexec_generic: no preexec run yet "
+        return 0
+    fi
+
+    case "$_shournal_preexec_ret" in
+        0) : ;;
+        '')
+            _shournal_debug "_shournal_postexec_generic: already cleaned up"
+            return 0
+        ;;
+        -1|130)
+            _shournal_debug "_shournal_postexec_generic: _shournal_preexec_ret is" \
+                            "$_shournal_preexec_ret. This was likely caused by Ctrl+C (SIGINT)."
+        ;;
+        *)
+            _shournal_debug "_shournal_postexec_generic: about to die due to" \
+                            "_shournal_preexec_ret of $_shournal_preexec_ret"
+            die=true
+        ;;
+    esac
 
     fifopath="$_shournal_fifo_basepath-$current_seq"
     _shournal_debug "_shournal_postexec_generic: using fifo at $fifopath"
+
+    _shournal_trap_push '' INT || :
+
     _shournal_run_finalize "$fifopath" "$exitcode"
+    _shournal_preexec_ret=''
+    if [ "$die" = true ] ; then
+        _shournal_warn "Disabling the shell-integration due to previous setup-erros..."
+        SHOURNAL_DISABLE
+    fi
+    _shournal_trap_pop || :
 
     return $exitcode
 }
@@ -281,8 +306,10 @@ case "$_SHOURNAL_SHELL_NAME" in
 # SHOURNAL_CMD_COUNTER without printing anything in PS0. First increment,
 # then execute shournal. Otherwise a SIGINT may abort PS0 execution,
 # preventing the increment.
-_shournal_ps0='${_SHOURNAL_SHELL_NAME:((++SHOURNAL_CMD_COUNTER)):0}'\
-'$(_shournal_preexec $SHOURNAL_CMD_COUNTER)'
+_shournal_ps0='${_SHOURNAL_SHELL_NAME:((_shournal_preexec_ret=-1)):0}'\
+'${_SHOURNAL_SHELL_NAME:((++SHOURNAL_CMD_COUNTER)):0}'\
+'$(_shournal_preexec $SHOURNAL_CMD_COUNTER)'\
+'${_SHOURNAL_SHELL_NAME:((_shournal_preexec_ret=$?)):0}'
 _shournal_prompt_command=$'_shournal_postexec\n'
 
 
@@ -306,12 +333,12 @@ _shournal_remove_prompts(){
 _shournal_preexec(){
     local current_seq="$1"
     local cmd_str
+
     if [[ -z "${PROMPT_COMMAND+x}" || "$PROMPT_COMMAND" != *"$_shournal_prompt_command"* ]]; then
         _shournal_error "_shournal_preexec: Invalid PROMPT_COMMAND. Apparently" \
             "PROMPT_COMMAND was modified after SHOURNAL_ENABLE" \
             "was called. This is often caused by double-sourcing the bashrc, e.g. from" \
             "~/.profile or .bash_profile."
-        echo 1 > "$_shournal_setup_error_path_current_pid"
         return 1
     fi
 
@@ -328,10 +355,6 @@ _shournal_preexec(){
 _shournal_postexec(){
     local ret=$?
     _shournal_postexec_generic "$SHOURNAL_CMD_COUNTER" "$ret" || :
-    if test -e "$_shournal_setup_error_path_current_pid"; then
-        _shournal_warn "Disabling the shell-integration due to previous setup-erros..."
-        SHOURNAL_DISABLE
-    fi
     return $ret
 }
 
@@ -359,9 +382,13 @@ _shournal_remove_prompts(){
 _shournal_preexec(){
     # maybe_todo: use $2 or $3 for expanded aliases instead of $1
     local cmd_str="$1"
+    local ret=0
+
+    _shournal_preexec_ret=-1
     ((++SHOURNAL_CMD_COUNTER))
-    _shournal_preexec_generic $SHOURNAL_CMD_COUNTER "$cmd_str" || return $?
-    return 0
+    _shournal_preexec_generic $SHOURNAL_CMD_COUNTER "$cmd_str" || ret=$?
+    _shournal_preexec_ret=$ret
+    return $ret
 }
 
 _shournal_postexec(){

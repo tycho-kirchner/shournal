@@ -169,6 +169,8 @@ _shournal_version="@shournal_version@"
 # _SHOURNAL_SHELL_NAME  (name of the current shell). It must be exported
 # for libshournal-shellwatch.so.
 # _shournal_shell_exec_string - if and only if the command is executed non-interactively
+# For zsh aliases: avoid error on double source
+unalias _shournal_trap_set &>/dev/null || :
 if [ -n "${BASH_VERSION+x}" ]; then
 export _SHOURNAL_SHELL_NAME='bash'
 
@@ -180,6 +182,32 @@ export _SHOURNAL_SHELL_NAME='bash'
 [ -n "${BASH_EXECUTION_STRING+x}" ] &&
     _shournal_shell_exec_string="$BASH_EXECUTION_STRING"
 
+_shournal_trap_push(){
+    local trap_tmp
+    # First save to temporary variable, as we are not interrupt-safe yet
+    trap_tmp="$(trap -p INT)"
+    trap "$@"
+    _shournal_int_traps+=("$trap_tmp")
+    return 0
+}
+
+_shournal_trap_pop(){
+    local old_trap
+    if [ ${#_shournal_int_traps[@]} -eq 0 ]; then
+        _shournal_error "_shournal_trap_pop - no int trap set" >&2
+        return 1
+    fi
+    old_trap="${_shournal_int_traps[-1]}"
+    # first unset: if we reset to default trap and user hits Ctrl+C, we would
+    # leak the array element
+    unset _shournal_int_traps[-1]
+    if [ -z "$old_trap" ]; then
+        trap - INT
+    else
+        eval "$old_trap"
+    fi
+    return 0
+}
 
 elif [ -n "${ZSH_VERSION+x}" ]; then
 
@@ -187,6 +215,12 @@ export _SHOURNAL_SHELL_NAME='zsh'
 
 [ -n "${ZSH_EXECUTION_STRING+x}" ] &&
     _shournal_shell_exec_string="$ZSH_EXECUTION_STRING"
+
+# This has to be at the top, so aliases are expanded in the other functions (files
+# are appended to this script)
+setopt aliases
+alias _shournal_trap_push='setopt localtraps; trap'
+_shournal_trap_pop(){ :; }
 
 else
     echo "shournal shell integration: sourced from unsupported shell - " \
