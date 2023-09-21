@@ -335,19 +335,34 @@ int osutil::findHighestFreeFd(int startFd, int minFd){
     return -1;
 }
 
-int osutil::unnamed_tmp(int flags){
+/// @param path: if empty, it will be filled with tmp.xxx at system's tempdir
+int osutil::mktmp(QByteArray &path, int flags){
+    if(path.isEmpty()){
+        path = QDir::tempPath().toUtf8();
+        path = pathJoinFilename(path, QByteArray("tmp.XXXXXX"));
+    }
+    int fd = ::mkostemp(path.data(), flags);
+    if (fd < 0) {
+        throw os::ExcOs("osutil::mktmp failed");
+    }
+    return fd;
+}
+
+int osutil::mktmp(int flags){
     QByteArray p(QDir::tempPath().toUtf8());
+    p = pathJoinFilename(p, QByteArray("tmp.XXXXXX"));
+    return osutil::mktmp(p, flags);
+}
+
+int osutil::unnamed_tmp(int flags){
     // tmpfs and possibly other filesystems do not suppot O_TMPFILE, for
     // the sake of simplicity just use mkostemp.
 #if false
-//#ifdef O_TMPFILE
+    //#ifdef O_TMPFILE
     int fd = os::open(p, O_RDWR | O_TMPFILE | O_EXCL | o_flags, true, S_IRUSR | S_IWUSR);
 #else
-    p = pathJoinFilename(p, QByteArray("tmp.XXXXXX"));
-    int fd = ::mkostemp(p.data(), flags);
-    if (fd < 0) {
-        throw os::ExcOs("unnamed_tmp failed");
-    }
+    QByteArray p;
+    int fd = osutil::mktmp(p, flags);
     if(remove(p) < 0){
         fprintf(stderr, "%s: failed to delete the just created file %s - %s\n",
                 __func__, p.constData(), strerror(errno));
