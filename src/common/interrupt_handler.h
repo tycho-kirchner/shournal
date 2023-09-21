@@ -1,16 +1,18 @@
 #pragma once
 
 #include <csignal>
-#include <QVarLengthArray>
+#include <qglobal.h>
+#include <vector>
 
-/// Defer processing of the signal SIGINT
+/// Defer processing of signals
 /// until destruction. Automatically restart (some)
 /// system-calls during that time (SA_RESTART).
 /// Only one instance allowed at a time per thread!
 class InterruptProtect
 {
 public:    
-    InterruptProtect(int signum=SIGINT);
+    InterruptProtect(int signum);
+    InterruptProtect(const std::vector<int> &sigs);
     bool signalOccurred();
 
     ~InterruptProtect();
@@ -18,7 +20,7 @@ public:
 public:
     Q_DISABLE_COPY(InterruptProtect)
 private:
-    struct sigaction m_oldAct{};
-    int m_signum;
+    std::vector<int> m_sigs{};
+    std::vector<struct sigaction> m_oldActions{};
 };
 
