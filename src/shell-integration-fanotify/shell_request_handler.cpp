@@ -506,7 +506,7 @@ ShellRequest shell_request_handler::checkForTriggerAndHandle(bool *success){
 
     // Interrupt protect mostly applies to waiting for a shournal response, which is
     // still short enough to justify not being interruptible.
-    InterruptProtect ip;
+    InterruptProtect ip(SIGINT);
 
     auto& g_shell = ShellGlobals::instance();
 
