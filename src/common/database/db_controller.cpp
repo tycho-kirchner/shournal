@@ -323,8 +323,6 @@ int db_controller::deleteCommand(const SqlQuery &sqlQuery)
     query->prepare("delete from cmd where " + sqlQuery.query());
     query->addBindValues(sqlQuery.values());
 
-    InterruptProtect ip;
-
     query->exec();
     int numRowsAffected = query->numRowsAffected();
     // the respective triggers have also caused the deletion of orphans in
