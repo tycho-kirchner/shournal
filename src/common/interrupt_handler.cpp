@@ -34,11 +34,37 @@ void ip_dummySighandler(int signum){
 #endif
 
 
+InterruptProtect::InterruptProtect()
+{}
+
 InterruptProtect::InterruptProtect(int signum) :
     InterruptProtect(std::vector<int>{signum})
 {}
 
 InterruptProtect::InterruptProtect(const std::vector<int> &sigs){
+    this->enable(sigs);
+}
+
+bool InterruptProtect::signalOccurred()
+{
+    return g_signalOccurred;
+}
+
+
+InterruptProtect::~InterruptProtect()
+{
+    if(! g_withinInterProtect){
+        return;
+    }
+    try {
+        this->disable();
+    }  catch (const std::exception& e) {
+        logCritical << __func__ << e.what();
+    }
+}
+
+void InterruptProtect::enable(const std::vector<int> &sigs)
+{
     if(g_withinInterProtect){
         throw QExcProgramming(QString(__func__) + ": only one instance allowed per thread");
     }
@@ -60,14 +86,11 @@ InterruptProtect::InterruptProtect(const std::vector<int> &sigs){
     }
 }
 
-bool InterruptProtect::signalOccurred()
+void InterruptProtect::disable()
 {
-    return g_signalOccurred;
-}
-
-
-InterruptProtect::~InterruptProtect()
-{    
+    if(! g_withinInterProtect){
+        throw QExcProgramming(QString(__func__) + ": not enabled");
+    }
     // restore previous handlers
     for(int idx=0; idx < int(m_sigs.size()); idx++){
         try {

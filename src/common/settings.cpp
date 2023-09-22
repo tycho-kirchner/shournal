@@ -20,6 +20,7 @@
 #include "cflock.h"
 #include "qfilethrow.h"
 #include "conversions.h"
+#include "safe_file_update.h"
 
 using Section_Ptr = qsimplecfg::Cfg::Section_Ptr;
 using qsimplecfg::ExcCfg;
@@ -542,26 +543,14 @@ void Settings::loadSectHash()
     }
 }
 
-/// @return true if the config file existed and was successfully parsed
-bool Settings::parseCfgIfExists(const QString& cfgPath)
-{
-    QFile cfgFile(cfgPath);
-    if( cfgFile.open(QFile::OpenModeFlag::ReadOnly | QFile::OpenModeFlag::Text)){
-        CFlock cfgFileLock(cfgFile.handle());
-        cfgFileLock.lockShared();
-        m_cfg.parse(cfgFile);
-        return true;
-    }
-    return false;
-}
 
-/// @param cfgVersionFile: the already opened and lock-protected version file (new file-path)
-Settings::ReadVersionReturn Settings::readVersion(QFileThrow &cfgVersionFile)
+Settings::ReadVersionReturn Settings::readVersion(SafeFileUpdate& verUpd8)
 {
     ReadVersionReturn ret;
-    ret.ver = QVersionNumber::fromString(QTextStream(&cfgVersionFile).readLine());
-    ret.verFilePath = cfgVersionFile.fileName();
-    ret.verLoadedFromLegacyPath = false;
+    verUpd8.read([&ret, &verUpd8]{
+        ret.ver = QVersionNumber::fromString(QTextStream(&verUpd8.file()).readLine());
+    });
+    ret.verFilePath = verUpd8.file().fileName();
     if(ret.ver.isNull() ){
         // check legacy version file (migrated...)
         ret.ver = readLegacyConfigFileVersion();
@@ -572,7 +561,6 @@ Settings::ReadVersionReturn Settings::readVersion(QFileThrow &cfgVersionFile)
             ret.ver = app::initialVersion();
         } else {
             ret.verFilePath = legacyCfgVersionFilePath();
-            ret.verLoadedFromLegacyPath = true;
         }
     }
     return ret;
@@ -614,36 +602,36 @@ void Settings::handleUnequalVersions(Settings::ReadVersionReturn &readVerResult)
 
 /// Store the config to disk. Note that this is only done for new versions,
 /// that's why the version file is also updated alongside.
-void Settings::storeCfg(QFileThrow &cfgVersionFile)
+void Settings::storeCfg(SafeFileUpdate &cfgUpd8, SafeFileUpdate &verUpd8)
 {
-    // In between, another process might have already updated the cfg-file
-    // which should do no harm though.
-    // It is the same file object, which was read beforehand, so trunc and seek.
-    cfgVersionFile.resize(0);
-    cfgVersionFile.seek(0);
-    m_cfg.store(cfgFilepath());
-    QTextStream(&cfgVersionFile) << app::version().toString();
-    cfgVersionFile.flush();
+    cfgUpd8.write([this, &cfgUpd8]{
+        m_cfg.store(cfgUpd8.file());
+    });
 
-    QFileInfo legacyVersionInfo(legacyCfgVersionFilePath());
-    if(legacyVersionInfo.exists() && ! legacyVersionInfo.isSymLink()){
-        // atomically create symlink to new cfg version file (using a temporary
-        // symlink and rename/move that):
-        logInfo << qtr("handle legacy config version file: creating symlink to "
-                       "new location...");
-        auto uuid = make_uuid();
-        QByteArray cfgPathBytes = cfgVersionFile.fileName().toLocal8Bit();
-        QByteArray tmpSymlinkLocation = legacyVersionInfo.absoluteDir().filePath(uuid).toLocal8Bit();
-        os::symlink(cfgPathBytes.constData(), tmpSymlinkLocation.constData());
-        os::rename(tmpSymlinkLocation, legacyVersionInfo.absoluteFilePath().toLocal8Bit());
-    }
+    verUpd8.write([&verUpd8, &cfgUpd8]{
+        QTextStream(&verUpd8.file()) << app::version().toString();
+
+        QFileInfo legacyVersionInfo(legacyCfgVersionFilePath());
+        if(legacyVersionInfo.exists() && ! legacyVersionInfo.isSymLink()){
+            // atomically create symlink to new cfg version file (using a temporary
+            // symlink and rename/move that):
+            logInfo << qtr("handle legacy config version file: creating symlink to "
+                           "new location...");
+            auto uuid = make_uuid();
+            QByteArray cfgPathBytes = cfgUpd8.file().fileName().toLocal8Bit();
+            QByteArray tmpSymlinkLocation = legacyVersionInfo.absoluteDir().filePath(uuid).toLocal8Bit();
+            os::symlink(cfgPathBytes.constData(), tmpSymlinkLocation.constData());
+            os::rename(tmpSymlinkLocation, legacyVersionInfo.absoluteFilePath().toLocal8Bit());
+        }
+    });
+
 }
 
 /// Parse or create the configuration file at the system's config path
 /// (please perform QCoreApplication::setApplicationName() before).
 /// Another file at config dir provides the version. If the config file version is greater
 /// than app-version, throw, if smaller, update the version and possibly
-/// the config-file-scheme as well (using an exclusive lock). Scheme updates
+/// the config-file-scheme as well. Scheme updates
 /// for sections work by directly renaming the sections in loadSections() and
 /// by moving the old to new sections in handleUnequalVersions(). Note that
 /// this also works in case of "redundant" scheme updates, where over multiple
@@ -661,18 +649,18 @@ void Settings::load()
         throw QExcIo(qtr("Failed to create configuration directory at %1")
                                  .arg(cfgDir) );
     }
-    QFileThrow cfgVersionFile(cfgDir + "/.config-version");
-    cfgVersionFile.open(QFile::OpenModeFlag::ReadWrite | QFile::OpenModeFlag::Text);
 
-    CFlock cfgVersionLock(cfgVersionFile.handle());
-    cfgVersionLock.lockShared();
+    SafeFileUpdate cfgUpd8(cfgPath);
+    bool cfgFileExisted = cfgUpd8.read([this, &cfgUpd8]{
+        m_cfg.parse(cfgUpd8.file());
+    });
 
-    bool cfgFileExisted = parseCfgIfExists(cfgPath);
+    SafeFileUpdate verUpd8(pathJoinFilename(cfgDir, QString(".config-version")));
     bool cfgVersionNeedsUpdate = false;
     m_parsedCfgVersion = app::version() ;
     if(cfgFileExisted){
         // do we need a version update?
-        auto readVerRet = readVersion(cfgVersionFile);
+        auto readVerRet = readVersion(verUpd8);
         if(readVerRet.ver != app::version()){
             m_parsedCfgVersion = readVerRet.ver;
             cfgVersionNeedsUpdate = true;
@@ -691,8 +679,8 @@ void Settings::load()
         // Only write configuration to disk, if there was no such file
         // or we are running a new version for the first time
         if(! cfgFileExisted || cfgVersionNeedsUpdate){
-            cfgVersionLock.lockExclusive();
-            storeCfg(cfgVersionFile);
+            logDebug << "about to update config at" << cfgPath;
+            storeCfg(cfgUpd8, verUpd8);
         }
     } catch(ExcCfg & ex) {
         ex.setDescrip(ex.descrip() + qtr(". The config file resides at %1").arg(cfgPath));

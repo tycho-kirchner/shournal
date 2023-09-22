@@ -52,6 +52,7 @@ public:
     void parse(const QString& filepath);
     void parse(QFile& file);
     void store(const QString& filepath);
+    void store(QFile& file);
 
     Section_Ptr operator[](const QString &sectName);
 

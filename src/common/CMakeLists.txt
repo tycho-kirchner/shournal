@@ -25,6 +25,7 @@ SET(lib_shournal_common_files
     qfddummydevice
     qfilethrow
     qresource_helper
+    safe_file_update
     settings
     shournal_run_common
     stdiocpp

@@ -13,6 +13,8 @@
 #include "qformattedstream.h"
 #include "cflock.h"
 #include "excos.h"
+#include "os.h"
+#include "interrupt_handler.h"
 
 
 namespace  {
@@ -56,9 +58,8 @@ void writeMultiLineKey(QFormattedStream& stream, const QString& keyname,
 /// text
 /// '''
 /// -> no \n after <text> (but before it there is one).
-/// So it does not matter, wether the closing triple quotes are in the same
+/// So it does not matter, whether the closing triple quotes are in the same
 /// or the next line.
-/// While parsing the file is locked using flock(2).
 /// @throws ExcCfg
 qsimplecfg::Cfg::Cfg() :
     m_allowEraseSections(true)
@@ -69,24 +70,15 @@ void qsimplecfg::Cfg::parse(const QString &filepath)
     createDirsToFilename(filepath);
     QFile file(filepath);
 
-    if(! file.open(QIODevice::OpenModeFlag::ReadWrite | QIODevice::OpenModeFlag::Text)){
+    if(! file.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text)){
         throw ExcCfg(qtr("Failed to open %1 - %2").
                      arg(filepath, file.errorString()));
-    }
-
-    CFlock lock(file.handle());
-    try {
-        lock.lockShared();
-    } catch (const os::ExcOs& e) {
-       throw ExcCfg(qtr("Parse error: failed to obtain lock on %1 : %2").arg(
-                        QFileInfo(file).absoluteFilePath(), e.what()));
     }
     parse(file);
 }
 
 /// @overload
 /// @param file: parse the already for reading opened file (whose offset should typically be zero).
-/// No locking is performed!
 void qsimplecfg::Cfg::parse(QFile &file)
 {
     QTextStream in(&file);
@@ -99,27 +91,21 @@ void qsimplecfg::Cfg::parse(QFile &file)
     }
 }
 
-/// Save config at given filepath, or, if it is empty,
-/// the one where it was loaded from via parse().
-/// Another file in the same directory with _LOCK-extension is locked, before saving.
-/// @throws ExcCfg
 void qsimplecfg::Cfg::store(const QString &filepath)
 {
+    createDirsToFilename(filepath);
     QFile file(filepath);
-
-    createDirsToFilename(file.fileName());
-
     if(! file.open(QIODevice::OpenModeFlag::WriteOnly | QIODevice::OpenModeFlag::Text)){
         throw ExcCfg(qtr("Failed to open %1 - %2").
                      arg(filepath, file.errorString()));
     }
-    CFlock lock(file.handle());
-    try {
-        lock.lockExclusive();
-    } catch (const os::ExcOs& e) {
-       throw ExcCfg(qtr("Store error: failed to obtain lock on %1 : %2").arg(filepath, e.what()));
-    }
+    store(file);
+}
 
+/// Save config at given filepath. **Not** safe against races.
+/// @throws ExcCfg
+void qsimplecfg::Cfg::store(QFile &file)
+{
     QFormattedStream stream(&file);
     stream.setStreamChunkSep('\n');
     unsetStreamCommentMode(stream);
@@ -204,7 +190,7 @@ void qsimplecfg::Cfg::handleParseKeyValue(QStringRef &line, size_t *pLineNumber,
     // mutli line string: keep going through file until the
     // next '''
     size_t startingLine = *pLineNumber;
-    while (!stream->atEnd()) {
+    while (true) {
         if(! readLineInto(*stream, &m_keyValReadBuf)){
             break;
         }
@@ -395,7 +381,7 @@ void qsimplecfg::Cfg::parse(QTextStream *in)
 
     QString lineBuf;
     lineBuf.reserve(8192);
-    while (!in->atEnd()) {
+    while (true) {
         if(! readLineInto(*in, &lineBuf)){
             break;
         }
@@ -405,9 +391,9 @@ void qsimplecfg::Cfg::parse(QTextStream *in)
         currentLine++;
 
         if(line.startsWith('#')){
-            ;  // No point in reading comments.
+            // No point in reading comments.
         } else if(line.isEmpty()){
-            ;
+
         } else if(line.startsWith('[')){
             if(! line.endsWith(']')){
                 throw ExcCfg(qtr("Line %1 - %2: section start [ without closing end ] detected").

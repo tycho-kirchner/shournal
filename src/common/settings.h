@@ -13,6 +13,8 @@
 
 using std::make_shared;
 
+class SafeFileUpdate;
+
 class Settings {
 public:
     typedef std::unordered_set<std::string> StringSet;
@@ -128,7 +130,6 @@ public:
 private:
     struct ReadVersionReturn {
         QVersionNumber ver;
-        bool verLoadedFromLegacyPath{};
         QString verFilePath;
     };
 
@@ -142,10 +143,9 @@ private:
     void loadSectMount();
     void loadSectHash();
 
-    bool parseCfgIfExists(const QString &cfgPath);
-    ReadVersionReturn readVersion(QFileThrow &cfgVersionFile);
+    ReadVersionReturn readVersion(SafeFileUpdate &verUpd8);
     void handleUnequalVersions(ReadVersionReturn& readVerResult);
-    void storeCfg(QFileThrow& cfgVersionFile);
+    void storeCfg(SafeFileUpdate& cfgUpd8, SafeFileUpdate& verUpd8);
     std::shared_ptr<PathTree> loadPaths(qsimplecfg::Cfg::Section_Ptr& section,
               const QString& keyName, bool eraseSubpaths,
               const std::unordered_set<QString> & defaultValues,

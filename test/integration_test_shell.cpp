@@ -13,6 +13,7 @@
 #include "qsimplecfg/cfg.h"
 #include "settings.h"
 #include "database/storedfiles.h"
+#include "safe_file_update.h"
 
 using subprocess::Subprocess;
 using db_controller::QueryColumns;
@@ -234,8 +235,11 @@ private slots:
         qsimplecfg::Cfg cfg;
         writeReadSettingsToCfg(pTmpDir->path(), cfg);
         auto & sets = Settings::instance();
-        auto cfgPath = sets.cfgFilepath();
-        cfg.store(cfgPath);
+        SafeFileUpdate cfgUpd8(sets.cfgFilepath());
+        cfgUpd8.write([&cfg, &cfgUpd8]{
+           cfg.store(cfgUpd8.file());
+        });
+
 
         const QString fname = "foo1";
         const QString fullPath = pTmpDir->path() + '/' + fname;
@@ -274,8 +278,10 @@ private slots:
         writeScriptSettingToCfg(pTmpDir->path(), {"sh"}, cfg);
         writeReadSettingsToCfg(pTmpDir->path(), cfg);
         auto & sets = Settings::instance();
-        auto cfgPath = sets.cfgFilepath();
-        cfg.store(cfgPath);
+        SafeFileUpdate cfgUpd8(sets.cfgFilepath());
+        cfgUpd8.write([&cfg, &cfgUpd8]{
+           cfg.store(cfgUpd8.file());
+        });
 
         const QString fname = "foo1.sh";
         const QString fullPath = pTmpDir->path() + '/' + fname;

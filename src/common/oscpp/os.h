@@ -169,8 +169,9 @@ Str_t readStr(int fd, size_t nbytes, bool retryOnInterrupt=false);
 
 size_t recvmsg (int fd, struct msghdr *message, int flags=0);
 template <class Str_t>
+void remove(const Str_t & path);
+template <class Str_t>
 void rename(const Str_t & old, const Str_t & new_);
-
 void rmdir(const char *path);
 
 size_t sendmsg (int fd, const struct msghdr *message,
@@ -326,6 +327,13 @@ Str_t os::readStr(int fd, size_t nbytes, bool retryOnInterrupt)
     return buf;
 }
 
+/// @throws ExcOs
+template <class Str_t>
+void os::remove(const Str_t & path){
+    if(::remove(strDataAccess(path)) == -1){
+        throw ExcOs("remove failed");
+    }
+}
 
 /// @throws ExcOs
 template <class Str_t>
