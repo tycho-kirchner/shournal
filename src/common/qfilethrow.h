@@ -15,7 +15,8 @@ public:
 
     bool seek(qint64 offset) override;
 
-    qint64 read(char *data, qint64 maxSize);
+    qint64 readData(char *data, qint64 maxlen) override;
+    qint64 readLineData(char *data, qint64 maxlen) override;
+    qint64 writeData(const char *data, qint64 len) override;
 
-    qint64 write(const QByteArray &data, bool throwIfNotAllWritten=true);
 };

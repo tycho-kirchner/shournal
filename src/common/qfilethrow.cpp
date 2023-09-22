@@ -49,9 +49,8 @@ bool QFileThrow::seek(qint64 offset)
     return true;
 }
 
-
-qint64 QFileThrow::read(char *data, qint64 maxSize){
-    auto ret = QFile::read(data, maxSize);
+qint64 QFileThrow::readData(char *data, qint64 maxSize){
+    auto ret = QFile::readData(data, maxSize);
     if(ret == -1){
         throw QExcIo(qtr("Failed to read from file %1: %2")
                      .arg(this->fileName(), this->errorString()));
@@ -59,21 +58,27 @@ qint64 QFileThrow::read(char *data, qint64 maxSize){
     return ret;
 }
 
+qint64 QFileThrow::readLineData(char *data, qint64 maxlen){
+    auto ret = QFile::readLineData(data, maxlen);
+    if(ret == -1){
+        throw QExcIo(qtr("Failed to readLine from file %1: %2")
+                     .arg(this->fileName(), this->errorString()));
+    }
+    return ret;
+}
 
 /// @throws QExcIo
-qint64 QFileThrow::write(const QByteArray &data, bool throwIfNotAllWritten)
+qint64 QFileThrow::writeData(const char *data, qint64 len)
 {
-    auto bytesWritten = QFile::write(data);
+    auto bytesWritten = QFile::writeData(data, len);
     if(bytesWritten == -1){
         throw QExcIo(qtr("Failed to write to file %1: %2")
                      .arg(this->fileName(), this->errorString()));
     }
-    if(throwIfNotAllWritten && bytesWritten != data.size()){
+    if( bytesWritten != len){
         throw QExcIo(qtr("Unexpected written size for file %1 - "
                          "expected %2, actual: %3")
-                     .arg(this->fileName()).arg(data.size()).arg(bytesWritten));
+                     .arg(this->fileName()).arg(len).arg(bytesWritten));
     }
     return bytesWritten;
 }
-
-
