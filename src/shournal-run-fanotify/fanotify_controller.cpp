@@ -190,9 +190,6 @@ void FanotifyController::setupPaths(){
     m_readMountPaths.reserve(allReadPaths.size());
 
     uint64_t writeMask = FAN_CLOSE_WRITE;
-    if(! r_wCfg.onlyClosedWrite){
-        writeMask |= FAN_MODIFY;
-    }
     uint64_t readMask = FAN_CLOSE_NOWRITE;
     uint64_t readWriteMask = readMask | writeMask;
 
@@ -310,9 +307,8 @@ bool FanotifyController::handleEvents()
 
 
 
-void FanotifyController::handleSingleEvent(const struct fanotify_event_metadata& metadata){
-
-    bool modified = metadata.mask & FAN_MODIFY;
+void FanotifyController::handleSingleEvent(
+        const struct fanotify_event_metadata& metadata){
     bool closed_write = metadata.mask & FAN_CLOSE_WRITE;
     bool closed_nowrite = metadata.mask & FAN_CLOSE_NOWRITE;
     if(metadata.mask & FAN_Q_OVERFLOW){
@@ -337,80 +333,9 @@ void FanotifyController::handleSingleEvent(const struct fanotify_event_metadata&
     }
 
 #endif
-    // Ignore further modify events for a filesystem-object (device/inode)
-    // until it is closed.
-    // Note that if only a small amount of data is written to a file,
-    // it can occur that both flags are set: FAN_MODIFY and FAN_CLOSE_WRITE
-    // No need to touch the ignore mask in these cases.
-    if (modified && ! closed_write && ! m_markLimitReached) {
-        if (fanotify_mark(m_fanFd,
-                          FAN_MARK_ADD | FAN_MARK_IGNORED_MASK |
-                             FAN_MARK_IGNORED_SURV_MODIFY,
-                          FAN_MODIFY ,
-                          metadata.fd,
-                          nullptr) == 0){
-            logDebug << "added to ignore mask";
-        } else  {
-            if(errno == ENOSPC){
-                m_markLimitReached = true;
-                logWarning << "fanotify mark-limit reached, "
-                                 "all closed-write events are treated as "
-                                 "modification event.";
-            } else {
-                logWarning << "fanotify_mark add to ignore mask failed for file "
-                           <<os::readlink("/proc/self/fd/" + std::to_string(metadata.fd));
-            }
-
-        }
-    }
     if (closed_write) {
-        // CLOSE_WRITE might also occur, if nothing was written.
-        // However, if the file was modifed (and variable 'modified' is false)
-        // removing the MODIFY from the ignore mask should succeed.
-        if(r_wCfg.onlyClosedWrite || modified){
-            // modifed event and closed_write event have both occurred
-            // ( OR we are interested in every closed-write-event).
-            handleModCloseWrite_safe(metadata);
-
-        } else {
-            // if a modification for that filesystem-object (device/inode)
-            // occurred (in a previous loop), removing the modify event from
-            // the ignore mask should succeed.
-            // Note: the order of fanotify_mark and handleModCloseWrite_safe matters:
-            // if the modification time was determined BEFORE the
-            // inode was removed from the ignore mask, a modification caused by our
-            // childprocess might remain unrecognised.
-            int mark_res = fanotify_mark(m_fanFd,
-                                         FAN_MARK_REMOVE | FAN_MARK_IGNORED_MASK
-                                            | FAN_MARK_IGNORED_SURV_MODIFY,
-                                         FAN_MODIFY,
-                                         metadata.fd,
-                                         nullptr);
-            if(mark_res == 0) {
-                logDebug << "removed from ignore mask";
-                // there should be a free space again:
-                m_markLimitReached = false;
-                handleModCloseWrite_safe(metadata);
-
-            } else if (errno == ENOENT) {
-                // ENOENT is returned, if no MODIFY event in the respective
-                // ignore mask exists. This can e.g. be the case, if
-                // a file was opened in append mode without having written to it.
-                // However, it is also possible that a file (or a hardlink to it)
-                // was openend multiple times. In that case the removal of the fanotify
-                // ignore mask succeeds only on the first close.
-                // If our fanotify ran out of marks, also handle the event:
-                if(m_markLimitReached){
-                    handleModCloseWrite_safe(metadata);
-                }
-            } else {
-                // Otherwise report the error.
-                logWarning << "fanotify_mark remove from ignore mask failed for file "
-                           << os::readlink("/proc/self/fd/" + std::to_string(metadata.fd));
-            }
-        }
-    } // if (closed_write)
-
+        handleModCloseWrite_safe(metadata);
+    }
     if(closed_nowrite){
         handleCloseNoWrite_safe(metadata);
     }
@@ -447,7 +372,8 @@ void FanotifyController::handleCloseNoWrite_safe(const fanotify_event_metadata &
 }
 
 
-void FanotifyController::handleModCloseWrite_safe(const fanotify_event_metadata & metadata){
+void FanotifyController::handleModCloseWrite_safe(
+        const fanotify_event_metadata & metadata){
     try {
         m_feventHandler->handleCloseWrite( metadata.fd );
     } catch (const std::exception & e) {

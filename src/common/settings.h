@@ -37,7 +37,6 @@ public:
         std::shared_ptr<PathTree> includePaths;
         std::shared_ptr<PathTree> includePathsHidden;
         std::shared_ptr<PathTree> excludePaths;
-        bool onlyClosedWrite {true};
         bool excludeHidden {true};
         uint64_t maxEventCount{std::numeric_limits<uint64_t>::max()};
 

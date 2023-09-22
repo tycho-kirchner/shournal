@@ -338,9 +338,6 @@ void Settings::loadSectWrite()
                                     numeric_limits<uint64_t>::max() :
                                     m_wSettings.maxEventCount;
 
-    // maybe_todo: also record write events (not only closewrite)
-    // - make it configurable -> test it...
-    m_wSettings.onlyClosedWrite = true;
 }
 
 void Settings::loadSectRead()
