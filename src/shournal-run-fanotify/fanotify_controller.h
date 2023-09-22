@@ -31,7 +31,7 @@ public:
 private:
 
     void handleSingleEvent(const fanotify_event_metadata &metadata);
-    void handleCloseNoWrite_safe(const fanotify_event_metadata &metadata);
+    void handleCloseRead_safe(const fanotify_event_metadata &metadata);
     void handleModCloseWrite_safe(const fanotify_event_metadata &metadata);
     void unregisterAllReadPaths();
     void ignoreOwnPath(const QByteArray& p);

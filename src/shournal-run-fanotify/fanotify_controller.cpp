@@ -157,8 +157,8 @@ void FanotifyController::setFileEventHandler(std::shared_ptr<FileEventHandler> &
 
 
 /// fanotify_mark all paths of interest, that is all paths
-/// which shall be observed for write-events (file modifications) or read events.
-/// We unshared the mount-namespace before, perform the
+/// which shall be observed for read- or write-events.
+/// We unshared the mount-namespace before, so perform the
 /// mark by using mount-points.
 /// Also collect all mount-points, which are submounts of
 /// a desired path (if / shall be observed, e.g.
@@ -238,7 +238,7 @@ bool FanotifyController::handleEvents()
     while(true) {
         // Read some events
         len = read(m_fanFd, buf, sizeof(buf));
-        if (len == -1 && errno != EAGAIN) {
+        if (unlikely(len == -1 && errno != EAGAIN)) {
             const auto preamble = qtr("read from fanotify file descriptor failed:");
             // maybe_todo: file a bug to the fanotify-devs? According to man 7 fanotify
             // there should be no permission check, when the kernel repoens the file
@@ -280,7 +280,7 @@ bool FanotifyController::handleEvents()
         // Loop over all events in the buffer
         while (FAN_EVENT_OK(metadata, len)) {
             // Check that run-time and compile-time structures match
-            if (metadata->vers != FANOTIFY_METADATA_VERSION) {
+            if (unlikely(metadata->vers != FANOTIFY_METADATA_VERSION)) {
                 logCritical << qtr("Mismatch of fanotify metadata version - runtime: %1, "
                                    "compiletime: %2. "
                                    "No event-processing takes place. "
@@ -292,7 +292,7 @@ bool FanotifyController::handleEvents()
             // metadata->fd contains either FAN_NOFD, indicating a
             // queue overflow, or a file descriptor (a nonnegative
             // integer).
-            if (metadata->fd < 0) {
+            if (unlikely(metadata->fd < 0)) {
                 logWarning << "fanotify: queue overflow";
                 m_overflowCount++;
             } else {
@@ -309,13 +309,10 @@ bool FanotifyController::handleEvents()
 
 void FanotifyController::handleSingleEvent(
         const struct fanotify_event_metadata& metadata){
-    bool closed_write = metadata.mask & FAN_CLOSE_WRITE;
-    bool closed_nowrite = metadata.mask & FAN_CLOSE_NOWRITE;
-    if(metadata.mask & FAN_Q_OVERFLOW){
+    if(unlikely(metadata.mask & FAN_Q_OVERFLOW)){
         logWarning << "fanotify: queue overflow";
         m_overflowCount++;
     }
-
  #ifndef NDEBUG
     {
         auto st = os::fstat(metadata.fd);
@@ -331,31 +328,29 @@ void FanotifyController::handleSingleEvent(
                  << "fd:" << metadata.fd << "uid: " << st.st_uid
                  << " gid: " << st.st_gid;
     }
-
 #endif
-    if (closed_write) {
+    if(metadata.mask & FAN_CLOSE_NOWRITE){
+        handleCloseRead_safe(metadata);
+    }
+    if (metadata.mask & FAN_CLOSE_WRITE) {
         handleModCloseWrite_safe(metadata);
     }
-    if(closed_nowrite){
-        handleCloseNoWrite_safe(metadata);
-    }
-
 }
 
 /// Handle a 'read'-event.
 /// If read 'script' files shall be stored, but not general read files,
 /// unregister from read events, as soon as the specified number of script
 /// files was collected.
-void FanotifyController::handleCloseNoWrite_safe(const fanotify_event_metadata &metadata){
-    if(m_ReadEventsUnregistered){
+void FanotifyController::handleCloseRead_safe(const fanotify_event_metadata &metadata){
+    if(unlikely(m_ReadEventsUnregistered)){
         // Do not edit: even if successfully unregistered,
         // events in the fanotify event-queue may still need to be consumed.
         return;
     }
-    if(! r_rCfg.enable && // never unregister, if general read files are logged
+    if(unlikely(! r_rCfg.enable && // never unregister, if general read files are logged
          r_scriptCfg.enable &&
             m_feventHandler->fileEvents().rStoredFilesCount() >=
-            r_scriptCfg.maxCountOfFiles) {
+            r_scriptCfg.maxCountOfFiles)) {
         unregisterAllReadPaths();
         m_ReadEventsUnregistered = true;
         return;
