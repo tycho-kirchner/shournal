@@ -54,5 +54,8 @@ public:
 class QExcIo : public QExcCommon
 {
 public:
-    using QExcCommon::QExcCommon;
+    explicit QExcIo(QString  text, bool collectStacktrace=true);
+    int errorNumber() const;
+private:
+    int m_errorNumber;
 };

@@ -4,6 +4,7 @@
 
 #include "exccommon.h"
 #include "util.h"
+#include "translation.h"
 
 
 
@@ -68,4 +69,24 @@ QExcProgramming::QExcProgramming(const QString &text) :
     QExcCommon (text)
 {
 
+}
+
+QExcIo::QExcIo(QString text, bool collectStacktrace) :
+    QExcCommon("", false)
+{
+    m_errorNumber = errno;
+    if(errno != 0){
+        text += " (" + QString::number(errno) +
+                "): " + translation::strerror_l(errno);
+    }
+
+    this->setDescrip(text);
+    if(collectStacktrace){
+        appendStacktraceToDescrip();
+    }
+}
+
+int QExcIo::errorNumber() const
+{
+    return m_errorNumber;
 }
