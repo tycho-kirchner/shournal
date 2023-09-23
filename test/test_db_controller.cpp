@@ -251,6 +251,7 @@ private slots:
         QCOMPARE(cmd1Back->value(), cmd1);
         q1.clear();
         q1.addWithAnd(queryCols.wFile_hash, qBytesFromVar(fInfo1.hash().value()) );
+        cmd1Back.reset();
         cmd1Back = queryForCmd(q1);
         QVERIFY(cmd1Back->next());
         sortFileWriteInfos(cmd1Back->value().fileWriteInfos);
@@ -296,7 +297,7 @@ private slots:
         q1.clear();
 
         q1.addWithAnd(queryCols.rFile_size, int(readEvent2->e.size()) );
-
+        cmd1Back.reset();
         cmd1Back = queryForCmd(q1);
         QVERIFY(cmd1Back->next());
         sortFileReadInfos(cmd1Back->value().fileReadInfos);
@@ -510,6 +511,7 @@ private slots:
         // ---------
         q.clear();
         q.addWithAnd(queryCols.cmd_id, 2);
+        cmd.reset();
         cmd = queryForCmd(q);
         QVERIFY(cmd->next());
         QCOMPARE(cmd->value().fileReadInfos.size(),2);
@@ -529,6 +531,7 @@ private slots:
 
         q.clear();
         q.addWithAnd(queryCols.cmd_id, 3);
+        cmd.reset();
         cmd = queryForCmd(q);
         QVERIFY(cmd->next());
         QCOMPARE(cmd->value().fileWriteInfos.size(),2);
@@ -545,6 +548,7 @@ private slots:
         // ---------
         q.clear();
         q.addWithAnd(queryCols.cmd_id, 4);
+        cmd.reset();
         cmd = queryForCmd(q);
         QVERIFY(cmd->next());
         QCOMPARE(cmd->value().fileReadInfos.size(),2);
