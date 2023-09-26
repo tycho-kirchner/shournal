@@ -3,11 +3,14 @@
 #include <QHash>
 #include <cassert>
 
+#include "logger.h"
+#include "osutil.h"
 #include "qsqlquerythrow.h"
 
 #include "qexcdatabase.h"
 #include "util.h"
 
+enum SQLITE_ERR { SQLITE_ERR_BUSY= 5 };
 
 //
 // QSqlQueryThrow::QSqlQueryThrow(QSqlResult *r)
@@ -60,18 +63,12 @@ QSqlQueryThrow::~QSqlQueryThrow()
 
 void QSqlQueryThrow::exec()
 {
-    if(! QSqlQuery::exec()){
-        throw QExcDatabase(generateExcMsgExec(this->lastQuery()), this->lastError());
-    }
-    m_execWasCalled = true;
+    this->_doExec(QString());
 }
 
 void QSqlQueryThrow::exec(const QString &query)
 {
-    if(! QSqlQuery::exec(query)){
-        throw QExcDatabase(generateExcMsgExec(query), this->lastError());
-    }
-    m_execWasCalled = true;
+    this->_doExec(query);
 }
 
 void QSqlQueryThrow::prepare(const QString &query)
@@ -175,6 +172,27 @@ QString QSqlQueryThrow::generateExcMsgExec(const QString &queryStr)
 
     QString msg = "exec <" + queryStr + ">" + valStr + " failed";
     return msg;
+}
+
+void QSqlQueryThrow::_doExec(const QString &query)
+{
+    for(int i=0; i<10; i++){
+        bool success = query.isEmpty() ? QSqlQuery::exec() : QSqlQuery::exec(query);
+        if(success){
+            m_execWasCalled = true;
+            return;
+        }
+        if(this->lastError().number() == SQLITE_ERR_BUSY){
+            logInfo << "Sqlquery failed with busy timeout. trying again in a "
+                       "few seconds:" << (query.isEmpty()?this->lastQuery():query) ;
+            osutil::randomSleep(5 *1000, 20 *1000);
+        } else {
+            // throw immediatly (below)
+            break;
+        }
+    }
+    throw QExcDatabase(generateExcMsgExec(query.isEmpty()?this->lastQuery():query),
+                       this->lastError());
 }
 
 const QString &QSqlQueryThrow::insertIgnorePreamble() const

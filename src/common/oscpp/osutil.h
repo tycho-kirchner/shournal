@@ -39,6 +39,7 @@ std::string parseGenericKeyValFile(int dirFd,
                                    const std::string &key);
 void printOpenFds(bool onlyRegular=false);
 
+void randomSleep(int msMin, int msMax);
 
 QByteArray readWholeFile(int fd, int bufSize);
 int retrieveFdFlags(int fd);

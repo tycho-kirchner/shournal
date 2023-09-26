@@ -19,7 +19,9 @@
 #include <sstream>
 #include <fcntl.h>
 #include <ext/stdio_filebuf.h>
-
+#include <thread>
+#include <random>
+#include <chrono>
 
 #include "osutil.h"
 #include "os.h"
@@ -239,6 +241,13 @@ void osutil::printOpenFds(bool onlyRegular)
         auto resolvedPath = os::readlink<QByteArray>(fdPath);
         QIErr() << fd << ": " << resolvedPath;
     }
+}
+
+void osutil::randomSleep(int msMin, int msMax)
+{
+    std::mt19937_64 eng{std::random_device{}()};
+    std::uniform_int_distribution<> dist{msMin, msMax};
+    std::this_thread::sleep_for(std::chrono::milliseconds{dist(eng)});
 }
 
 /// For most efficient usage assign a bufsize a little larger than the (probable)

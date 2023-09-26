@@ -40,6 +40,7 @@ public:
 
 private:
     QString generateExcMsgExec(const QString& queryStr);
+    void _doExec(const QString& query);
     QString m_insertIgnorePreamble;
     bool m_execWasCalled;
     bool m_withinTransaction;
