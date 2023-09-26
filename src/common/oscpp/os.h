@@ -64,6 +64,9 @@ const std::vector<int> &catchableTermSignals();
 
 void chdir(const char *path);
 void chdir(const std::string& path);
+template <class Str_t>
+void chmod(const Str_t& path, mode_t mode);
+
 void close(int fd);
 
 void *dlsym (void *handle, const char *symbol);
@@ -231,6 +234,14 @@ KernelVersion getKernelVersion();
 
 } // namespace os
 
+template <class Str_t>
+void os::chmod(const Str_t& path, mode_t mode){
+    if(::chmod(strDataAccess(path), mode) == -1){
+        throw ExcOs("chmod failed");
+    }
+}
+
+
 template <class ContainerT>
 void os::exec(const ContainerT &args, char * const envp[])
 {
@@ -359,7 +370,7 @@ template <class Str_t>
 off_t os::sendfile(const Str_t& out_path, const Str_t& in_path, size_t count){
     int out_fd=-1, in_fd=-1;
     try {
-        out_fd = os::open<Str_t>(out_path, os::OPEN_WRONLY);
+        out_fd = os::open<Str_t>(out_path, os::OPEN_WRONLY | os::OPEN_CREAT);
         in_fd = os::open<Str_t>(in_path, os::OPEN_RDONLY);
         auto ret = os::sendfile(out_fd, in_fd, count);
         close(out_fd);

@@ -38,7 +38,7 @@ see [Overhead](#overhead).
 After installation and easy setup of the
 [shell-integration](./README-shell-integration.md) the following questions
 may be answered within seconds:
-* What files were modified or read by a command? Or reverse: What shell-commands
+* What files were modified, read or executed by a command? Or reverse: What shell-commands
   were used to create/modify or read from a certain file?
 * You executed a script. What was the script-content by the time it was called?
 * The command read a config-file - which one, and what was in it?

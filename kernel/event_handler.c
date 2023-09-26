@@ -361,7 +361,6 @@ void event_handler_fput(unsigned long ip __attribute__ ((unused)),
     if (file->f_mode & FMODE_NONOTIFY ||
         // maybe_todo: check file_inode(file) == NULL ifndef FMODE_OPENED
         !S_ISREG(file_inode(file)->i_mode)
-        || unlikely(file->f_flags & FMODE_EXEC)
                      )
         return;
 

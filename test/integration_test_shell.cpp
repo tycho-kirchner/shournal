@@ -245,7 +245,7 @@ private slots:
         const QString fullPath = pTmpDir->path() + '/' + fname;
 
         QFileThrow(fullPath).open(QFile::WriteOnly);
-        const QString cmdTxt = "cat " + fullPath;
+        QString cmdTxt = "cat " + fullPath;
         executeCmdInbservedShell(cmdTxt, setupCmd);
 
         SqlQuery query;
@@ -260,12 +260,43 @@ private slots:
         auto cmdInfo = cmdIter->value();
         QCOMPARE(cmdInfo.text, cmdTxt);
         QCOMPARE(cmdInfo.fileReadInfos.size(), 1);
-        const auto& fReadInfo = cmdInfo.fileReadInfos.first();
+        auto fReadInfo = cmdInfo.fileReadInfos.first();
         QCOMPARE(fReadInfo.name, fname);
         QCOMPARE(fReadInfo.path, pTmpDir->path());
         QCOMPARE(fReadInfo.isStoredToDisk, false);
 
         QVERIFY(! cmdIter->next());
+        cmdIter.reset();
+
+        // Test exec (collected as read files). Copy system echo-binary to out tmppath
+        auto echoPath = QStandardPaths::findExecutable("echo").toLocal8Bit();
+        QVERIFY(! echoPath.isEmpty());
+        auto echoInTmp = pathJoinFilename(pTmpDir->path().toLocal8Bit(),
+                                          QByteArray("echo"));
+        os::sendfile(echoInTmp, echoPath, os::stat(echoPath).st_size);
+        os::chmod(echoInTmp, 0755);
+
+        // Check if called binaries are tracked when directly called or indirectly, via
+        // env.
+        for(QString cmdTxt : QStringList{echoInTmp + " exec_trace_test",
+                                         "env " + echoInTmp + " exec_trace_test"}){
+            executeCmdInbservedShell(cmdTxt, setupCmd);
+            query.clear();
+            query.addWithAnd(cols.cmd_txt, cmdTxt);
+
+            // Have to explicitly free cmdIter at loop-end to avoid database locks.
+            // On first loop, the transaction of cmdIter may still be active, so
+            // the database would be locked, when we execute the next command in
+            // the shell (!).
+            auto cmdIter = db_controller::queryForCmd(query);
+            QVERIFY(cmdIter->next());
+            cmdInfo = cmdIter->value();
+            QCOMPARE(cmdInfo.text, cmdTxt);
+            QCOMPARE(cmdInfo.fileReadInfos.size(), 1);
+            fReadInfo = cmdInfo.fileReadInfos.first();
+            QCOMPARE(fReadInfo.name, QString("echo"));
+            QCOMPARE(fReadInfo.path, pTmpDir->path());
+        }
     }
 
 

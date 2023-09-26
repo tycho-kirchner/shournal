@@ -346,7 +346,7 @@ void Settings::loadSectRead()
 
     sectReadEvents->setComments(qtr(
                                    "Configure, which paths shall be observed for "
-                                   "*read*-events. Put each desired path into "
+                                   "read- or exec-events. Put each desired path into "
                                    "a separate line. "
                                    "Per default read file-events are only logged, "
                                    "if you have *also* write permission (assuming other "
