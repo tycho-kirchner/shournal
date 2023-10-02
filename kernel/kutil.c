@@ -253,10 +253,8 @@ void kutil_kthread_exit(struct completion *comp, long code){
         complete_and_exit(comp, code);
     else if(kthread_complete_and_exit)
         kthread_complete_and_exit(comp, code);
-    else {
-        pr_err("cannot stop kernel thread. Please unload this module "
-               "immediatly and report this fatal bug.");
-    }
+    pr_err("Failed to stop kernel thread. Please unload this module "
+           "immediatly and report this fatal bug.");
 }
 
 
