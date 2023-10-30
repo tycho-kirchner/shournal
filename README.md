@@ -59,7 +59,8 @@ an observed shell-command-series can be directly transformed into rules for
 the [*Snakemake workflow engine*](https://github.com/snakemake/snakemake),
 a tool to *create reproducible and scalable data analyses*.
 
-*shournal* runs only on GNU/Linux.
+*shournal* runs on GNU/Linux or Microsoft Windows via
+the Windows Subsystem for Linux (WSL) using its *fanotify* edition.
 
  *For a more formal introduction please also check out our preprint
 [Bashing irreproducibility with
