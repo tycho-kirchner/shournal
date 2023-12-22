@@ -21,12 +21,8 @@
   Ubuntu:
   ~~~
   apt-get install g++ cmake make qtbase5-dev libqt5sql5-sqlite \
-   uuid-dev libcap-dev uuid-runtime linux-headers-generic dkms
-  ~~~
-  Ubuntu HWE:
-  ~~~
-  apt-get install g++ cmake make qtbase5-dev libqt5sql5-sqlite \
-   uuid-dev libcap-dev uuid-runtime linux-headers-generic-hwe-$(lsb_release -rs) dkms
+   uuid-dev libcap-dev uuid-runtime dkms \
+   linux-headers-generic # or linux-headers-generic-hwe-$(lsb_release -rs) on HWE
   ~~~
   Opensuse:
   ~~~
