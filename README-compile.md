@@ -24,6 +24,11 @@
   apt-get install g++ cmake make qtbase5-dev libqt5sql5-sqlite \
    uuid-dev libcap-dev uuid-runtime linux-headers-generic dkms
   ~~~
+  Ubuntu 20.04 HWE:
+  ~~~
+  apt-get install g++ cmake make qtbase5-dev libqt5sql5-sqlite \
+   uuid-dev libcap-dev uuid-runtime linux-headers-generic-hwe-20.04 dkms
+  ~~~
   Opensuse:
   ~~~
   zypper install gcc-c++ cmake make libqt5-qtbase-devel \
