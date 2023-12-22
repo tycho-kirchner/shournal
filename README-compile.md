@@ -16,8 +16,7 @@
   Debian:
   ~~~
   apt-get install g++ cmake make qtbase5-dev libqt5sql5-sqlite \
-   uuid-dev libcap-dev uuid-runtime linux-headers-$(uname -r) dkms
-
+   uuid-dev libcap-dev uuid-runtime linux-headers-$(dpkg --print-architecture) dkms
   ~~~
   Ubuntu:
   ~~~
