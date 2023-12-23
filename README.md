@@ -148,9 +148,14 @@ want to install *shournal* on a real host (or virtual machine) and
 *shournal-fanotify* does not contain the kernel backend and
 is targeted at institutions where the usage of *out-of-tree kernel-modules*
 is discouraged. <br>
-Only LTS-releases are officially supported, the packages are known to work on
-Debian 10 (Buster), Debian 11 (Bullseye), Ubuntu 18.04 (Bionic), Ubuntu 20.04 (Focal)
-and Ubuntu 22.04 (Jammy Jellyfish).
+Only LTS-releases are officially supported, the packages are known to work
+from Debian 10 (Buster) and Ubuntu 18.04 (Bionic) onwards.
+Before installing *shournal* including its kernel backend, make
+sure, the kernel headers are installed: <br>
+**Ubuntu**: `apt install linux-headers-generic` <br>
+**Ubuntu** with [HWE](https://askubuntu.com/questions/248914/what-is-hardware-enablement-hwe):
+`apt install linux-headers-generic-hwe-$(lsb_release -rs)` <br>
+**Debian**: `apt install linux-headers-$(dpkg --print-architecture)` <br>
 Install deb-packages as usual, e.g. <br>
 `sudo apt install ./shournal_2.2_amd64.deb` <br>
 To enable the shell-integration:
