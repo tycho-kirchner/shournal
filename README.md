@@ -62,10 +62,11 @@ a tool to *create reproducible and scalable data analyses*.
 *shournal* runs on GNU/Linux or Microsoft Windows via
 the Windows Subsystem for Linux (WSL) using its *fanotify* edition.
 
- *For a more formal introduction please also check out our preprint
-[Bashing irreproducibility with
-shournal](https://doi.org/10.1101/2020.08.03.232843)
-on bioRxiv.*
+For a more formal description please also check out our paper <br>
+Kirchner, T., Riege, K. & Hoffmann, S. *Bashing irreproducibility with shournal*.
+Sci Rep 14, 4872 (2024). https://doi.org/10.1038/s41598-024-53811-9
+
+<br>
 
 ![Example session animation](images/shournal-example-session.gif)
 
