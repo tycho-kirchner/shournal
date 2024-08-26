@@ -28,7 +28,7 @@ struct dentry;
 
 
 struct event_target {
-    atomic_t _f_count; /* refcount - do not edit */
+    refcount_t _f_count; /* refcount - do not edit */
 
     bool w_enable; /* record write events */
     bool r_enable; /* record read events */
@@ -78,41 +78,37 @@ struct event_target {
 
     char file_init_path[PATH_MAX];
 
+    struct rcu_work destroy_rwork;
     int __dbg_flags;
 };
 
-struct event_target* event_target_get_existing(const struct shournalk_mark_struct*);
-struct event_target* event_target_get_or_create(const struct shournalk_mark_struct*);
+struct event_target* event_target_create(const struct shournalk_mark_struct*);
 long event_target_commit(struct event_target*);
 bool event_target_is_commited(const struct event_target*);
 
 
-static inline struct event_target*
+static inline __attribute__((__warn_unused_result__))
+struct event_target*
 event_target_get(struct event_target* event){
-    atomic_inc(&event->_f_count);
-    return event;
+    if(likely(refcount_inc_not_zero(&event->_f_count))){
+        return event;
+    }
+    return NULL;
 }
 
 void __event_target_put(struct event_target* event_target);
 
 static inline void
 event_target_put(struct event_target* event_target){
-    long refcount;
-    refcount = atomic_dec_return(&event_target->_f_count);
-    // pr_devel("refount is now: %ld\n", refcount);
-    if(likely(refcount) > 0){
-        return;
-    }
-    if(refcount == 0){
+#ifdef DEBUG
+    might_sleep();
+#endif
+
+    if(unlikely( refcount_dec_and_test(&event_target->_f_count) )){
         __event_target_put(event_target);
-        return;
     }
-    // refcount < 0!
-    kutil_WARN_ONCE_IFN_DBG(1, "event_target_put: refcount < 0");
 }
 
 
 void event_target_write_result_to_user_ONCE(struct event_target*, long error_nb);
-
-size_t event_target_compute_count(void);
 

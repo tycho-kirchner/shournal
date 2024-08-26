@@ -214,7 +214,7 @@ static long __handle_pid_add(struct shournalk_mark_struct* mark_struct){
         return -EINVAL;
     }
 
-    event_target = event_target_get_or_create(mark_struct);
+    event_target = event_target_create(mark_struct);
     if(IS_ERR(event_target)){
         return PTR_ERR(event_target);
     }
@@ -310,15 +310,15 @@ static long __handle_mark_add(struct shournalk_mark_struct mark_struct){
     }
 
     // for all other add-actions an existing event target is required
-    t = event_target_get_existing(&mark_struct);
-    if(IS_ERR(t)){
+    t = get_event_target_from_pid((pid_t)mark_struct.pid);
+    if(unlikely(IS_ERR(t))){
         return PTR_ERR(t);
     }
 
     // locking applies to not committed targets only, so it is
     // no problem to lock (a bit) early
     mutex_lock(&t->lock);
-    if(event_target_is_commited(t)){
+    if(unlikely(event_target_is_commited(t))){
         pr_debug("invalid action %d - "
                  "event-target is already committed", mark_struct.action);
         ret = -EBUSY;
@@ -365,11 +365,18 @@ static long __handle_mark_remove(struct shournalk_mark_struct mark_struct){
 static long __handle_commit(struct shournalk_mark_struct mark_struct){
     long ret = 0;
     struct event_target* event_target;
-    if( IS_ERR(event_target = event_target_get_existing(&mark_struct))) {
+    event_target = get_event_target_from_pid((pid_t)mark_struct.pid);
+    if(unlikely(IS_ERR(event_target))) {
         return PTR_ERR(event_target);
     }
     mutex_lock(&event_target->lock);
-    ret = event_target_commit(event_target);
+    if(likely(! event_target_is_commited(event_target))){
+         ret = event_target_commit(event_target);
+    } else {
+        pr_debug("__handle_commit: - "
+                 "event-target is already committed");
+        ret = -EBUSY;
+    }
     mutex_unlock(&event_target->lock);
 
     event_target_put(event_target);

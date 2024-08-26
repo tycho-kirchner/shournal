@@ -67,13 +67,14 @@ __find_task_entry(struct task_struct* task,
 
 
 /// find and get a reference from task table under rcu_lock
-static inline struct event_target*
+static inline __attribute__((__warn_unused_result__))
+struct event_target*
 __find_get_event_target_safe(struct task_struct* task){
     struct task_entry* el;
     struct event_target* event_target;
     u32 t_hash;
     t_hash = __task_hash(task);
-    rcu_read_lock();   
+    rcu_read_lock();
     if((el = __find_task_entry(task, t_hash)) == NULL){
         rcu_read_unlock();
         return NULL;
@@ -176,7 +177,7 @@ out_unlock:
 static bool
 __remove_task_from_table_safe(struct task_struct *task, bool in_exit){
     struct task_entry* el;
-    bool enqueued = false;
+    bool removed = false;
     u32 t_hash;
 
     t_hash = __task_hash(task);
@@ -194,15 +195,14 @@ __remove_task_from_table_safe(struct task_struct *task, bool in_exit){
         }
         // free later
         queue_rcu_work(del_taskentries_wq, &el->destroy_rwork);
-        enqueued = true; // do not "enqueued = queue_rcu_work()", we do not care, if
-                         // done now or later.
+        removed = true;
         // pr_devel("stop observing pid %d, init event path %s, caller %d\n",
         //           task->pid, el->event_target->file_init_path,
         //           el->event_target->caller_pid);
     }
     rcu_read_unlock();
 
-    return enqueued;
+    return removed;
 }
 
 
@@ -295,6 +295,22 @@ void event_handler_destructor(void)
     kmem_cache_destroy(__task_entry_cache);
 }
 
+struct event_target*
+get_event_target_from_pid(pid_t pid){
+    struct task_struct* task;
+    struct event_target* event_target;
+    task = __get_task_if_allowed(pid);
+    if(IS_ERR(task)){
+        return (struct event_target*)task;
+    }
+    event_target = __find_get_event_target_safe(task);
+    if(unlikely(event_target == NULL)){
+        event_target = ERR_PTR(-ENXIO);
+    }
+    put_task_struct(task);
+    return event_target;
+}
+
 /// Register param event_target as target for file events for the
 /// given pid. The respective task must be running and
 /// the caller must have the necessary capabilities. If the process is
@@ -312,7 +328,16 @@ long event_handler_add_pid(struct event_target* event_target, pid_t pid,
         return PTR_ERR(task);
     }
     ret = __insert_task_into_table_safe(task, event_target, true);
-    if(collect_exitcode && ret == 0){
+
+    // We may have been asked to trace a task which is just about to exit and there is a
+    // small timeslot, where the task is still there but has already called our traced
+    // function cgroup_exit. Is this case, we have just created a stale event_target
+    // reference. Look at kernel/exit.c::do_exit. do_exit sets the PF_EXITING flag before
+    // calling cgroup_exit, so below code is fine.
+    if (unlikely(READ_ONCE(task->flags) & PF_EXITING)) {
+        pr_debug("just marked an exiting task. Removing it again");
+        __remove_task_from_table_safe(task, false);
+    } else if(collect_exitcode && ret == 0){
         WRITE_ONCE(event_target->exit_tsk, task);
     }
 

@@ -20,35 +20,6 @@
 #include "xxhash_shournalk.h"
 
 
-DEFINE_HASHTABLE(static event_dest_table, 12);
-
-
-static DEFINE_MUTEX(event_table_mutex);
-
-struct table_entry {
-     struct event_target* event_target;
-     struct hlist_node node ;
-};
-
-
-static inline u32 __file_hash(struct file* pipe_w) {
-    return (u32)(long)pipe_w;
-}
-
-static struct table_entry* __find_event_entry_if_exist(struct file* file){
-    struct table_entry* el;
-    u32 file_hash;
-
-    file_hash = __file_hash(file);
-    hash_for_each_possible(event_dest_table, el, node, file_hash) {
-        if(el->event_target->file->__file == file){
-            return el;
-        }
-    }
-    return NULL;
-}
-
-
 static struct file* __get_check_target_file(int fd){
     struct file* file;
     int error_nb = 0;
@@ -223,7 +194,7 @@ __event_target_create(struct file* target_file, struct file* pipe_w,
     atomic_set(&t->_written_to_user_pipe, 0);
     t->ERROR = false;
 
-    atomic_set(&t->_f_count, 0);
+    refcount_set(&t->_f_count, 1);
     t->cred = current_cred();
     t->lost_event_count = 0;
     t->stored_files_count = 0;
@@ -291,6 +262,16 @@ static void __event_target_free(struct event_target* t){
     kvfree(t);
 }
 
+static void __envent_target_destroy_work(struct work_struct *work){
+    struct event_target* t = container_of(to_rcu_work(work),
+                    struct event_target, destroy_rwork);
+    __event_target_free(t);
+}
+
+
+
+////////////////////////////// public ////////////////////////////////////
+
 
 // TODO: limit listeners per user to 128, like fanotify does.
 /// event_target's are found by the struct file
@@ -300,46 +281,19 @@ static void __event_target_free(struct event_target* t){
 /// (and store it in the hash-table). Once all processes finished
 /// (or were unmarked again), notify userspace by writing into
 /// the passed pipe.
-static struct event_target*
-__event_target_get_or_create(const struct shournalk_mark_struct * mark_struct, bool must_exist)
+struct event_target*
+event_target_create(const struct shournalk_mark_struct * mark_struct)
 {
-    struct table_entry* el = NULL;
     struct event_target* event_target = NULL;
     struct file* target_file = NULL;
     struct file* pipe_w = NULL;
     long error = -ENOSYS;
-    u32 file_hash;
 
     target_file = __get_check_target_file(mark_struct->target_fd);
     if(IS_ERR(target_file)){
         return (void*)target_file;
     }
 
-    mutex_lock(&event_table_mutex);
-
-    el = __find_event_entry_if_exist(target_file);
-    if(el != NULL){
-        // A known event_target
-        event_target = event_target_get(el->event_target);
-        mutex_unlock(&event_table_mutex);
-        // pr_devel("Target exists. Putting...\n");
-        //  We need only one target_file reference, so put.
-        fput(target_file);
-        return event_target;
-    }
-
-    if(must_exist){
-        error = -ENXIO;
-        goto err_put_unlock;
-    }
-
-    // allocate new event target
-
-    el = kmalloc((sizeof(struct table_entry)), SHOURNALK_GFP);
-    if(!el){
-        error = -ENOMEM;
-        goto err_put_unlock;
-    }
     pipe_w = __get_check_pipe(mark_struct->pipe_fd);
     if(IS_ERR(pipe_w)){
         error = PTR_ERR(pipe_w);
@@ -350,25 +304,15 @@ __event_target_get_or_create(const struct shournalk_mark_struct * mark_struct, b
         error = PTR_ERR(event_target);
         goto err_put_unlock;
     }
-    atomic_set(&event_target->_f_count, 1);
 
     // maybe_todo: add caller-pid to threadname?
     if((error = event_consumer_thread_create(event_target, "shournalk_consumer"))){
         goto err_put_unlock;
     }
 
-    // do not fail from here on
-    el->event_target = event_target;
-    // only add on success - we unlock the table early in err_put_unlock
-    file_hash = __file_hash(target_file);
-    hash_add(event_dest_table, &el->node, file_hash);
-
-    mutex_unlock(&event_table_mutex);
-
-    return event_target;       
+    return event_target;
 
 err_put_unlock:
-    mutex_unlock(&event_table_mutex);
     if(! IS_ERR_OR_NULL(event_target)){
         // ownership of pipe and target_file already transferred
         __event_target_free(event_target);
@@ -376,20 +320,9 @@ err_put_unlock:
         if(! IS_ERR_OR_NULL(pipe_w)) fput(pipe_w);
         if(! IS_ERR_OR_NULL(target_file)) fput(target_file);
     }
-    if(el != NULL) kfree(el);
     return ERR_PTR(error);
 }
 
-////////////////////////////// public ////////////////////////////////////
-
-
-struct event_target* event_target_get_existing(const struct shournalk_mark_struct * mark_struct){
-    return __event_target_get_or_create(mark_struct, true);
-}
-
-struct event_target* event_target_get_or_create(const struct shournalk_mark_struct * mark_struct){
-    return __event_target_get_or_create(mark_struct, false);
-}
 
 // no events are registered before target is commited
 long event_target_commit(struct event_target* t){
@@ -419,9 +352,8 @@ bool event_target_is_commited(const struct event_target* t){
 }
 
 
-/// Final put - refcount should usually be zero
+/// Final put
 void __event_target_put(struct event_target* event_target){
-    struct table_entry* el;
     long user_ret;
     int pending_bytes;
     struct event_consumer* consumer = &event_target->event_consumer;
@@ -429,24 +361,6 @@ void __event_target_put(struct event_target* event_target){
     bool we_are_consume_thread;
 
     might_sleep();
-
-    mutex_lock(&event_table_mutex);
-    // Now, that we are locked, check again, if another task did not
-    // get a ref in between.
-    if(atomic_read(&event_target->_f_count) > 0){
-        mutex_unlock(&event_table_mutex);
-        return;
-    }
-
-    el = __find_event_entry_if_exist(event_target->file->__file);
-    if(unlikely(el == NULL)){
-        mutex_unlock(&event_table_mutex);
-        WARN(1, "event_target does not exist in table. Memory leak?!");
-        return;
-    }
-    hash_del(&el->node);
-    mutex_unlock(&event_table_mutex);
-    kfree(el);
 
 #ifdef DEBUG
     if(event_target->__dbg_flags){
@@ -488,7 +402,13 @@ void __event_target_put(struct event_target* event_target){
     // pr_info("dircache-hits: %lld, pathwrite_hits: %lld\n", event_target->_dircache_hits,
     //             event_target->_pathwrite_hits);
 
-    __event_target_free(event_target);
+    if(current_work() == NULL){
+        INIT_RCU_WORK(&event_target->destroy_rwork, __envent_target_destroy_work);
+        // system_long_wq is flushed in event_handler_destructor, so do not change!
+        queue_rcu_work(system_long_wq, &event_target->destroy_rwork);
+    } else {
+        __event_target_free(event_target);
+    }
 
     if(we_are_consume_thread){
         // we just released the final reference - that's it.
@@ -521,19 +441,4 @@ void event_target_write_result_to_user_ONCE(struct event_target* event_target, l
         pr_debug("Failed to write to user pipe - returned: %ld", write_ret);
     }
 }
-
-
-/// Debug function
-size_t event_target_compute_count(void){
-    struct table_entry* el;
-    u32 bucket;
-    size_t count = 0;
-    mutex_lock(&event_table_mutex);
-    hash_for_each(event_dest_table, bucket, el, node) {
-        count++;
-    }
-    mutex_unlock(&event_table_mutex);
-    return count;
-}
-
 

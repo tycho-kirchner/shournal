@@ -50,27 +50,11 @@ error1:
 
 static void __exit shournalk_exit(void)
 {
-    size_t target_count;
-
     // Be very careful about the order here.
     shournalk_sysfs_destructor();    
     tracepoint_helper_destructor();
     event_handler_destructor();
     shournalk_global_destructor();
-
-    target_count = event_target_compute_count();
-
-    if(target_count != 0){
-        // We should never get here.
-        pr_warn("event_target count not 0 but %ld\n", target_count);
-        msleep(500);
-        target_count = event_target_compute_count();
-        if(target_count != 0){
-            pr_warn("event_target count *still* not 0 but %ld\n", target_count);
-        }
-        // maybe_todo: __event_target_put. But this will likely
-        // not be enough.
-    }
 }
 
 module_init(shournalk_init)
