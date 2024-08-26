@@ -194,7 +194,7 @@ __event_target_create(struct file* target_file, struct file* pipe_w,
     atomic_set(&t->_written_to_user_pipe, 0);
     t->ERROR = false;
 
-    refcount_set(&t->_f_count, 1);
+    kuref_set(&t->_f_count, 1);
     t->cred = current_cred();
     t->lost_event_count = 0;
     t->stored_files_count = 0;

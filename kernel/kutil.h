@@ -240,4 +240,22 @@ kutil_inode_permission(struct user_namespace *user_ns, struct inode * inode, int
 
 }
 
+// see f405df5de3170c00e5c54f8b7cf4766044a032ba
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
+
+#define kuref_t             atomic_t
+#define kuref_sub_and_test  atomic_sub_and_test
+#define kuref_set           atomic_set
+#define kuref_inc_not_zero  atomic_inc_not_zero
+#define kuref_dec_and_test  atomic_dec_and_test
+
+#else
+
+#define kuref_t             refcount_t
+#define kuref_sub_and_test  refcount_sub_and_test
+#define kuref_set           refcount_set
+#define kuref_inc_not_zero  refcount_inc_not_zero
+#define kuref_dec_and_test  refcount_dec_and_test
+
+#endif
 

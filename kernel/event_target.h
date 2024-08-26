@@ -28,7 +28,7 @@ struct dentry;
 
 
 struct event_target {
-    refcount_t _f_count; /* refcount - do not edit */
+    kuref_t _f_count; /* refcount - do not edit */
 
     bool w_enable; /* record write events */
     bool r_enable; /* record read events */
@@ -90,7 +90,7 @@ bool event_target_is_commited(const struct event_target*);
 static inline __attribute__((__warn_unused_result__))
 struct event_target*
 event_target_get(struct event_target* event){
-    if(likely(refcount_inc_not_zero(&event->_f_count))){
+    if(likely(kuref_inc_not_zero(&event->_f_count))){
         return event;
     }
     return NULL;
@@ -104,7 +104,7 @@ event_target_put(struct event_target* event_target){
     might_sleep();
 #endif
 
-    if(unlikely( refcount_dec_and_test(&event_target->_f_count) )){
+    if(unlikely( kuref_dec_and_test(&event_target->_f_count) )){
         __event_target_put(event_target);
     }
 }

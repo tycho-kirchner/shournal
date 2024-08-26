@@ -61,7 +61,7 @@ __consume_close_events(struct event_target* event_target){
         // bulk refcount-decrement..
         int event_count = bytes_total/sizeof(struct close_event);
         event_target->consumed_event_count += event_count;
-        if(refcount_sub_and_test(event_count, &event_target->_f_count)){
+        if(kuref_sub_and_test(event_count, &event_target->_f_count)){
             __event_target_put(event_target);
         }
     }
