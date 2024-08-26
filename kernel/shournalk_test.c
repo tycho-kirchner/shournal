@@ -95,7 +95,7 @@ test_err_out:
     return false;
 }
 
-bool test_hash_table_str(void){
+static bool test_hash_table_str(void){
     struct hash_entry_str* orig_e = NULL;
     struct hash_entry_str* back_e = NULL;
     const char* str1 = "foobar";
