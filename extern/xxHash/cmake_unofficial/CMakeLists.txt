@@ -30,7 +30,7 @@ else()
     LANGUAGES C)
 endif()
 
-cmake_minimum_required (VERSION 2.8.12)
+cmake_minimum_required (VERSION 3.6)
 
 # If XXHASH is being bundled in another project, we don't want to
 # install anything.  However, we want to let people override this, so
