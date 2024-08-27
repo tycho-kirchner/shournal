@@ -1,17 +1,12 @@
 
 
-SET(oscpp_files
-    cflock
-    excos
-    fdentries
-    os
-    osutil
-    oscaps
-
-    )
-
 add_library(oscpp_lib
-    ${oscpp_files}
+  cflock.cpp
+  excos.cpp
+  fdentries.cpp
+  os.cpp
+  osutil.cpp
+  oscaps.cpp
     )
 
 target_link_libraries(oscpp_lib PUBLIC

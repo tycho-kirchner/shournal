@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.6)
 
 if (NOT (CMAKE_VERSION VERSION_LESS "3.20"))
-    cmake_policy( SET CMP0115 OLD )
+    cmake_policy( SET CMP0115 NEW )
 endif()
 
 # version applies to all released files: shournal, shournal-run, libshournal-shellwatch.so

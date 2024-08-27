@@ -1,12 +1,9 @@
 
-SET(qsimplecfg_files
-    cfg
-    section
-    exccfg
-    )
 
 add_library(lib_qsimplecfg
-    ${qsimplecfg_files}  
+  cfg.cpp
+  section.cpp
+  exccfg.cpp
  )
 
 target_link_libraries(lib_qsimplecfg PUBLIC

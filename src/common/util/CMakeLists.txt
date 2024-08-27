@@ -1,20 +1,20 @@
 
 
 add_library(lib_util
-    cleanupresource
-    compareoperator
-    conversions
-    cpp_exit
-    exccommon
-    qoutstream
-    qformattedstream
-    strlight
-    strlight_util
-    staticinitializer
+    cleanupresource.h
+    compareoperator.cpp
+    conversions.cpp
+    cpp_exit.cpp
+    exccommon.cpp
+    qoutstream.cpp
+    qformattedstream.cpp
+    strlight.cpp
+    strlight_util.cpp
+    staticinitializer.h
     sys_ioprio.h
-    translation
-    util
-    util_performance
+    translation.cpp
+    util.cpp
+    util_performance.cpp
     )
 
 

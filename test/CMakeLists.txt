@@ -17,20 +17,20 @@ find_package(Qt5Test REQUIRED)
 add_definitions( -DSHOURNALTEST_SQLITE_v_2_2="${CMAKE_CURRENT_SOURCE_DIR}/sqlite_sample_db_v2_2")
 
 add_executable(runTests
-    main
-    autotest
-    test_cfg
-    test_pathtree
-    test_db_controller
-    test_cxxhash
-    test_fileeventhandler
-    test_fdcommunication
-    test_osutil
-    test_qformattedstream
-    test_qoptargparse
-    test_util
-    integration_test_shell
-    helper_for_test
+    main.cpp
+    autotest.h
+    test_cfg.cpp
+    test_pathtree.cpp
+    test_db_controller.cpp
+    test_cxxhash.cpp
+    test_fileeventhandler.cpp
+    test_fdcommunication.cpp
+    test_osutil.cpp
+    test_qformattedstream.cpp
+    test_qoptargparse.cpp
+    test_util.cpp
+    integration_test_shell.cpp
+    helper_for_test.cpp
 )
 
 add_test(NAME tests COMMAND runTests)

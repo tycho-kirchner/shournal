@@ -12,14 +12,14 @@ include_directories(
 
 
 add_library(libshournal-shellwatch SHARED    
-    libshournal-shellwatch
-    attached_bash
-    attached_shell
-    event_open
-    event_process
-    shell_globals
-    shell_logger
-    shell_request_handler
+    libshournal-shellwatch.cpp
+    attached_bash.cpp
+    attached_shell.cpp
+    event_open.cpp
+    event_process.cpp
+    shell_globals.cpp
+    shell_logger.cpp
+    shell_request_handler.cpp
     )
 
 # to list exported symbols of the compiled .so:

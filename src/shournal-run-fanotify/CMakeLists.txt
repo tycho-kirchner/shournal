@@ -20,12 +20,12 @@ include_directories(
 
 
 add_executable(shournal-run-fanotify
-    shournal-run-fanotify.cpp # main
-    fanotify_controller
-    filewatcher_fan
-    mount_controller
-    msenter
-    orig_mountspace_process
+    shournal-run-fanotify.cpp
+    fanotify_controller.cpp
+    filewatcher_fan.cpp
+    mount_controller.cpp
+    msenter.cpp
+    orig_mountspace_process.cpp
     )
 
 target_link_libraries(shournal-run-fanotify

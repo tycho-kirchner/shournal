@@ -1,11 +1,11 @@
 
 add_library(lib_qoptargparse
-    excoptargparse
-    qoptargparse
-    qoptarg
-    qoptsqlarg
-    qoptvarlenarg
-    qoptargtrigger
+    excoptargparse.cpp
+    qoptargparse.cpp
+    qoptarg.cpp
+    qoptsqlarg.cpp
+    qoptvarlenarg.cpp
+    qoptargtrigger.cpp
  )
 
 target_link_libraries(lib_qoptargparse PUBLIC

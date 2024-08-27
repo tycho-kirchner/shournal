@@ -5,56 +5,56 @@ add_subdirectory(qoptargparse)
 add_subdirectory(qsimplecfg)
 
 SET(lib_shournal_common_files
-    app
-    cefd
-    console_dialog
-    cxxhash
-    fdcommunication
-    fileeventhandler
-    fileevents
-    generic_container
-    groupcontrol
-    hashcontrol
-    hashmeta
-    idmapentry
-    interrupt_handler
-    logger
-    limited_priority_queue
-    pidcontrol
-    pathtree
-    qfddummydevice
-    qfilethrow
-    qresource_helper
-    safe_file_update
-    settings
-    shournal_run_common
-    stdiocpp
-    stupidinject
-    socket_message
-    subprocess
+    app.cpp
+    cefd.cpp
+    console_dialog.cpp
+    cxxhash.cpp
+    fdcommunication.cpp
+    fileeventhandler.cpp
+    fileevents.cpp
+    generic_container.h
+    groupcontrol.cpp
+    hashcontrol.cpp
+    hashmeta.cpp
+    idmapentry.h
+    interrupt_handler.cpp
+    logger.cpp
+    limited_priority_queue.h
+    pidcontrol.cpp
+    pathtree.cpp
+    qfddummydevice.cpp
+    qfilethrow.cpp
+    qresource_helper.cpp
+    safe_file_update.h
+    settings.cpp
+    shournal_run_common.cpp
+    stdiocpp.cpp
+    stupidinject.cpp
+    socket_message.cpp
+    subprocess.cpp
     user_kernerl.h
     xxhash_common.h
     xxhash_common.c
 )
 
 set(database_files
-    database/db_connection
-    database/db_controller
-    database/sqlite_database_scheme
-    database/commandinfo
-    database/sessioninfo
-    database/fileinfos
-    database/sqlquery
-    database/file_query_helper
-    database/insertifnotexist
-    database/query_columns
-    database/db_conversions
-    database/sqlite_database_scheme_updates
-    database/storedfiles
-    database/db_globals
-    database/command_query_iterator
-    database/qexcdatabase
-    database/qsqlquerythrow
+    database/db_connection.cpp
+    database/db_controller.cpp
+    database/sqlite_database_scheme.cpp
+    database/commandinfo.cpp
+    database/sessioninfo.cpp
+    database/fileinfos.cpp
+    database/sqlquery.cpp
+    database/file_query_helper.cpp
+    database/insertifnotexist.cpp
+    database/query_columns.h
+    database/db_conversions.cpp
+    database/sqlite_database_scheme_updates.cpp
+    database/storedfiles.cpp
+    database/db_globals.cpp
+    database/command_query_iterator.cpp
+    database/qexcdatabase.cpp
+    database/qsqlquerythrow.cpp
 )
 
 add_library(lib_shournal_common

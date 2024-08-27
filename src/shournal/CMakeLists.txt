@@ -1,14 +1,14 @@
 
 
 add_executable(${PROJECT_NAME} ../../html-export/dist/htmlexportres.qrc
-    shournal.cpp # main
-    argcontrol_dbdelete
-    argcontrol_dbquery
-    command_printer
-    command_printer_html
-    command_printer_human
-    command_printer_json
-    cmd_stats
+    shournal.cpp
+    argcontrol_dbdelete.cpp
+    argcontrol_dbquery.cpp
+    command_printer.cpp
+    command_printer_html.cpp
+    command_printer_human.cpp
+    command_printer_json.cpp
+    cmd_stats.cpp
     )
 
 # To keep dependencies low, only generate the main.js

@@ -1,11 +1,11 @@
 
 
 add_executable(shournal-run
-    shournal-run.cpp # main
-    fifocom
-    filewatcher_shournalk
-    mark_helper
-    shournalk_ctrl
+    shournal-run.cpp
+    fifocom.cpp
+    filewatcher_shournalk.cpp
+    mark_helper.cpp
+    shournalk_ctrl.c
 )
 
 target_link_libraries(shournal-run
