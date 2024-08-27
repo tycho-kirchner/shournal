@@ -229,16 +229,26 @@ _vfs_fadvise_dummy(struct file *file, loff_t offset, loff_t len,
 // see commit 47291baa8ddfdae10663624ff0a15ab165952708
 // and        a6435940b62f81a1718bf2bd46a051379fc89b9d
 static inline int
-kutil_inode_permission(struct user_namespace *user_ns, struct inode * inode, int mask){
+kutil_inode_permission(struct path* path, int mask){
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 12, 0)) && \
     !defined FS_ALLOW_IDMAP
-    (void)(user_ns);
-    return inode_permission(inode, mask);
+    return inode_permission(path->dentry->d_inode, mask);
 #else
-    return inode_permission(user_ns, inode, mask);
+    return path_permission(path, mask);
+#endif
+}
+
+// see commit 077c212f0344a
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(6, 7, 0))
+static inline time64_t kutil_get_mtime_sec(const struct inode *inode){
+    return inode_get_mtime_sec(inode);
+}
+#else
+static inline time64_t kutil_get_mtime_sec(const struct inode *inode){
+    return inode->i_mtime.tv_sec;
+}
 #endif
 
-}
 
 // see f405df5de3170c00e5c54f8b7cf4766044a032ba
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))

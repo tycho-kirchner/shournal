@@ -10,6 +10,7 @@
 #include <linux/fadvise.h>
 #include <linux/kthread.h>
 #include <linux/mmu_context.h>
+#include <linux/splice.h>
 #include <asm/uaccess.h>
 
 
@@ -211,7 +212,7 @@ static bool __do_log_file_event(struct event_target* t,
 
 
     user_event.flags = event_flags;
-    user_event.mtime = inode->i_mtime.tv_sec;
+    user_event.mtime = kutil_get_mtime_sec(inode);
     user_event.size = inode->i_size;
     user_event.mode = inode->i_mode;
     user_event.hash_is_null = t->partial_hash.chunksize == 0 ||
@@ -613,17 +614,15 @@ bool event_consumer_flush_target_file_safe(struct event_target *t)
 void close_event_consume(struct event_target* event_target, struct close_event* close_ev){
     bool may_read;
     bool may_write;
-    struct inode* inode = close_ev->path.dentry->d_inode;
 
     if(unlikely(event_target->ERROR)){
         goto out;
     }
-    if(unlikely(! inode)){
+    if(unlikely(! close_ev->path.dentry->d_inode)){
         pr_devel("ignore event, inode is NULL.\n");
         goto out;
     }
-    may_read =  kutil_inode_permission(
-                   event_target->user_ns, inode, MAY_READ) == 0;
+    may_read =  kutil_inode_permission(&close_ev->path, MAY_READ) == 0;
     if(unlikely(! may_read)){
         // maybe the file event came from a setuid-program? Otherwise, the file
         // might be writable, but not readable. We ignore this special
@@ -632,8 +631,7 @@ void close_event_consume(struct event_target* event_target, struct close_event* 
         goto out;
     }
     // __dbg_print_event(event_target, close_event, "test");
-    may_write = kutil_inode_permission(
-                  event_target->user_ns, inode, MAY_WRITE) == 0;
+    may_write = kutil_inode_permission(&close_ev->path, MAY_WRITE) == 0;
 
     // Just as fanotify does, we consider O_RDWR only
     // as write-event.
