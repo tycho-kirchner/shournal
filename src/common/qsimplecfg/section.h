@@ -8,6 +8,7 @@
 #include <QHash>
 #include <QVariant>
 
+#include "compat.h"
 #include "ordered_map.h"
 #include "exccfg.h"
 #include "util.h"
@@ -42,7 +43,7 @@ public:
     ContainerT getValues(const QString & key, const ContainerT & defaultValue=ContainerT(),
                          bool insertDefaultIfNotExist=false,
                          const QString & separator=",",
-                         QString::SplitBehavior splitbehaviour=QString::SkipEmptyParts );
+                         Qt::SplitBehavior splitbehaviour=Qt::SkipEmptyParts );
 
 
     void setComments(const QString &comments);
@@ -133,7 +134,7 @@ template<class ContainerT>
 ContainerT Section::getValues(const QString &key, const ContainerT &defaultValue,
                               bool insertDefaultIfNotExist,
                               const QString &separator,
-                              QString::SplitBehavior splitbehaviour)
+                              Qt::SplitBehavior splitbehaviour)
 {
     QVariantList defaultVariantValues;
     for(const auto & val : defaultValue){

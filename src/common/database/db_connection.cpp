@@ -10,6 +10,7 @@
 #include <QDir>
 #include <unistd.h>
 
+#include "compat.h"
 #include "db_connection.h"
 #include "cflock.h"
 #include "sqlite_database_scheme.h"
@@ -110,7 +111,7 @@ createOrUpDateDb(QSqlQueryThrow &query, CFlock& lock){
     if(! versionTableExists(query)){
         logInfo << qtr("Creating new sqlite database");
         QStringList statements = QString(
-                    SQLITE_DATABASE_SCHEME).split(';', QString::SkipEmptyParts);
+                    SQLITE_DATABASE_SCHEME).split(';', Qt::SkipEmptyParts);
         for(const QString& stmt : statements){
             query.exec(stmt);
         }

@@ -2,6 +2,7 @@
 
 add_library(lib_util
     cleanupresource.h
+    compat.h
     compareoperator.cpp
     conversions.cpp
     cpp_exit.cpp

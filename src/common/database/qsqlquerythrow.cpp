@@ -36,6 +36,15 @@ static QString mkInsertIgnorePreamble(const QString& driverName)
     return "insert ignore";
 }
 
+static int sqlerrToNumber(const QSqlError & err){
+    try {
+        return qVariantTo_throw<int>(err.nativeErrorCode());
+    } catch (ExcQVariantConvert& ex) {
+        ex.setDescrip("Failed to convert Sqlerror to number - " +
+                      ex.descrip());
+        throw;
+    }
+}
 
 QSqlQueryThrow::QSqlQueryThrow(const QSqlDatabase& db)
     : QSqlQuery (db),
@@ -182,7 +191,7 @@ void QSqlQueryThrow::_doExec(const QString &query)
             m_execWasCalled = true;
             return;
         }
-        if(this->lastError().number() == SQLITE_ERR_BUSY){
+        if(sqlerrToNumber(this->lastError()) == SQLITE_ERR_BUSY){
             logInfo << "Sqlquery failed with busy timeout. trying again in a "
                        "few seconds:" << (query.isEmpty()?this->lastQuery():query) ;
             osutil::randomSleep(5 *1000, 20 *1000);

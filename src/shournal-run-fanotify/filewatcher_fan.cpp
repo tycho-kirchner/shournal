@@ -15,6 +15,7 @@
 #include <thread>
 #include <future>
 
+#include "compat.h"
 #include "filewatcher_fan.h"
 #include "fanotify_controller.h"
 #include "mount_controller.h"
@@ -404,7 +405,7 @@ E_SocketMsg FileWatcher::processSocketEvent( CommandInfo& cmdInfo ){
             break;
         }
         case E_SocketMsg::LOG_MESSAGE:
-            m_shellLogger.stream() << msg.bytes << endl;
+            m_shellLogger.stream() << msg.bytes << Qt::endl;
             break;
 
         case E_SocketMsg::CLEAR_EVENTS:

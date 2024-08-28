@@ -5,6 +5,7 @@
 #include <fcntl.h>
 
 #include "autotest.h"
+#include "compat.h"
 #include "osutil.h"
 #include "helper_for_test.h"
 #include "util.h"
@@ -72,8 +73,8 @@ CommandInfo generateCmdInfo(){
     cmd.hostname = "myhost";
     cmd.username = "myuser";
     cmd.returnVal = 42;
-    cmd.startTime = QDateTime(QDate(2019,1, id_ % 28));
-    cmd.endTime = QDateTime(QDate(2019,1, id_ % 28));
+    cmd.startTime = Qt::datetimeFromDate(QDate(2019,1, id_ % 28));
+    cmd.endTime = Qt::datetimeFromDate(QDate(2019,1, id_ % 28));
     cmd.workingDirectory = "/home/user";
 
     id_++;
@@ -161,7 +162,7 @@ class DbCtrlTest : public QObject {
 
         FileEvent e{};
         e.m_close_event.flags = O_WRONLY;
-        e.m_close_event.mtime = QDateTime(QDate(2019,1, id_ % 28)).toTime_t();
+        e.m_close_event.mtime = Qt::datetimeFromDate(QDate(2019,1, id_ % 28)).toTime_t();
         e.m_close_event.size = id_;
         e.m_close_event.mode = 0;
         e.m_close_event.hash = hash_;

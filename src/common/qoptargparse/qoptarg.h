@@ -4,6 +4,7 @@
 #include <QVector>
 #include <unordered_set>
 
+#include "compat.h"
 #include "util.h"
 #include "qoptargtrigger.h"
 #include "excoptargparse.h"
@@ -180,7 +181,7 @@ ContainerT QOptArg::getValuesByDelim(const QString& delim, const ContainerT& def
         return defaultValues;
     }
     ContainerT container;
-    const auto splittedVals = QString(m_vals.argv[0]).split(delim, QString::SplitBehavior::SkipEmptyParts);
+    const auto splittedVals = QString(m_vals.argv[0]).split(delim, Qt::SkipEmptyParts);
     if(splittedVals.size() < minValueSize || splittedVals.size() > maxValueSize){
          throw ExcOptArgParse(qtr("argument %1 requires at least %2 and at most %3 "
                                   "parameters, separated by '%4' but %5 were given.")

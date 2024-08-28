@@ -3,8 +3,9 @@
 #include <QTextStream>
 #include <QStandardPaths>
 
-#include "console_dialog.h"
 
+#include "compat.h"
+#include "console_dialog.h"
 #include "qoutstream.h"
 #include "util.h"
 #include "subprocess.h"
@@ -56,7 +57,7 @@ int console_dialog::openFileInExternalEditor(const QString &filepath)
         // support also EDITOR-strings like e.g. 'geany -i' -> if we cannot find
         // the executable, try to split by space
         if((QStandardPaths::findExecutable(editor)).isEmpty() ){
-            const auto splitted = editor.split(' ', QString::SplitBehavior::SkipEmptyParts);
+            const auto splitted = editor.split(' ', Qt::SkipEmptyParts);
             if(splitted.length() > 1){
                 for(const QString& s : splitted){
                     args.push_back(s.toStdString());

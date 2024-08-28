@@ -9,6 +9,7 @@
 
 #include <memory>
 
+#include "compat.h"
 #include "qoutstream.h"
 #include "subprocess.h"
 #include "qoptargparse/qoptargparse.h"
@@ -122,7 +123,7 @@ inline int run(int argc, char *argv[])
             QIErr() << "missing argument" << argShell.name();
             exit(1);
         }
-        const auto shellArgs = argShell.getValue<QString>().split(" ", QString::SkipEmptyParts);
+        const auto shellArgs = argShell.getValue<QString>().split(" ", Qt::SkipEmptyParts);
         if(shellArgs.first().startsWith("bash")){
             globals().integrationSetupCommand = "export HISTFILE=/dev/null";
         } else if(shellArgs.first().startsWith("zsh")){

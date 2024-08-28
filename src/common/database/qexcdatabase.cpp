@@ -11,7 +11,7 @@ QExcDatabase::QExcDatabase(const QString &preamble, const QSqlError &err) :
         setDescrip( descrip() + ": ");
     }
     setDescrip( descrip() + err.text()
-                + '('+ QString::number(err.number()) + ')');
+                + '('+ err.nativeErrorCode() + ')');
 }
 
 QExcDatabase::QExcDatabase(const QString &preamble) :

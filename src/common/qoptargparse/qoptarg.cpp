@@ -4,7 +4,7 @@
 #include <utility>
 
 #include "qoptarg.h"
-
+#include "compat.h"
 #include "exccommon.h"
 #include "excoptargparse.h"
 #include "util.h"
@@ -129,8 +129,7 @@ QStringList QOptArg::getOptions(int maxCount) const
     QStringList valList;
     for(int i=0; i < m_vals.len; i++){
         QStringList newVals = QString(m_vals.argv[i])
-                .split(m_allowedOptionsDelimeter,
-                       QString::SplitBehavior::SkipEmptyParts);
+                .split(m_allowedOptionsDelimeter, Qt::SkipEmptyParts);
         for(const QString& str : newVals){
             if(m_allowedOptions.find(str) == m_allowedOptions.end()){
                 throw ExcOptArgParse(qtr("'%1' is not a supported option for '%2'. ")

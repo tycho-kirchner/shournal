@@ -2,7 +2,7 @@
 #include <cassert>
 
 #include "qoutstream.h"
-
+#include "compat.h"
 
 QOut::QOut() :
     m_textStream(stdout)
@@ -42,7 +42,7 @@ QIErr::QIErr() :
 
 QIErr::~QIErr()
 {
-    m_ts << endl;
+    m_ts << Qt::endl;
 }
 
 void QIErr::setPreambleCallback(const std::function<QString ()> &f){
