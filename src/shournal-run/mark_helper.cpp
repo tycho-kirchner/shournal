@@ -21,7 +21,8 @@ using std::string;
 static const QHash<QVersionNumber, QVersionNumber> KVERSION_COMPATIBILITY_MAP = {
     {QVersionNumber{2,9}, QVersionNumber{2,8}},
     {QVersionNumber{3,0}, QVersionNumber{2,8}},
-    {QVersionNumber{3,1}, QVersionNumber{2,8}}
+    {QVersionNumber{3,1}, QVersionNumber{2,8}},
+    {QVersionNumber{3,2}, QVersionNumber{2,8}}
 };
 
 ExcShournalk::ExcShournalk(const QString &text) :
