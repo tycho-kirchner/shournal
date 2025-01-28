@@ -79,7 +79,7 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
         }
         s.setMaxLineWidth(oldMaxLineWidth);
 
-        printWriteInfos(s, cmd.fileWriteInfos);
+        printWriteInfos(cmd, s);
         printReadInfos(s, cmd);
     }
 
@@ -136,14 +136,15 @@ void CommandPrinterHuman::printCommandInfosEvtlRestore(std::unique_ptr<CommandQu
 
 
 void
-CommandPrinterHuman::printReadFileEventEvtlRestore(QFormattedStream& s,
-                                                   const FileReadInfo& f,
-                                                   const QString &cmdIdStr){
+CommandPrinterHuman::printReadFileEventEvtlRestore
+(const CommandInfo &cmd, QFormattedStream& s,
+ const FileReadInfo& f, const QString &cmdIdStr){
+    auto fStatus = (reportFileStatus()) ? " "+f.currentStatus(cmd) : "";
     s.setLineStart(m_indentlvl2);
     s << pathJoinFilename(f.path, f.name)
       << "(" + m_userStrConv.bytesToHuman(f.size) + ")"
       << qtr("Hash:") << ((f.hash.isNull()) ? "-" : QString::number(f.hash.value()))
-      << "id" << QString::number(f.idInDb) <<  + "\n";
+      << "id" << QString::number(f.idInDb) + fStatus + "\n";
     if(! f.isStoredToDisk){
         // since shournal 2.1 it is possible to log only meta-information about
         // read files without storing them in the read files dir.
@@ -198,8 +199,10 @@ void CommandPrinterHuman::printReadFile(QFormattedStream &s, QFile &f)
     }
 }
 
-void CommandPrinterHuman::printWriteInfos(QFormattedStream &s, const FileWriteInfos &fileWriteInfos)
+void CommandPrinterHuman::printWriteInfos
+(const CommandInfo& cmd, QFormattedStream &s)
 {
+    auto & fileWriteInfos = cmd.fileWriteInfos;
     if(fileWriteInfos.isEmpty()){
         return;
     }
@@ -217,10 +220,11 @@ void CommandPrinterHuman::printWriteInfos(QFormattedStream &s, const FileWriteIn
             }
             break;
         }
+        auto fStatus = (reportFileStatus()) ? " "+f.currentStatus(cmd) : "";
         s << pathJoinFilename(f.path, f.name)
           << "(" + m_userStrConv.bytesToHuman(f.size) + ")"
-          << qtr("Hash:") << ((f.hash.isNull()) ? "-" : QString::number(f.hash.value()))
-          << "\n";
+          << qtr("Hash:") << ((f.hash.isNull()) ? "-" : QString::number(f.hash.value())) +
+             fStatus + "\n";
         ++counter;
     }
 
@@ -246,7 +250,7 @@ void CommandPrinterHuman::printReadInfos(QFormattedStream &s, const CommandInfo 
             }
             break;
         }
-        printReadFileEventEvtlRestore(s, f, cmdIdStr);
+        printReadFileEventEvtlRestore(cmd, s, f, cmdIdStr);
         ++counter;
     }
 }

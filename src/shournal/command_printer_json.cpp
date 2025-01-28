@@ -22,9 +22,11 @@ void CommandPrinterJson::printCommandInfosEvtlRestore(std::unique_ptr<CommandQue
         outstream << "HEADER:" << doc.toJson(QJsonDocument::Compact) << "\n";
     }
 
+    CmdJsonWriteCfg jsonCfg(true);
+    jsonCfg.fileStatus = this->reportFileStatus();
     while(cmdIter->next()){
         QJsonObject cmdObject;
-        cmdIter->value().write(cmdObject);
+        cmdIter->value().write(cmdObject, false, jsonCfg);
         QJsonDocument doc(cmdObject);
         outstream << "COMMAND:" << doc.toJson(QJsonDocument::Compact) << "\n";
 

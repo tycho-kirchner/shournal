@@ -88,6 +88,7 @@ void CommandInfo::write(QJsonObject &json, bool withMilliseconds,
 
             QJsonObject fReadObj;
             info.write(fReadObj);
+            fReadObj["status"] = (writeCfg.fileStatus) ? info.currentStatus(*this) : "NA";
             fReadArr.append(fReadObj);
             ++idx;
             if(idx >= writeCfg.maxCountRFiles){
@@ -101,9 +102,10 @@ void CommandInfo::write(QJsonObject &json, bool withMilliseconds,
         QJsonArray fWriteArr;
         int idx = 0;
         for(const auto& info : fileWriteInfos){
-            QJsonObject fWriteObject;
-            info.write(fWriteObject);
-            fWriteArr.append(fWriteObject);
+            QJsonObject fWObject;
+            info.write(fWObject);
+            fWObject["status"] = (writeCfg.fileStatus) ? info.currentStatus(*this) : "NA";
+            fWriteArr.append(fWObject);
             ++idx;
             if(idx >= writeCfg.maxCountWFiles){
                 break;

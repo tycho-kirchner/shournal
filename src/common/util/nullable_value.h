@@ -54,6 +54,11 @@ public:
         return value() == rhs.value();
     }
 
+    bool operator!=(const NullableValue& rhs) const
+    {
+        return!(operator==(rhs));
+    }
+
     NullableValue& operator=(const T& val)
     {
         setValue(val);

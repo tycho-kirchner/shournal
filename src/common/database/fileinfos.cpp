@@ -1,7 +1,37 @@
 #include "fileinfos.h"
 
-#include "util.h"
 #include "db_conversions.h"
+#include "commandinfo.h"
+#include "hashcontrol.h"
+#include "logger.h"
+#include "qfilethrow.h"
+#include "util.h"
+
+FileInfo::~FileInfo() {};
+
+QString FileInfo::currentStatus(const CommandInfo &cmd) const
+{
+    auto filename = pathJoinFilename(this->path, this->name);
+    try{
+        QFileThrow f(filename);
+        if(!f.exists()){
+            return "N";
+        }
+        HashControl hashCtrl;
+        f.open(QFile::OpenModeFlag::ReadOnly);
+        const auto st_ = os::fstat(f.handle());
+        if(size != st_.st_size ||
+           QDateTime::fromTime_t(static_cast<uint>(st_.st_mtime))!= mtime ||
+           hash!= hashCtrl.genPartlyHash(f.handle(), st_.st_size, cmd.hashMeta, false)){
+            return "M";
+        }
+        return "U";
+    } catch (const std::exception& ex) {
+        logWarning << qtr("Failed to determine status of file %1 - %2").arg(filename)
+                      .arg(QString(ex.what()));
+        return "ERROR";
+    }
+}
 
 
 void FileWriteInfo::write(QJsonObject &json) const
@@ -14,7 +44,7 @@ void FileWriteInfo::write(QJsonObject &json) const
 }
 
 bool
-FileWriteInfo::operator==(const FileWriteInfo &rhs) const
+FileWriteInfo::operator==(const FileInfo &rhs) const
 {
     if(idInDb != db::INVALID_INT_ID && rhs.idInDb != db::INVALID_INT_ID){
         return idInDb == rhs.idInDb;
@@ -54,4 +84,9 @@ FileReadInfo::operator==(const FileReadInfo &rhs) const
             name == rhs.name &&
             mode == rhs.mode &&
             hash == rhs.hash;
+}
+
+bool FileReadInfo::operator==(const FileInfo&) const
+{
+    throw QExcProgramming("Unimplemented FileReadInfo::operator==(const FileInfo &rhs)");
 }

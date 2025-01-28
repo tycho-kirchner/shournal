@@ -18,11 +18,12 @@ public:
 protected:
     Q_DISABLE_COPY(CommandPrinterHuman)
 
-    void printReadFileEventEvtlRestore(QFormattedStream& s, const FileReadInfo& readInfo,
+    void printReadFileEventEvtlRestore(const CommandInfo &cmd, QFormattedStream& s,
+                                       const FileReadInfo& readInfo,
                                        const QString& cmdIdStr);
     void printReadFile(QFormattedStream& s, QFile& f);
 
-    void printWriteInfos(QFormattedStream& s, const FileWriteInfos& fileWriteInfos);
+    void printWriteInfos(const CommandInfo &cmd, QFormattedStream& s);
     void printReadInfos(QFormattedStream& s, const CommandInfo& cmd);
 
     QMimeDatabase m_mimedb;

@@ -46,6 +46,8 @@ struct CmdJsonWriteCfg {
 
     int maxCountWFiles{std::numeric_limits<int>::max()};
     int maxCountRFiles{std::numeric_limits<int>::max()};
+
+    bool fileStatus{false};
 };
 
 struct CommandInfo

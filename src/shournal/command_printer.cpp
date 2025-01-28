@@ -81,6 +81,16 @@ void CommandPrinter::setMinCountOfStats(int val)
     m_minCountOfStats = val;
 }
 
+void CommandPrinter::setReportFileStatus(bool val)
+{
+    m_reportFileStatus = val;
+}
+
+bool CommandPrinter::reportFileStatus() const
+{
+    return m_reportFileStatus;
+}
+
 void CommandPrinter::setMaxCountRfiles(int maxCountRfiles)
 {
     m_maxCountRfiles = maxCountRfiles;

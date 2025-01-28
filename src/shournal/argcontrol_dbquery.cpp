@@ -295,6 +295,13 @@ void argcontol_dbquery::parse(int argc, char *argv[])
                               "10 entries."));
     parser.addArg(&argStatCounts);
 
+    QOptArg argFileStat("", "stat",
+                        qtr("Report the current status of files compared to the "
+                            "database as U (up to date), "
+                            "M (modified), N (not exist) ERROR (in case of an error) or "
+                            "NA (not queried, only using json)."), false);
+    parser.addArg(&argFileStat);
+
 
     // --------------------- End of Args -----------------------
 
@@ -405,6 +412,10 @@ void argcontol_dbquery::parse(int argc, char *argv[])
     }
     if(argRFile.wasParsed()){
         addFileQuery(query, argRFile, argTakeFromRFile, true);
+    }
+
+    if(argFileStat.wasParsed()){
+        cmdPrinter->setReportFileStatus(true);
     }
 
 

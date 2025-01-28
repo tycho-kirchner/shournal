@@ -7,9 +7,11 @@
 #include "nullable_value.h"
 #include "db_globals.h"
 
+struct CommandInfo;
 
-struct FileWriteInfo
-{
+struct FileInfo {
+    virtual ~FileInfo() = 0;
+
     qint64 idInDb { db::INVALID_INT_ID };
 
     QDateTime mtime;
@@ -18,25 +20,27 @@ struct FileWriteInfo
     QString   name;
     HashValue  hash;
 
-    void write(QJsonObject &json) const;
+    virtual QString currentStatus(const CommandInfo &cmd) const;
+    virtual void write(QJsonObject &json) const = 0;
+    virtual bool operator==(const FileInfo& rhs) const = 0 ;
+};
 
-    bool operator==(const FileWriteInfo& rhs) const;
+struct FileWriteInfo : public FileInfo
+{
+
+    virtual void write(QJsonObject &json) const;
+    virtual bool operator==(const FileInfo& rhs) const;
+
 };
 
 
-struct FileReadInfo
+struct FileReadInfo : public FileInfo
 {
-    qint64 idInDb { db::INVALID_INT_ID };
-
-    QDateTime mtime;
-    qint64 size {};
-    QString path;
-    QString name;
     mode_t mode {};
-    HashValue hash;
     bool isStoredToDisk {false};
 
-    void write(QJsonObject &json) const;
+    virtual void write(QJsonObject &json) const;
 
-    bool operator==(const FileReadInfo& rhs) const;
+    virtual bool operator==(const FileReadInfo& rhs) const;
+    virtual bool operator==(const FileInfo& rhs) const;
 };

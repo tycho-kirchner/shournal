@@ -30,6 +30,8 @@ public:
     virtual void setMaxCountRfiles(int maxCountRfiles);
     virtual CmdStats& cmdStats();
     virtual void setMinCountOfStats(int val);
+    virtual void setReportFileStatus(bool val);
+    virtual bool reportFileStatus() const;
 
 protected:
     Q_DISABLE_COPY(CommandPrinter)
@@ -52,6 +54,7 @@ protected:
     int m_maxCountRfiles{0};
     CmdStats m_cmdStats;
     int m_minCountOfStats;
+    bool m_reportFileStatus{false};
 };
 
 
