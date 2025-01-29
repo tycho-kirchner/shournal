@@ -32,7 +32,9 @@
 #include "conversions.h"
 #include "console_dialog.h"
 #include "qfilethrow.h"
+#include "shournal_run_common.h"
 
+using namespace shournal_run_common;
 
 /// Uncaught exception handler
 void onterminate() {
@@ -51,7 +53,7 @@ void onterminate() {
 [[noreturn]]
 void execShournalRun(const QByteArray& backendFilename,
                      QOptArg::RawValues_t &cargs, bool withinOrigMountspace,
-                     QOptArg &argVerbosity, QOptArg &argExecFilename);
+                     QVarLengthArray<QOptArg*> forwardArgs);
 
 
 int shournal_main(int argc, char *argv[])
@@ -167,8 +169,25 @@ int shournal_main(int argc, char *argv[])
 
     parser.addArg(&argLsOurPaths);
 
+    auto argCfgDir = mkarg_cfgdir();
+    parser.addArg(&argCfgDir);
+    auto argDataDir = mkarg_datadir();
+    parser.addArg(&argDataDir);
+
+    // Forward these to shournal-run:
+    QVarLengthArray<QOptArg*> forwardArgs = {&argVerbosity, &argExecFilename, &argCfgDir,
+                                           &argDataDir};
+
     try {
         parser.parse(argc, argv);
+        auto & sets = Settings::instance();
+        if(argCfgDir.wasParsed()){
+            sets.setUserCfgDir(argCfgDir.getValue<QString>());
+        }
+        if(argDataDir.wasParsed()){
+            sets.setUserDataDir(argDataDir.getValue<QString>());
+        }
+
         if(argVerbosity.wasParsed()){
             QByteArray verbosity = argVerbosity.getOptions(1).first().toLocal8Bit();
             logger::setVerbosityLevel(verbosity.constData());
@@ -179,7 +198,7 @@ int shournal_main(int argc, char *argv[])
         if(argExec.wasParsed()){
             auto backendFilename = argBackend.getValue<QString>();
             if(backendFilename.isEmpty()){
-                backendFilename = Settings::instance().chooseShournalRunBackend();
+                backendFilename = sets.chooseShournalRunBackend();
                 if(backendFilename.isEmpty()){
                     QIErr() << qtr("No backend-filename given and no valid "
                                    "backend found - exiting...");
@@ -188,8 +207,7 @@ int shournal_main(int argc, char *argv[])
             }
             execShournalRun(backendFilename.toLocal8Bit(),
                             parser.rest(), argMsenterOrig.wasParsed(),
-                            argVerbosity,
-                            argExecFilename);
+                            forwardArgs);
         }
 
         if(argVersion.wasParsed()){
@@ -264,7 +282,7 @@ int shournal_main(int argc, char *argv[])
 
 void execShournalRun(const QByteArray& backendFilename,
                      QOptArg::RawValues_t& cargs , bool withinOrigMountspace,
-                     QOptArg& argVerbosity, QOptArg& argExecFilename){
+                     QVarLengthArray<QOptArg*> forwardArgs){
     // setuid-programs change some parts of the environment for security reasons.
     // Therefor, pass the environment via argv and apply it later (after setuid
     // to original user)
@@ -276,11 +294,16 @@ void execShournalRun(const QByteArray& backendFilename,
     }
 
     QByteArray verbosityStr;
-    if(argVerbosity.wasParsed()){
-        args.push_back("--verbosity");
-        verbosityStr = argVerbosity.getValue<QByteArray>();
-        args.push_back(verbosityStr.constData());
+    QVarLengthArray<QByteArray> forwardArgsBuf;
+    for(QOptArg* a : forwardArgs){
+        if(a->wasParsed()){
+            // we need another buffer for the char* args array.
+            forwardArgsBuf.push_back(a->name().toLocal8Bit());
+            args.push_back(forwardArgsBuf.last());
+            args.push_back(a->vals().argv[0]);
+        }
     }
+
     const char* tmpdir = getenv("TMPDIR");
     if(tmpdir != nullptr){
         args.push_back("--tmpdir");
@@ -299,10 +322,6 @@ void execShournalRun(const QByteArray& backendFilename,
     std::string envSize = std::to_string(args.size() - envSizeIdx - 1);
     args[envSizeIdx] = envSize.c_str();
 
-    if(argExecFilename.wasParsed()){
-        args.push_back("--exec-filename");
-        args.push_back(argExecFilename.vals().argv[0]);
-    }
 
     // As long as arguments start with a minus those
     // are passed as options to the shournal-run backend, e.g.

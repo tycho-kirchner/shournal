@@ -52,7 +52,9 @@ using socket_message::E_SocketMsg;
 #include "fdentries.h"
 #include "qoutstream.h"
 #include "shournalk_ctrl.h"
+#include "shournal_run_common.h"
 
+using namespace shournal_run_common;
 
 /// Uncaught exception handler
 static void onterminate() {
@@ -207,8 +209,20 @@ static int shournal_run_main(int argc, char *argv[])
                                      "database after event processing"), false);
     parser.addArg(&argNoDb);
 
+    auto argCfgDir = mkarg_cfgdir();
+    parser.addArg(&argCfgDir);
+    auto argDataDir = mkarg_datadir();
+    parser.addArg(&argDataDir);
+
     try {
+        auto & sets = Settings::instance();
         parser.parse(argc, argv);
+        if(argCfgDir.wasParsed()){
+            sets.setUserCfgDir(argCfgDir.getValue<QString>());
+        }
+        if(argDataDir.wasParsed()){
+            sets.setUserDataDir(argDataDir.getValue<QString>());
+        }
 
         if(argCloseFds.wasParsed()){
             // Do this early before we open fds ourselves.
@@ -256,7 +270,7 @@ static int shournal_run_main(int argc, char *argv[])
 
         try {
             logger::enableLogToFile(app::SHOURNAL_RUN);
-            Settings::instance().load();
+            sets.load();
             StoredFiles::mkpath();
         } catch(const qsimplecfg::ExcCfg & ex){
             QIErr() << qtr("Failed to load config file: ") << ex.descrip();

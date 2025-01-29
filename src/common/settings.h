@@ -92,6 +92,8 @@ public:
 
 
 public:
+    void setUserCfgDir(const QString& p);
+    void setUserDataDir(const QString& p);
     void load();
     QString chooseShournalRunBackend();
 
@@ -102,6 +104,7 @@ public:
 
     QString cfgAppDir();
     QString cfgFilepath();
+    QString dataDir();
 
     const QStringList& defaultIgnoreCmds();
 
@@ -163,6 +166,8 @@ private:
     const QString m_userHome { QDir::homePath() };
     const QString m_workingDir { QDir::currentPath() };
     QVersionNumber m_parsedCfgVersion;
+    QString m_userCfgDir;
+    QString m_userDataDir;
 
 private:
     // unit testing...

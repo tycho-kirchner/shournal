@@ -32,9 +32,11 @@
 #include "db_connection.h"
 #include "storedfiles.h"
 #include "socket_message.h"
+#include "shournal_run_common.h"
 
 using fdcommunication::SocketCommunication;
 using socket_message::E_SocketMsg;
+using namespace shournal_run_common;
 
 namespace  {
 
@@ -194,6 +196,10 @@ int shournal_run_main(int argc, char *argv[])
                          qtr("Print a short summary after "
                              "event processing finished."), false);
     parser.addArg(&argPrintSummary);
+    auto argCfgDir = mkarg_cfgdir();
+    parser.addArg(&argCfgDir);
+    auto argDataDir = mkarg_datadir();
+    parser.addArg(&argDataDir);
 
     try {
         parser.parse(argc, argv);
@@ -242,6 +248,14 @@ int shournal_run_main(int argc, char *argv[])
             cpp_exit(0);
         }
 
+        auto & sets = Settings::instance();
+        if(argCfgDir.wasParsed()){
+            sets.setUserCfgDir(argCfgDir.getValue<QString>());
+        }
+        if(argDataDir.wasParsed()){
+            sets.setUserDataDir(argDataDir.getValue<QString>());
+        }
+
         // has to be before argExec
         if(argMsenterOrig.wasParsed()){
             // do not crash here if called from shell-integration, if
@@ -284,7 +298,7 @@ int shournal_run_main(int argc, char *argv[])
 
         try {
             logger::enableLogToFile(app::CURRENT_NAME);
-            Settings::instance().load();
+            sets.load();
             StoredFiles::mkpath();
         } catch(const qsimplecfg::ExcCfg & ex){
             QIErr() << qtr("Failed to load config file: ") << ex.descrip();

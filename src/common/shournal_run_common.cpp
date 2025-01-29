@@ -22,3 +22,15 @@ void shournal_run_common::print_summary(uint64_t n_wEvents, uint64_t n_rEvents,
               .arg(n_storedEvents)
               .arg(Conversions().bytesToHuman(targetFileSize));
 }
+
+QOptArg shournal_run_common::mkarg_cfgdir()
+{
+    return QOptArg("", "cfg-dir",
+                   qtr("Override the path to shournal's configuration directory."));
+}
+
+QOptArg shournal_run_common::mkarg_datadir()
+{
+    return QOptArg("", "data-dir",
+                   qtr("Override the path to shournal's data directory."));
+}

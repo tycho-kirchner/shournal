@@ -44,6 +44,16 @@ Settings &Settings::instance()
     return s;
 }
 
+void Settings::setUserCfgDir(const QString &p)
+{
+    m_userCfgDir = p;
+}
+
+void Settings::setUserDataDir(const QString &p)
+{
+    m_userDataDir = p;
+}
+
 
 const QStringList &Settings::defaultIgnoreCmds()
 {
@@ -59,6 +69,9 @@ const QStringList &Settings::defaultIgnoreCmds()
 
 QString Settings::cfgAppDir()
 {
+    if(! m_userCfgDir.isEmpty()){
+        return m_userCfgDir;
+    }
     // don't make path static -> mutliple test cases...
     return
        pathJoinFilename(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation),
@@ -69,6 +82,14 @@ QString Settings::cfgFilepath()
 {
     // don't make path static -> mutliple test cases...
     return cfgAppDir() + "/config.ini";
+}
+
+QString Settings::dataDir()
+{
+    if(! m_userDataDir.isEmpty()){
+        return m_userDataDir;
+    }
+    return QStandardPaths::writableLocation(QStandardPaths::DataLocation);
 }
 
 // was in use until shournal 2.1, then migrated

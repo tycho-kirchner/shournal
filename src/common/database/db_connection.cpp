@@ -22,6 +22,7 @@
 #include "app.h"
 #include "util.h"
 #include "staticinitializer.h"
+#include "settings.h"
 
 static QSqlDatabase* g_db = nullptr;
 
@@ -173,9 +174,9 @@ static void openAndPrepareSqliteDb()
 
 
 
-const QString& db_connection::getDatabaseDir(){
-    static const QString path = QStandardPaths::writableLocation(QStandardPaths::DataLocation);
-    return path;
+QString db_connection::getDatabaseDir(){
+    auto & sets = Settings::instance();
+    return sets.dataDir();
 }
 
 /// @return the created dir

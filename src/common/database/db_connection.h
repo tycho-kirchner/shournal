@@ -8,7 +8,7 @@ typedef std::shared_ptr<QSqlQueryThrow> QueryPtr;
 
 namespace db_connection {
 
-const QString &getDatabaseDir();
+QString getDatabaseDir();
 QString mkDbPath();
 
 void setupIfNeeded();
