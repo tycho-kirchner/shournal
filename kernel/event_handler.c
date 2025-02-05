@@ -22,7 +22,7 @@ struct task_entry {
      struct hlist_node node ;
      struct rcu_work destroy_rwork;
 } ;
-DEFINE_HASHTABLE(static task_table, 16);
+static DEFINE_HASHTABLE(task_table, 16);
 static struct kmem_cache * __task_entry_cache;
 
 static DEFINE_SPINLOCK(task_table_lock);
