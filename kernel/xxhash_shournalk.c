@@ -38,7 +38,13 @@
  * - xxHash source repository: https://github.com/Cyan4973/xxHash
  */
 
+// See commit 5f60d5f "move asm/unaligned.h to linux/unaligned.h"
+#if __has_include(<asm/unaligned.h>)
 #include <asm/unaligned.h>
+#else
+#include <linux/unaligned.h>
+#endif
+
 #include <linux/errno.h>
 #include <linux/compiler.h>
 #include <linux/kernel.h>
