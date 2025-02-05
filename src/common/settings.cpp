@@ -297,7 +297,7 @@ static void cleanExcludePaths(const std::shared_ptr<PathTree>& includePaths,
     cleanExcludePaths( {includePaths.get()}, excludePaths, sectionName);
 }
 
-void Settings::loadSections(){
+bool Settings::loadSections(const QVersionNumber& parsedCfgVersion){
     m_cfg.setInitialComments(qtr(
                                  "Configuration file for %1. Uncomment lines "
                                  "to change defaults. Multi-line-values (e.g. paths) "
@@ -316,17 +316,20 @@ void Settings::loadSections(){
                                  "as those are lost each time shournal is updated to "
                                  "a new version.").arg(app::SHOURNAL)
                              );
-    loadSectWrite();
-    loadSectRead();
+    bool updateNeeded = false;
+    updateNeeded |= loadSectWrite(parsedCfgVersion);
+    updateNeeded |= loadSectRead(parsedCfgVersion);
     loadSectScriptFiles();
     loadSectIgnoreCmd();
     loadSectMount();
     loadSectHash();
+    return updateNeeded;
 }
 
-void Settings::loadSectWrite()
+bool Settings::loadSectWrite(const QVersionNumber& parsedCfgVersion)
 {
     auto sectWriteEvents = m_cfg["File write-events"];
+    bool updateNeeded = false;
     sectWriteEvents->setComments(qtr(
                                      "Configure, which paths shall be observed for "
                                      "*write*-events. Put each desired path into "
@@ -344,9 +347,11 @@ void Settings::loadSectWrite()
 
     bool insertMaxEventCount;
     uint32_t maxEventCount;
-    if(m_parsedCfgVersion < QVersionNumber{2,4}){
+    if(parsedCfgVersion < QVersionNumber{2,4}){
         // Backwards compatibility: old versions did not impose
         // an event limit
+        updateNeeded = true;
+        logDebug << "updating cfg-file to" << QVersionNumber{2,4}.toString();
         insertMaxEventCount = true;
         maxEventCount = 0;
     } else {
@@ -358,13 +363,13 @@ void Settings::loadSectWrite()
     m_wSettings.maxEventCount = (m_wSettings.maxEventCount == 0) ?
                                     numeric_limits<uint64_t>::max() :
                                     m_wSettings.maxEventCount;
-
+    return updateNeeded;
 }
 
-void Settings::loadSectRead()
+bool Settings::loadSectRead(const QVersionNumber& parsedCfgVersion)
 {
     auto sectReadEvents  = m_cfg[SECT_READ_NAME];
-
+    bool updateNeeded = false;
     sectReadEvents->setComments(qtr(
                                    "Configure, which paths shall be observed for "
                                    "read- or exec-events. Put each desired path into "
@@ -386,9 +391,11 @@ void Settings::loadSectRead()
 
     bool insertMaxEventCount;
     uint32_t maxEventCount;
-    if(m_parsedCfgVersion < QVersionNumber{2,4}){
+    if(parsedCfgVersion < QVersionNumber{2,4}){
         // Backwards compatibility: older versions did not impose
         // an event limit
+        updateNeeded = true;
+        logDebug << "updating cfg-file to" << QVersionNumber{0,9}.toString();
         insertMaxEventCount = true;
         maxEventCount = 0;
     } else {
@@ -400,6 +407,7 @@ void Settings::loadSectRead()
     m_rSettings.maxEventCount = (m_rSettings.maxEventCount == 0) ?
                                     numeric_limits<uint64_t>::max() :
                                     m_rSettings.maxEventCount;
+    return updateNeeded;
 }
 
 void Settings::loadSectScriptFiles()
@@ -586,24 +594,28 @@ Settings::ReadVersionReturn Settings::readVersion(SafeFileUpdate& verUpd8)
 
 /// If cached cfg-version is newer than our app's version, throw,
 /// if it is older, migrate sections to new names.
-void Settings::handleUnequalVersions(Settings::ReadVersionReturn &readVerResult)
+/// @return: true, if an update was necessary, else false
+bool Settings::updateCfgScheme
+(const QVersionNumber& configSchemeVer, Settings::ReadVersionReturn &readVerResult)
 {
-    if(readVerResult.ver > app::version()){
+    if(readVerResult.ver == configSchemeVer){
+        return false;
+    }
+    if(readVerResult.ver > configSchemeVer){
          throw ExcCfg(qtr("The config-file version is greater than the "
-                          "application version. This most likely happens "
+                          "scheme version. This most likely happens "
                           "if running shournal's shell integration while "
                           "shournal was updated. In that case "
                           "simply exit the shell session and start it again. "
                           "Otherwise you might have "
                           "downgraded shournal and need to manually correct "
                           "the version-file at %1. "
-                          "Cached version is %2, current application version is %3")
+                          "Cached version is %2, current scheme version is %3")
                       .arg(readVerResult.verFilePath)
                       .arg(readVerResult.ver.toString())
-                      .arg(app::version().toString()));
+                      .arg(configSchemeVer.toString()));
     }
 
-    assert( readVerResult.ver < app::version() );
     if(readVerResult.ver < QVersionNumber{0,9}){
         logDebug << "updating cfg-file to" << QVersionNumber{0,9}.toString();
         m_cfg.renameParsedSection("Hash", "Hash for file write-events");
@@ -616,18 +628,20 @@ void Settings::handleUnequalVersions(Settings::ReadVersionReturn &readVerResult)
         m_cfg.renameParsedSection("File read-events", "File read-events storage settings");
         m_cfg.renameParsedSection("Hash for file write-events", "Hash");
     }
+    return true;
 }
 
 /// Store the config to disk. Note that this is only done for new versions,
 /// that's why the version file is also updated alongside.
-void Settings::storeCfg(SafeFileUpdate &cfgUpd8, SafeFileUpdate &verUpd8)
+void Settings::storeCfg
+(const QVersionNumber& configSchemeVer, SafeFileUpdate &cfgUpd8, SafeFileUpdate &verUpd8)
 {
     cfgUpd8.write([this, &cfgUpd8]{
         m_cfg.store(cfgUpd8.file());
     });
 
-    verUpd8.write([&verUpd8, &cfgUpd8]{
-        QTextStream(&verUpd8.file()) << app::version().toString();
+    verUpd8.write([&verUpd8, &cfgUpd8, &configSchemeVer]{
+        QTextStream(&verUpd8.file()) << configSchemeVer.toString();
 
         QFileInfo legacyVersionInfo(legacyCfgVersionFilePath());
         if(legacyVersionInfo.exists() && ! legacyVersionInfo.isSymLink()){
@@ -648,10 +662,10 @@ void Settings::storeCfg(SafeFileUpdate &cfgUpd8, SafeFileUpdate &verUpd8)
 /// Parse or create the configuration file at the system's config path
 /// (please perform QCoreApplication::setApplicationName() before).
 /// Another file at config dir provides the version. If the config file version is greater
-/// than app-version, throw, if smaller, update the version and possibly
+/// than out scheme version, throw, if smaller, update the version and possibly
 /// the config-file-scheme as well. Scheme updates
 /// for sections work by directly renaming the sections in loadSections() and
-/// by moving the old to new sections in handleUnequalVersions(). Note that
+/// by moving the old to new sections in updateCfgScheme(). Note that
 /// this also works in case of "redundant" scheme updates, where over multiple
 /// scheme versions the same section is renamed multiple times. Intermediate
 /// sections are created as necessary and potentially dropped/renamed again
@@ -673,20 +687,21 @@ void Settings::load()
         m_cfg.parse(cfgUpd8.file());
     });
 
+    // Until shournal v3.2 the config version was always set to the application version.
+    // This required a synchronized update of all machines sharing the same config dir.
+    // Therefore, only update the config version if a scheme update is necessary.
+    const auto configSchemeVer = QVersionNumber{3, 2};
+    auto parsedCfgVersion = configSchemeVer;
     SafeFileUpdate verUpd8(pathJoinFilename(cfgDir, QString(".config-version")));
     bool cfgVersionNeedsUpdate = false;
-    m_parsedCfgVersion = app::version() ;
     if(cfgFileExisted){
         // do we need a version update?
         auto readVerRet = readVersion(verUpd8);
-        if(readVerRet.ver != app::version()){
-            m_parsedCfgVersion = readVerRet.ver;
-            cfgVersionNeedsUpdate = true;
-            handleUnequalVersions(readVerRet);
-        }
+        cfgVersionNeedsUpdate = updateCfgScheme(configSchemeVer, readVerRet);
+        parsedCfgVersion = readVerRet.ver;
     }
     try {
-        loadSections();
+        cfgVersionNeedsUpdate |= loadSections(parsedCfgVersion);
 
         auto notReadKeys = m_cfg.generateNonReadSectionKeyPairs();
         if(! notReadKeys.isEmpty()){
@@ -695,10 +710,10 @@ void Settings::load()
                                *notReadKeys.first().second.begin()));
         }
         // Only write configuration to disk, if there was no such file
-        // or we are running a new version for the first time
+        // or we are using a new scheme for the first time
         if(! cfgFileExisted || cfgVersionNeedsUpdate){
             logDebug << "about to update config at" << cfgPath;
-            storeCfg(cfgUpd8, verUpd8);
+            storeCfg(configSchemeVer, cfgUpd8, verUpd8);
         }
     } catch(ExcCfg & ex) {
         ex.setDescrip(ex.descrip() + qtr(". The config file resides at %1").arg(cfgPath));

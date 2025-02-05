@@ -137,17 +137,18 @@ private:
 
     Settings() = default;
     void addIgnoreCmd(QString cmd, bool warnIfNotFound, const QString & ignoreCmdsSectName);
-    void loadSections();
-    void loadSectWrite();
-    void loadSectRead();
+    bool loadSections(const QVersionNumber& parsedCfgVersion);
+    bool loadSectWrite(const QVersionNumber& parsedCfgVersion);
+    bool loadSectRead(const QVersionNumber& parsedCfgVersion);
     void loadSectScriptFiles();
     void loadSectIgnoreCmd();
     void loadSectMount();
     void loadSectHash();
 
     ReadVersionReturn readVersion(SafeFileUpdate &verUpd8);
-    void handleUnequalVersions(ReadVersionReturn& readVerResult);
-    void storeCfg(SafeFileUpdate& cfgUpd8, SafeFileUpdate& verUpd8);
+    bool updateCfgScheme(const QVersionNumber&, ReadVersionReturn&);
+    void storeCfg(const QVersionNumber &configSchemeVer, SafeFileUpdate& cfgUpd8,
+                  SafeFileUpdate& verUpd8);
     std::shared_ptr<PathTree> loadPaths(qsimplecfg::Cfg::Section_Ptr& section,
               const QString& keyName, bool eraseSubpaths,
               const std::unordered_set<QString> & defaultValues,
@@ -165,7 +166,6 @@ private:
     StringSet m_ignoreCmdsRegardlessOfArgs;
     const QString m_userHome { QDir::homePath() };
     const QString m_workingDir { QDir::currentPath() };
-    QVersionNumber m_parsedCfgVersion;
     QString m_userCfgDir;
     QString m_userDataDir;
 
