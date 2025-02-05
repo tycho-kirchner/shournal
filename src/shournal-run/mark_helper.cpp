@@ -9,21 +9,11 @@
 #include "stdiocpp.h"
 #include "translation.h"
 #include "os.h"
+#include "logger.h"
 
 using std::unordered_map;
 using std::string;
 
-// To avoid unnecessary unloading of the kernel module shournalk
-// when a new version is installed,
-// define a compatibility map, where the key corresponds
-// to the "current" version and the value determines the *minimum*
-// required version.
-static const QHash<QVersionNumber, QVersionNumber> KVERSION_COMPATIBILITY_MAP = {
-    {QVersionNumber{2,9}, QVersionNumber{2,8}},
-    {QVersionNumber{3,0}, QVersionNumber{2,8}},
-    {QVersionNumber{3,1}, QVersionNumber{2,8}},
-    {QVersionNumber{3,2}, QVersionNumber{2,8}}
-};
 
 ExcShournalk::ExcShournalk(const QString &text) :
     QExcCommon(text, false)
@@ -73,15 +63,22 @@ ShournalkControl::ShournalkControl()
                            .arg(translation::strerror_l(errno)));
     }
     if(strcmp(SHOURNAL_VERSION, kversion.ver_str) != 0){
+        // Try to avoid unnecessary unloading of the kernel module shournalk
+        // when a new version is installed:
         auto kver = QVersionNumber::fromString(kversion.ver_str);
-        const auto & compatible_ver = KVERSION_COMPATIBILITY_MAP.find(app::version());
-        if(compatible_ver == KVERSION_COMPATIBILITY_MAP.end() ||
-                kver < compatible_ver.value()){
-            throw ExcShournalk(qtr("Version mismatch - %1 version is %2, but "
-                                   "%3 version is %4")
-                               .arg(app::SHOURNAL_RUN).arg(SHOURNAL_VERSION)
-                               .arg("kernel-module").arg(kversion.ver_str)
-                               );
+        const auto minVersion = QVersionNumber{2,8};
+        if(kver < minVersion){
+            throw ExcShournalk(qtr("Version mismatch - kernel-module version is %1, but "
+                                   "min. required version of %2 is %3")
+                               .arg(kversion.ver_str)
+                               .arg(app::SHOURNAL_RUN).arg(minVersion.toString()));
+        }
+        if(kver > app::version()){
+            logWarning <<qtr("The kernel-module (v%1) is newer than %2 (v%3). "
+                             "Continuing anyway...")
+                         .arg(kversion.ver_str)
+                         .arg(app::SHOURNAL_RUN).arg(app::version().toString());
+
         }
     }
 
