@@ -53,17 +53,21 @@ static void newSqliteDbIfNeeded(){
     });
 }
 
-// called in case database- and application version is different
-static void handleDifferentVersions(const QVersionNumber& dbVersion,
-                                    QSqlQueryThrow& query){
-    assert(dbVersion != app::version());
-
-    if(dbVersion > app::version()){
-        logWarning << qtr("The database version (%1) is higher than the application version (%2). "
-                          "Note that downgrades of the database "
-                          "are *not* supported, so things may go wrong. Please update shournal "
+static void updateDbScheme(QSqlQueryThrow& query){
+    const auto dbVersion = queryVersion(query);
+    // Until shournal v3.2 the database version was always set to the application version.
+    // This required a synchronized update of all machines sharing the same databse.
+    // Therefore, only update the database version if a scheme update is necessary.
+    auto latestSchemeVer = QVersionNumber{3, 2};
+    if(dbVersion == latestSchemeVer){
+        return;
+    }
+    if(dbVersion > latestSchemeVer){
+        logWarning << qtr("The database version (%1) is higher than the scheme version "
+                          "(%2). Note that downgrades of the database are *not* "
+                          "supported, so things may go wrong. Please update shournal "
                           "(on this machine).")
-                      .arg(dbVersion.toString()).arg(app::version().toString());
+                      .arg(dbVersion.toString()).arg(latestSchemeVer.toString());
         return;
     }
     // the version is smaller -> perform all necessary updates
@@ -93,7 +97,7 @@ static void handleDifferentVersions(const QVersionNumber& dbVersion,
     }
 
     query.prepare("replace into version (id, ver) values (1, ?)");
-    query.addBindValue(app::version().toString());
+    query.addBindValue(latestSchemeVer.toString());
     query.exec();
 
 }
@@ -126,10 +130,8 @@ createOrUpDateDb(QSqlQueryThrow &query, CFlock& lock){
                           .arg(db_connection::getDatabaseDir(), dbDir.errorString());
         }
     }
-    const auto dbVersion = queryVersion(query);
-    if(dbVersion != app::version()){
-        handleDifferentVersions(dbVersion, query);
-    }
+    updateDbScheme(query);
+
     query.commit();
     // outside of transaction (see above):
     // Allow for delete queries with cascades
