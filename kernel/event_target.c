@@ -31,10 +31,9 @@ static struct file* __get_check_target_file(int fd){
         goto err_cleanup_ret;
     }
 
-    // Important permission check! Otherwise we could
-    // overwrite any file user has read permission for.
-    if (file_inode(file)->i_opflags & O_RDONLY) {
-        pr_debug("target file only opened read only\n");
+    // We'll write to this file, so make sure we're allowed to
+    if (!(file->f_mode & FMODE_WRITE)) {
+        pr_debug("target file not writable\n");
         error_nb = -EPERM;
         goto err_cleanup_ret;
     }
@@ -77,12 +76,11 @@ static struct file* __get_check_pipe(int pipe_fd){
         goto err_cleanup_ret;
     }
 
-    // maybe_todo: check O_WRONLY?
-    // if (file_inode(file)->i_opflags & O_RDONLY) {
-    //     pr_devel("passed FIFO descriptor is not the write end\n");
-    //     error_nb = -EPERM;
-    //     goto err_cleanup_ret;
-    // }
+    if (!(orig_pipe->f_mode & FMODE_WRITE)) {
+        pr_debug("passed FIFO descriptor is not the write end\n");
+        error_nb = -EPERM;
+        goto err_cleanup_ret;
+    }
 
     // With CONFIG_PROVE_LOCKING, kernel v5.10.191 a spurious "BUG: Invalid wait context"
     // occurred. Apparently, during dentry_open, a mutex is locked, thus previous code
