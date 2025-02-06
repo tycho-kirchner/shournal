@@ -24,8 +24,6 @@ static struct file* __get_check_target_file(int fd){
     struct file* file;
     int error_nb = 0;
 
-    spin_lock(&current->files->file_lock);
-
     file = fget(fd);
     if (!file){
         pr_devel("fget failed on target file\n");
@@ -46,12 +44,10 @@ static struct file* __get_check_target_file(int fd){
         error_nb = -EBADFD;
         goto err_cleanup_ret;
     }
-    spin_unlock(&current->files->file_lock);
     return file;
 
 
 err_cleanup_ret:
-    spin_unlock(&current->files->file_lock);
     if(! IS_ERR_OR_NULL(file)){
         fput(file);
     }
@@ -68,8 +64,6 @@ static struct file* __get_check_pipe(int pipe_fd){
     struct file* orig_pipe = NULL;
     struct file* new_pipe = NULL;
     long error_nb = 0;
-
-    spin_lock(&current->files->file_lock);
 
     orig_pipe = fget(pipe_fd);
     if (!orig_pipe){
@@ -90,6 +84,11 @@ static struct file* __get_check_pipe(int pipe_fd){
     //     goto err_cleanup_ret;
     // }
 
+    // With CONFIG_PROVE_LOCKING, kernel v5.10.191 a spurious "BUG: Invalid wait context"
+    // occurred. Apparently, during dentry_open, a mutex is locked, thus previous code
+    // calling dentry_open inside spin_lock(&current->files->file_lock) was buggy. Let's
+    // remember this by calling:
+    might_sleep();
     // reopen in nonblocking mode
     new_pipe = dentry_open(&orig_pipe->f_path,
                            O_WRONLY | O_NONBLOCK,
@@ -102,14 +101,12 @@ static struct file* __get_check_pipe(int pipe_fd){
         error_nb = PTR_ERR(new_pipe);
         goto err_cleanup_ret;
     }
-    spin_unlock(&current->files->file_lock);
     fput(orig_pipe);
 
     return new_pipe;
 
 
 err_cleanup_ret:
-    spin_unlock(&current->files->file_lock);
     if(! IS_ERR_OR_NULL(orig_pipe)) fput(orig_pipe);
     if(! IS_ERR_OR_NULL(new_pipe)) fput(new_pipe);
 
