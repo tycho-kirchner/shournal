@@ -461,7 +461,8 @@ space.
 
 ## Overhead
 File tracing imposes a **runtime overhead**.
-A detailed performance evaluation may follow soon. For now:
+For a detailed performance evaluation please refer to our
+[paper](https://doi.org/10.1038/s41598-024-53811-9) . In brief:
 We measured the following command executions with shournal v2.9:
 * compile elfutils-0.176
 * git checkout — checkout the Linux kernel’s source code from v4.19 to v3.10.
