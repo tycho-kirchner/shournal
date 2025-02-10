@@ -15,16 +15,18 @@ shournalk-y += shournalk_main.o event_handler.o shournalk_sysfs.o \
                event_consumer_cache.o \
                xxhash_common.o \
 
-ifeq ($(shournal_cmake_build), true)
-$(info building kernel module from cmake)
-
-else
-# usually called by dkms but can also be used standalone
-
 PWD         := $(shell pwd)
 KVER        ?= $(shell uname -r)
 KBASE       ?= /lib/modules/$(KVER)
 KBUILD_DIR  ?= $(KBASE)/build
+
+ifeq ($(shournal_cmake_build), true)
+$(info building kernel module from cmake)
+all:
+	@$(MAKE) -C $(KBUILD_DIR) M=$(PWD) modules
+
+else
+# usually called by dkms but can also be used standalone
 
 no_strip    ?= false
 
