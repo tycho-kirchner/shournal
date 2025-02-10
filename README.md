@@ -42,6 +42,7 @@ may be answered within seconds:
   were used to create/modify or read from a certain file?
 * You executed a script. What was the script-content by the time it was called?
 * The command read a config-file - which one, and what was in it?
+* The command ran for a long time - can a re-execution be avoided (s. `--stat`)?
 * What other commands were executed during the same shell-session?
 * What about working directory, command start- and end-time or the
   exit status ($?) ?
@@ -110,6 +111,26 @@ Please note: below examples make use of the
   ...
   cmd-id 2 $?=0 2022-04-20 15:46 $ ./demo.sh
   ...
+  ~~~
+* Are input files up to date, such that re-execution of the command can be
+  avoided? Add `--stat` to the query, reporting current file statuses as
+  U (up to date), M (modified), N (not exist) ERROR (in case of an error) or NA
+  (not queried, only using json).
+  ~~~
+  $ cat foo > bar
+  $ shournal -q -wf bar --stat
+  cmd-id 1 $?=0 2025-02-10 11:38-11:38 $ cat foo > bar
+  ...
+  1 written file:
+     /home/tycho/bar (3 bytes) Hash: 15349503233279147316 U
+  1 read file:
+     /home/tycho/foo (3 bytes) Hash: 15349503233279147316 id 404002 U
+  ~~~
+  To query only for changed input files, execute
+  ~~~
+  shournal -q -wf bar --stat --output-format json | grep -F 'COMMAND:' | \
+    sed -n 's/COMMAND://p' | \
+    jq -r '.fileReadEvents | .[] | .status + " " + .path' | grep -v ^U
   ~~~
 * What commands were executed at the current working directory?
   ~~~
