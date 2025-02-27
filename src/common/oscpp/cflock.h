@@ -26,6 +26,7 @@ public:
 
 private:
     int m_fd;
-    bool m_isLocked;
+    bool m_isLockedSH{false};
+    bool m_isLockedEX{false};
 };
 
