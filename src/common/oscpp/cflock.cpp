@@ -50,31 +50,11 @@ CFlock::~CFlock()
 void CFlock::lockExclusive()
 {
     assert(checkFdFlockFlags(m_fd, LOCK_EX));
-    try {
-        os::flock(m_fd, LOCK_EX);
-    } catch (const os::ExcOs& ex) {
-        if(ex.errorNumber() != EDEADLK){
-            throw;
-        }
-        // EDEADLK is actually not a true flock error. However, on any non-ancient NFS,
-        // flock is implicitly converted to fcntl(2) byte-range locking. On
-        // openSUSE Leap 15.6, in scenarios with at least three concurrent lockers
-        // converting shared to exclusive locks, EDEADLK occurs frequently. While this
-        // might indicate a bug in NFS itself, work it around here anyway, by completely
-        // unlocking first.
-        bool prevIsLockedSH = m_isLockedSH;
-        unlock();
-        try {
-            os::flock(m_fd, LOCK_EX);
-        } catch (const os::ExcOs&) {
-            if(prevIsLockedSH){
-                std::cerr << "flock(LOCK_EX) failed the second time: " << ex.what()
-                          << ". Trying to re-gain the previous shared lock\n";
-                lockShared();
-            }
-            throw;
-        }
+    if(m_isLockedSH){
+        throw QExcProgramming("Due to NFS issues, upgrading shared to exclusive "
+                              "locks is not supported. Please unlock() first.");
     }
+    os::flock(m_fd, LOCK_EX);
     m_isLockedSH = false;
     m_isLockedEX = true;
 }

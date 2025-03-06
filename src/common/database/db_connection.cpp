@@ -110,6 +110,7 @@ createOrUpDateDb(QSqlQueryThrow &query, CFlock& lock){
     //  middle of a multi-statement transaction (when SQLite is not in autocommit mode)"
     // The scheme-updates require foreign_keys=OFF, so call below pragma:
     query.exec("PRAGMA foreign_keys=OFF");
+    lock.unlock();
     lock.lockExclusive();
     query.transaction();
 
