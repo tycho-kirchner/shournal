@@ -401,8 +401,13 @@ void Filewatcher_shournalk::run()
         stdiocpp::fseek(shournalk->tmpFileTarget(), 0, SEEK_SET);
         FileEvents fileEvents;
         fileEvents.setFile(shournalk->tmpFileTarget());
-        // Do not disturb other processes while we flush events to database
-        os::setpriority(PRIO_PROCESS, 0, PRIO_DATABASE_FLUSH);
+        try {
+            // Do not disturb other processes while we flush events to database
+            os::setpriority(PRIO_PROCESS, 0, PRIO_DATABASE_FLUSH);
+        } catch (const os::ExcOs&) {
+            // This may happen regularly, e.g. if priority was already lowered.
+            logDebug << "Failed to set priority before database flush";
+        }
         try {
             cmdInfo.idInDb = db_controller::addCommand(cmdInfo);
             db_controller::addFileEvents(cmdInfo, fileEvents);
