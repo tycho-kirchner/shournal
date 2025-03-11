@@ -53,12 +53,8 @@ static void newSqliteDbIfNeeded(){
     });
 }
 
-static void updateDbScheme(QSqlQueryThrow& query){
+static void updateDbScheme(QSqlQueryThrow& query, const QVersionNumber& latestSchemeVer){
     const auto dbVersion = queryVersion(query);
-    // Until shournal v3.2 the database version was always set to the application version.
-    // This required a synchronized update of all machines sharing the same databse.
-    // Therefore, only update the database version if a scheme update is necessary.
-    auto latestSchemeVer = QVersionNumber{3, 2};
     if(dbVersion == latestSchemeVer){
         return;
     }
@@ -103,14 +99,19 @@ static void updateDbScheme(QSqlQueryThrow& query){
 }
 
 static void
-createOrUpDateDb(QSqlQueryThrow &query, CFlock& lock){
+createOrUpDateDb(QSqlQueryThrow &query, const QVersionNumber& latestSchemeVer){
     logDebug << "about to lockExclusive database for scheme update...";
     // quoting sqlite.org/foreignkeys.html
     // "It is not possible to enable or disable foreign key constraints in the
     //  middle of a multi-statement transaction (when SQLite is not in autocommit mode)"
     // The scheme-updates require foreign_keys=OFF, so call below pragma:
     query.exec("PRAGMA foreign_keys=OFF");
-    lock.unlock();
+    QFileThrow lockfile(db_connection::getDatabaseDir() + "/.shournal-dblock");
+    lockfile.open(QFile::OpenModeFlag::ReadWrite);
+    // Lock exclusively on scheme update. Note that for some reason concurrent
+    // processes executing "PRAGMA locking_mode=EXCLUSIVE; BEGIN EXCLUSIVE;" deadlocked
+    // during integration tests, so be careful with that directive.
+    CFlock lock(lockfile.handle());
     lock.lockExclusive();
     query.transaction();
 
@@ -131,9 +132,10 @@ createOrUpDateDb(QSqlQueryThrow &query, CFlock& lock){
                           .arg(db_connection::getDatabaseDir(), dbDir.errorString());
         }
     }
-    updateDbScheme(query);
+    updateDbScheme(query, latestSchemeVer);
 
     query.commit();
+    lock.unlock();
     // outside of transaction (see above):
     // Allow for delete queries with cascades
     query.exec("PRAGMA foreign_keys=ON");
@@ -144,31 +146,27 @@ static void openAndPrepareSqliteDb()
 {
     const QString appDataLoc = db_connection::mkDbPath();
     const QString dbPath = appDataLoc + "/database.db";
-    QFileThrow lockfile(appDataLoc + "/.shournal-dblock");
-    lockfile.open(QFile::OpenModeFlag::ReadWrite);
-    // Lock to allow for concurrent database scheme updates. First, we lock shared,
-    // upgrading to exclusive on scheme update. Note that for some reason concurrent
-    // processes executing "PRAGMA locking_mode=EXCLUSIVE; BEGIN EXCLUSIVE;" deadlocked
-    // during integration tests, so be careful with that directive.
-    CFlock lock(lockfile.handle());
-    lock.lockShared();
     g_db->setDatabaseName(dbPath);
     if(! g_db->open()) {
         throw QExcDatabase(__func__, g_db->lastError());
     }
 
+    // Until shournal v3.2 the database version was always set to the application version.
+    // This required a synchronized update of all machines sharing the same database.
+    // Therefore, only update the database version if a scheme update is necessary.
+    auto latestSchemeVer = QVersionNumber{3, 2};
     QSqlQueryThrow query(*g_db);
     if(! versionTableExists(query)){
         logDebug << "version table did not exist yet..";
-        createOrUpDateDb(query, lock);
+        createOrUpDateDb(query, latestSchemeVer);
     } else {
         const auto dbVersion = queryVersion(query);
-        logDebug << "current db-version" << dbVersion.toString();
-        if(dbVersion != app::version()){
-            createOrUpDateDb(query, lock);
+        logDebug << "current db-version" << dbVersion.toString()
+                 << "latestSchemeVer" << latestSchemeVer.toString();
+        if(dbVersion != latestSchemeVer){
+            createOrUpDateDb(query, latestSchemeVer);
         }
     }
-    lock.unlock();
 
     // Allow for delete queries with cascades
     query.exec("PRAGMA foreign_keys=ON");
