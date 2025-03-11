@@ -3,6 +3,7 @@
 
 #include "cflock.h"
 #include "os.h"
+#include "osutil.h"
 
 #ifndef NDEBUG
 
@@ -31,6 +32,26 @@ static bool checkFdFlockFlags(int fd, int operation){
 
 #endif
 
+/// In order to catch further possible NFS idiosyncrasies (bugs?), better never lock
+/// blocking. See also e.g. shournal's commit 1918f88.
+static void doLockNB(int fd, int operation){
+    for(int i=0; ; i++){
+        try {
+            os::flock(fd, operation | LOCK_NB);
+            return;
+        } catch (const os::ExcOs& ex) {
+            if(ex.errorNumber() != EWOULDBLOCK){
+                throw;
+            }
+            if(i>9){
+                std::cerr << "doLockNB: gave up waiting for lock\n";
+                throw;
+            }
+            osutil::randomSleep(1 *1000, 3 *1000);
+        }
+    }
+}
+
 CFlock::CFlock(int fd) :
     m_fd(fd)
 {}
@@ -54,7 +75,7 @@ void CFlock::lockExclusive()
         throw QExcProgramming("Due to NFS issues, upgrading shared to exclusive "
                               "locks is not supported. Please unlock() first.");
     }
-    os::flock(m_fd, LOCK_EX);
+    doLockNB(m_fd, LOCK_EX);
     m_isLockedSH = false;
     m_isLockedEX = true;
 }
@@ -62,7 +83,7 @@ void CFlock::lockExclusive()
 void CFlock::lockShared()
 {
     assert(checkFdFlockFlags(m_fd, LOCK_SH));
-    os::flock(m_fd, LOCK_SH);
+    doLockNB(m_fd, LOCK_SH);
     m_isLockedEX = false;
     m_isLockedSH = true;
 }
