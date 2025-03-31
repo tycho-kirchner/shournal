@@ -64,6 +64,14 @@
   # or if using a Debian-based distribution, generate a .deb-package:
   cpack -G DEB
   ~~~
+* To also compile unit- and integration-tests, run cmake with
+  `-Dtest=ON` (debugging symbols via `-DCMAKE_BUILD_TYPE=Debug`). This generates
+  a `test/runTests` binary in the build dir. Without any arguments, it runs
+  unit-tests. Integrations-tests are, for instance, executed using:
+  ~~~
+  # SHOURNAL_BACKEND=fanotify|ko
+  SHOURNAL_BACKEND=fanotify test/runTests --integration --shell 'bash -i'
+  ~~~
 
 
 **After compile and install**: <br>
