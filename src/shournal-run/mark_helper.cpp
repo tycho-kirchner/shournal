@@ -3,6 +3,7 @@
 #include <sys/user.h>
 #include <QHash>
 #include <QVersionNumber>
+#include <unistd.h>
 
 #include "app.h"
 #include "shournalk_ctrl.h"
@@ -204,12 +205,13 @@ void ShournalkControl::markPaths(const Settings::StrLightSet& paths, int path_tp
 void ShournalkControl::markExtensions
 (const Settings::StrLightSet& extensions, int ext_type){
     StrLight extBuf;
-    extBuf.reserve(PAGE_SIZE);
+    const StrLight::size_type BUF_SIZE = 4096;
+    extBuf.reserve(BUF_SIZE);
     for(const auto & str : extensions){
         // add extensions to a single long string
         // separated by slash. Flush, if bigger
-        // than PAGE_SIZE (unlikely)
-        if(extBuf.size() + str.size() + 1 > PAGE_SIZE){
+        // than BUF_SIZE (unlikely)
+        if(extBuf.size() + str.size() + 1 > BUF_SIZE){
             doMarkExtensions(extBuf, ext_type);
         }
         extBuf += str + '/';
@@ -233,5 +235,3 @@ void ShournalkControl::doMarkExtensions
                            .arg(extensions.c_str()));
     }
 }
-
-
